@@ -13,7 +13,7 @@
 # limitations under the License.
 
 #
-# volume::delete
+# volume::add
 #
 
 # scan for available /dev/xvd* devices from dmesg
@@ -25,12 +25,6 @@ if node.platform =~ /windows/
   include_recipe "volume::windows_vol_add"
   return
 end
-
-package "lvm2"
-package "mdadm"
-
-include_recipe "shared::set_provider"
-
 storage = nil
 node.workorder.payLoad[:DependsOn].each do |dep|
   if dep["ciClassName"] =~ /Storage/
@@ -38,16 +32,45 @@ node.workorder.payLoad[:DependsOn].each do |dep|
     break
   end
 end
+include_recipe "shared::set_provider"
 
+size = node.workorder.rfcCi.ciAttributes["size"].gsub(/\s+/, "")
+
+storage_provider = node.storage_provider_class
+if (storage_provider =~ /azure/) && !storage.nil?        
+       dev_id=nil
+       device_maps = storage['ciAttributes']['device_map'].split(" ")
+       node.set[:device_maps] = device_maps
+       device_maps.each do |dev_vol|
+            dev_id = dev_vol.split(":")[4]
+          end
+       Chef::Log.info("executing lsblk #{dev_id}")
+       `lsblk #{dev_id}`
+       if $?.to_i != 0
+         Chef::Log.info("Device NOT attached, attaching the disk now ...")
+         include_recipe "azuredatadisk::attach" 
+       else
+         Chef::Log.info("Device is already attached")
+       end  
+ end
+ 
+package "lvm2"
+package "mdadm"
+
+
+storageUpdated = false
+if !storage.nil?
+   storageUpdated = storage.ciBaseAttributes.has_key?("size")
+end
 cloud_name = node[:workorder][:cloud][:ciName]
 newDevicesAttached = ""
 mode = "no-raid"
-vol_size =  node.workorder.rfcCi.ciAttributes[:size]
+
 Chef::Log.info("-------------------------------------------------------------")
-Chef::Log.info("Volume Size : "+vol_size )
+Chef::Log.info("Volume Size : "+size )
 Chef::Log.info("-------------------------------------------------------------")
 
-if node.workorder.rfcCi.ciAttributes[:size] == "-1"
+if size == "-1"
   Chef::Log.info("skipping because size = -1")
   return
 end
@@ -68,14 +91,8 @@ logical_name = node.workorder.rfcCi.ciName
 
 cloud_name = node[:workorder][:cloud][:ciName]
 token_class = node[:workorder][:services][:compute][cloud_name][:ciClassName].split(".").last.downcase
-include_recipe "shared::set_provider"
 
-storage_provider = node.storage_provider_class
-
-if node[:storage_provider_class] =~ /azure/ && !storage.nil?
-  include_recipe "azuredatadisk::attach_datadisk"
-end
-
+Chef::Log.info("storage_provider:#{storage_provider}")
 # need ruby block so package resource above run first
 ruby_block 'create-iscsi-volume-ruby-block' do
   block do
@@ -97,7 +114,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
           vols.push dev_id
           dev_list += dev_id+" "
         end
-      else
+      else        
         provider = node[:iaas_provider]
         storage_provider = node[:storage_provider]
 
@@ -127,7 +144,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
             case token_class
               when /ibm/
                 if vol.attached?
-                  Chef::Log.error("attached already, no way to determine device")
+                  exit_with_error "attached already, no way to determine device"
                   # mdadm sometime reassembles with _0
                   new_raid_device = `ls -1 #{raid_device}* 2>/dev/null`.chop
                   if new_raid_device.empty?
@@ -153,7 +170,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
                 end
 
                 if retry_count == max_retry_count
-                  Chef::Log.error("max retry count of "+max_retry_count.to_s+" hit ... device list: "+orig_device_list.inspect.gsub("\n"," "))
+                  exit_with_error("max retry count of "+max_retry_count.to_s+" hit ... device list: "+orig_device_list.inspect.gsub("\n"," "))
                   exit 1
                 end
 
@@ -180,16 +197,24 @@ ruby_block 'create-iscsi-volume-ruby-block' do
               when /openstack/
                 if vol.attachments != nil && vol.attachments.size > 0 &&
                     vol.attachments[0]["serverId"] == instance_id
-                  Chef::Log.error("attached already, no way to determine device")
+                  exit_with_error "attached already, no way to determine device"
                   # mdadm sometime reassembles with _0
                   new_raid_device = `ls -1 #{raid_device}* 2>/dev/null`.chop
-                  if new_raid_device.empty?
+		              non_raid_device  = `ls -1 /dev/#{platform_name}/#{node.workorder.rfcCi.ciName}* 2>/dev/null`.chop
+                  if new_raid_device.empty? && non_raid_device.empty?
+                    Chef::Log.warn("Cleanup Failed Attempt ")
+                    vol.detach instance_id, vol_id
                     exit 1
                   else
-                    raid_device = new_raid_device
-                    break
+                    if new_raid_device.empty?
+                      raid_device = non_raid_device
+                      no_raid_device = non_raid_device
+                    else
+                      raid_device = new_raid_device
+                      no_raid_device = new_raid_device
+                    end
+		          next
                   end
-
                 end
 
 
@@ -211,8 +236,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
                 end
 
                 if retry_count == max_retry_count
-                  Chef::Log.error("max retry count of "+max_retry_count.to_s+" hit ... device list: "+orig_device_list.inspect.gsub("\n"," "))
-                  exit 1
+                  exit_with_error("max retry count of "+max_retry_count.to_s+" hit ... device list: "+orig_device_list.inspect.gsub("\n"," "))
                 end
 
                 new_dev = nil
@@ -335,7 +359,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
       max_retry = 10
 
       if vols.size > 1 && mode != 'no-raid'
-
+        
         cmd = "yes |mdadm --create -l#{level} -n#{vols.size.to_s} --assume-clean --chunk=256 #{raid_device} #{dev_list} 2>&1"
         until ::File.exists?(raid_device) || has_created_raid || exec_count > max_retry do
           Chef::Log.info(raid_device+" being created with: "+cmd)
@@ -399,40 +423,44 @@ end
 ruby_block 'create-ephemeral-volume-on-azure-vm' do
   only_if { (storage.nil? && token_class =~ /azure/ && _fstype != 'tmpfs') }
   block do
-    initial_mountpoint = '/mnt/resource'
-
-    `mkdir /myScript`
-    `touch /myScript/lvmscript.sh`
+     initial_mountpoint = '/mnt/resource'
+     restore_script_dir = '/opt/oneops/azure-restore-ephemeral-mntpts'
+     script_fullpath_name = "#{restore_script_dir}/#{logical_name}.sh"
+    `mkdir #{restore_script_dir}`
+    `touch #{script_fullpath_name}`
 
     Chef::Log.info("unmounting #{initial_mountpoint}")
-    `echo "umount #{initial_mountpoint}" > /myScript/lvmscript.sh`
+    `echo "umount #{initial_mountpoint}" > #{script_fullpath_name}`
 
     ephemeralDevice = '/dev/sdb1'
-    `echo "pvcreate -f #{ephemeralDevice}" >> /myScript/lvmscript.sh`
-    `echo "vgcreate #{platform_name}-eph #{ephemeralDevice}" >> /myScript/lvmscript.sh`
+    `echo "pvcreate -f #{ephemeralDevice}" >> #{script_fullpath_name}`
+    `echo "vgcreate #{platform_name}-eph #{ephemeralDevice}" >> #{script_fullpath_name}`
 
-    size = node.workorder.rfcCi.ciAttributes["size"]
     l_switch = "-L"
     if size =~ /%/
       l_switch = "-l"
     end
-
-    `echo "lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}-eph" >> /myScript/lvmscript.sh`
-    `echo "if [ ! -d #{_mount_point}/lost+found ]" >> /myScript/lvmscript.sh`
-    `echo "then" >> /myScript/lvmscript.sh`
+    `echo ""yes" | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}-eph" >> #{script_fullpath_name}`
+    `echo "if [ ! -d #{_mount_point}/lost+found ]" >> #{script_fullpath_name}`
+    `echo "then" >> #{script_fullpath_name}`
     if node[:platform_family] == "rhel" && (node[:platform_version]).to_i >= 7
       # -f switch not valid in latest mkfs
-      `echo "mkfs -t #{_fstype} /dev/#{platform_name}-eph/#{logical_name}" >> /myScript/lvmscript.sh`
+      `echo "mkfs -t #{_fstype} /dev/#{platform_name}-eph/#{logical_name}" >> #{script_fullpath_name}`
     else
-      `echo "mkfs -t #{_fstype} -f /dev/#{platform_name}-eph/#{logical_name}" >> /myScript/lvmscript.sh`
+      `echo "mkfs -t #{_fstype} -f /dev/#{platform_name}-eph/#{logical_name}" >> #{script_fullpath_name}`
     end
-    `echo "fi" >> /myScript/lvmscript.sh`
-    `echo "mkdir #{_mount_point}" >> /myScript/lvmscript.sh`
-    `echo "mount /dev/#{platform_name}-eph/#{logical_name} #{_mount_point}" >> /myScript/lvmscript.sh`
-    `sudo chmod +x /myScript/lvmscript.sh`
-    `sudo echo "sh /myScript/lvmscript.sh" >> /etc/rc.local`
+    `echo "fi" >> #{script_fullpath_name}`
+    `echo "mkdir -p #{_mount_point}" >> #{script_fullpath_name}`
+    `echo "mount /dev/#{platform_name}-eph/#{logical_name} #{_mount_point}" >> #{script_fullpath_name}`
+    `sudo chmod +x #{script_fullpath_name}`
+     awk_cmd = "awk /#{logical_name}.sh/ /etc/rc.local | wc -l"   
+    `echo "count=\\$(#{awk_cmd})">> #{script_fullpath_name}` # Check whether script is already added to rc.local, add restore script if not present.
+    `echo "if [ \\$count == 0 ];then" >> #{script_fullpath_name}` 
+     `echo "sudo echo \\"sh #{script_fullpath_name}\\" >> \/etc\/rc.local" >> #{script_fullpath_name}`
+     `echo "fi" >> #{script_fullpath_name}`
     `sudo chmod +x /etc/rc.local`
-    `sudo sh /myScript/lvmscript.sh`
+     Chef::Log.info("executing #{script_fullpath_name} script")
+    `sudo sh "#{script_fullpath_name}"`
   end
 end
 
@@ -511,7 +539,6 @@ ruby_block 'create-ephemeral-volume-ruby-block' do
       Chef::Log.info("no ephemerals.")
     end
 
-    size = node.workorder.rfcCi.ciAttributes["size"]
     l_switch = "-L"
     if size =~ /%/
       l_switch = "-l"
@@ -523,12 +550,7 @@ ruby_block 'create-ephemeral-volume-ruby-block' do
       `lvdisplay /dev/#{platform_name}-eph/#{logical_name}`
       if $?.to_i != 0
         # pipe yes to agree to clear filesystem signature
-        cmd = "yes | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}-eph"
-        Chef::Log.info("running: #{cmd} ..."+`#{cmd}`)
-        if $? != 0
-          Chef::Log.error("error in lvcreate")
-          exit 1
-        end
+        execute_command("yes | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}-eph")
       end
 
     end
@@ -579,14 +601,16 @@ ruby_block 'create-storage-non-ephemeral-volume' do
     end
 
     if device_list != ""
-      # yes | and -ff needed sometimes
-      Chef::Log.info("vgcreate #{platform_name} #{device_list} ..."+`yes | vgcreate -ff #{platform_name} #{device_list}`)
+      if rfc_action != "update"
+        # yes | and -ff needed sometimes
+        Chef::Log.info("vgcreate #{platform_name} #{device_list} ..."+`yes | vgcreate -ff #{platform_name} #{device_list}`)
+      else
+        Chef::Log.info("vgextend #{platform_name} #{device_list} ..."+`yes | vgextend -ff #{platform_name} #{device_list}`)
+      end
     else
       Chef::Log.info("Volume Group Exists Already")
     end
 
-
-    size = node.workorder.rfcCi.ciAttributes["size"]
     l_switch = "-L"
     if size =~ /%/
       l_switch = "-l"
@@ -595,20 +619,12 @@ ruby_block 'create-storage-non-ephemeral-volume' do
     `lvdisplay /dev/#{platform_name}/#{logical_name}`
     if $?.to_i != 0
       # pipe yes to agree to clear filesystem signature
-      cmd = "yes | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}"
-      Chef::Log.info("running: #{cmd} ..."+`#{cmd}`)
-      if $? != 0
-        Chef::Log.error("error in lvcreate")
-        exit 1
-      end
+      execute_command("yes | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}")
     end
-
-    `vgchange -ay #{platform_name}`
-    if $? != 0
-      Chef::Log.error("Error in vgchange")
-      exit 1
+    if rfc_action == "update" && storageUpdated
+      execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}")
     end
-
+    execute_command("vgchange -ay #{platform_name}")
   end
 end
 
@@ -654,7 +670,21 @@ ruby_block 'filesystem' do
       Chef::Log.info("filesystem type: "+_fstype+" device: "+_device +" mount_point: "+_mount_point)
       # result attr updates cms
       Chef::Log.info("***RESULT:device="+_device)
-
+      if rfc_action == "update"
+        has_resized = false
+        if _fstype == "xfs"
+	        `xfs_growfs #{_mount_point}`
+	        Chef::Log.info("Extending the xfs filesystem" )
+	        has_resized = true
+	      elsif (_fstype == "ext4" || _fstype == "ext3") && File.exists?("/dev/#{platform_name}/#{logical_name}")
+          `resize2fs /dev/#{platform_name}/#{logical_name}`
+           Chef::Log.info("Extending the filesystem" )
+           has_resized = true
+        end
+        if has_resized && $? != 0
+          exit_with_error "Error in extending filesystem"
+        end
+      end
       `mountpoint -q #{_mount_point}`
       if $?.to_i == 0
         Chef::Log.info("device #{_mount_point} already mounted.")
@@ -673,25 +703,20 @@ ruby_block 'filesystem' do
         else
           cmd = "mkfs -t #{_fstype} -f #{_device}"
         end
-
-        Chef::Log.info(cmd+" ... "+`#{cmd}`)
+        execute_command("#{cmd}")
       end
 
       # in-line because of the ruby_block doesn't allow updated _device value passed to mount resource
       `mkdir -p #{_mount_point}`
-      cmd = "mount -t #{_fstype} -o #{_options} #{_device} #{_mount_point}"
-      result = `#{cmd}`
-      if result.to_i != 0
-        Chef::Log.error("mount error: #{result.to_s}")
-      end
+      execute_command("mount -t #{_fstype} -o #{_options} #{_device} #{_mount_point}")
 
       # clear and add to fstab again to make sure has current attrs on update
-      result = `grep -v #{_device} /etc/fstab > /tmp/fstab`
+      execute_command("grep -v #{_device} /etc/fstab > /tmp/fstab")
       ::File.open("/tmp/fstab","a") do |fstab|
         fstab.puts("#{_device} #{_mount_point} #{_fstype} #{_options} 1 1")
         Chef::Log.info("adding to fstab #{_device} #{_mount_point} #{_fstype} #{_options} 1 1")
       end
-      `mv /tmp/fstab /etc/fstab`
+      `mv /tmp/fstab /etc/fstab` 
 
       if token_class =~ /azure/
         `sudo mkdir /opt/oneops/workorder`
@@ -709,32 +734,24 @@ ruby_block 'ramdisk tmpfs' do
     `mount | grep #{_mount_point}`
     if $?.to_i == 0
       Chef::Log.info("device #{_device} for mount-point #{_mount_point} already mounted.Will unmount it.")
-      umount_res = `umount #{_mount_point}`
-      if umount_res.to_i != 0
-        Chef::Log.error("umount error: #{umount_res.to_s}")
-      end
+      execute_command("umount #{_mount_point}`")
     end
 
-    _size = node.workorder.rfcCi.ciAttributes["size"]
     if _options == nil || _options.empty?
       _options = "defaults"
     end
 
-    Chef::Log.info("mounting ramdisk :: filetype:#{_fstype} dir:#{_mount_point} device:#{_device} size:#{_size} options:#{_options}")
+    Chef::Log.info("mounting ramdisk :: filetype:#{_fstype} dir:#{_mount_point} device:#{_device} size:#{size} options:#{_options}")
 
     # Make directory if not existing
     `mkdir -p #{_mount_point}`
 
-    cmd = "mount -t #{_fstype} -o size=#{_size} #{_fstype} #{_mount_point}"
-    result = `#{cmd}`
-    if result.to_i != 0
-      Chef::Log.error("mount error: #{result.to_s}")
-    end
+    execute_command("mount -t #{_fstype} -o size=#{size} #{_fstype} #{_mount_point}")
 
     # clear existing mount_point and add to fstab again to ensure update attributes and to persist the ramdisk across reboots
-    result = `grep -v #{_mount_point} /etc/fstab > /tmp/fstab`
+    execute_command("grep -v #{_mount_point} /etc/fstab > /tmp/fstab")
     ::File.open("/tmp/fstab","a") do |fstab|
-      fstab.puts("#{_device} #{_mount_point} #{_fstype} #{_options},size=#{_size}")
+      fstab.puts("#{_device} #{_mount_point} #{_fstype} #{_options},size=#{size}")
       Chef::Log.info("adding to fstab #{_device} #{_mount_point} #{_fstype} #{_options}")
     end
     `mv /tmp/fstab /etc/fstab`

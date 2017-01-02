@@ -298,7 +298,9 @@ ruby_block 'setup bind and dhclient' do
     # but restart (and leave running) if dhclient is choice selected. and leave it down otherwise
     if attrs[:dhclient] == 'true'
       Chef::Log.info("starting: #{dhclient_cmdline}")
-      `#{dhclient_cmdline}`
+      output = `#{dhclient_cmdline}`
+      Chef::Log.info("returned: #{output} exitstatus: #{$?.exitstatus}")
+
     else
        Chef::Log.info("will not start dhclient because dhclient not desired")
     end

@@ -82,7 +82,7 @@ attribute 'webapp_install_dir',
 attribute 'tomcat_user',
           :description => "User",
           :format => {
-              :help => 'System user to use for the tomcat process (Note: if empty will default to os-specific tomcat or tomcat6)',
+              :help => 'System user to use for the tomcat process (Note: if empty will default to os-specific tomcat or tomcat version selected )',
               :category => '2.Server',
               :order => 1
           }
@@ -90,7 +90,7 @@ attribute 'tomcat_user',
 attribute 'tomcat_group',
           :description => "Group",
           :format => {
-              :help => 'System group to use for the tomcat process (Note: if empty will default to os-specific tomcat or tomcat6)',
+              :help => 'System group to use for the tomcat process (Note: if empty will default to os-specific tomcat or tomcat version selected )',
               :category => '2.Server',
               :order => 2
           }

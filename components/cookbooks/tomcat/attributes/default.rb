@@ -1,11 +1,12 @@
 # Tomcat
+tversion = "tomcat"+node[:tomcat][:version][0,1]
 default["tomcat"]["port"] = 8080
 default["tomcat"]["server_port"] = 8005
 default["tomcat"]["ssl_port"] = 8443
 default["tomcat"]["ajp_port"] = 8009
 default["tomcat"]["java_options"] = "-Djava.awt.headless=true"
 default["tomcat"]["use_security_manager"] = false
-default["tomcat"]["webapp_install_dir"] = '/var/lib/tomcat6/webapps'
+default["tomcat"]["webapp_install_dir"] = "/var/lib/#{tversion}/webapps"
 default["tomcat"]["stop_time"] = 45
 # Default thread pool configuration
 default['tomcat']['executor']['executor_name'] = 'tomcatThreadPool'
@@ -29,35 +30,35 @@ case platform
 when "centos","redhat","fedora"
   set["tomcat"]["user"] = "tomcat"
   set["tomcat"]["group"] = "tomcat"
-  set["tomcat"]["home"] = "/usr/share/tomcat6"
-  set["tomcat"]["base"] = "/usr/share/tomcat6"
-  set["tomcat"]["config_dir"] = "/etc/tomcat6"
-  set["tomcat"]["log_dir"] = "/var/log/tomcat6"
-  set["tomcat"]["tmp_dir"] = "/var/cache/tomcat6/temp"
-  set["tomcat"]["work_dir"] = "/var/cache/tomcat6/work"
+  set["tomcat"]["home"] = "/usr/share/#{tversion}"
+  set["tomcat"]["base"] = "/usr/share/#{tversion}"
+  set["tomcat"]["config_dir"] = "/etc/#{tversion}"
+  set["tomcat"]["log_dir"] = "/var/log/#{tversion}"
+  set["tomcat"]["tmp_dir"] = "/var/cache/#{tversion}/temp"
+  set["tomcat"]["work_dir"] = "/var/cache/#{tversion}/work"
   set["tomcat"]["context_dir"] = "#{tomcat["config_dir"]}/Catalina/localhost"
-  set["tomcat"]["webapp_dir"] = "/var/lib/tomcat6/webapps"
+  set["tomcat"]["webapp_dir"] = "/var/lib/#{tversion}/webapps"
 when "debian","ubuntu"
-  set["tomcat"]["user"] = "tomcat6"
-  set["tomcat"]["group"] = "tomcat6"
-  set["tomcat"]["home"] = "/usr/share/tomcat6"
-  set["tomcat"]["base"] = "/var/lib/tomcat6"
-  set["tomcat"]["config_dir"] = "/etc/tomcat6"
-  set["tomcat"]["log_dir"] = "/var/log/tomcat6"
-  set["tomcat"]["tmp_dir"] = "/tmp/tomcat6-tmp"
-  set["tomcat"]["work_dir"] = "/var/cache/tomcat6"
+  set["tomcat"]["user"] = "#{tversion}"
+  set["tomcat"]["group"] = "#{tversion}"
+  set["tomcat"]["home"] = "/usr/share/#{tversion}"
+  set["tomcat"]["base"] = "/var/lib/#{tversion}"
+  set["tomcat"]["config_dir"] = "/etc/#{tversion}"
+  set["tomcat"]["log_dir"] = "/var/log/#{tversion}"
+  set["tomcat"]["tmp_dir"] = "/tmp/#{tversion}-tmp"
+  set["tomcat"]["work_dir"] = "/var/cache/#{tversion}"
   set["tomcat"]["context_dir"] = "#{tomcat["config_dir"]}/Catalina/localhost"
-  set["tomcat"]["webapp_dir"] = "/var/lib/tomcat6/webapps"
+  set["tomcat"]["webapp_dir"] = "/var/lib/#{tversion}/webapps"
 else
-  set["tomcat"]["user"] = "tomcat6"
-  set["tomcat"]["group"] = "tomcat6"
-  set["tomcat"]["home"] = "/usr/share/tomcat6"
-  set["tomcat"]["base"] = "/var/lib/tomcat6"
-  set["tomcat"]["config_dir"] = "/etc/tomcat6"
-  set["tomcat"]["access_log_dir"] = "/var/log/tomcat6"
-  set["tomcat"]["log_dir"] = "/var/log/tomcat6"
-  set["tomcat"]["tmp_dir"] = "/tmp/tomcat6-tmp"
-  set["tomcat"]["work_dir"] = "/var/cache/tomcat6"
+  set["tomcat"]["user"] = "#{tversion}"
+  set["tomcat"]["group"] = "#{tversion}"
+  set["tomcat"]["home"] = "/usr/share/#{tversion}"
+  set["tomcat"]["base"] = "/var/lib/#{tversion}"
+  set["tomcat"]["config_dir"] = "/etc/#{tversion}"
+  set["tomcat"]["access_log_dir"] = "/var/log/#{tversion}"
+  set["tomcat"]["log_dir"] = "/var/log/#{tversion}"
+  set["tomcat"]["tmp_dir"] = "/tmp/#{tversion}-tmp"
+  set["tomcat"]["work_dir"] = "/var/cache/#{tversion}"
   set["tomcat"]["context_dir"] = "#{tomcat["config_dir"]}/Catalina/localhost"
-  set["tomcat"]["webapp_dir"] = "/var/lib/tomcat6/webapps"
+  set["tomcat"]["webapp_dir"] = "/var/lib/#{tversion}/webapps"
 end

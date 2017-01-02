@@ -12,4 +12,4 @@ master = lbs.first['ciAttributes']['dns_record']
 %>
 KUBE_MASTER="--master=<%= master %>:8080"
 
-KUBE_LOG_LEVEL="--v=<%= node.kubernetes.log_level %>
+KUBE_LOG_LEVEL="--v=<%= node.kubernetes.log_level %>"

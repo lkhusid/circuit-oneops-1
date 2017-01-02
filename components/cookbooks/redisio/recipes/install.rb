@@ -26,11 +26,21 @@ else
   include_recipe 'redisio::_install_prereqs'
   #  include_recipe 'build-essential::default'
 
-  redis = node['redisio']
-  location = "#{redis['mirror']}/#{redis['base_name']}#{redis['version']}.#{redis['artifact_type']}"
+tarball = "redis-#{node['redisio']['version']}.tar.gz"
+puts "#{tarball}"
 
-  redisio_install "redis-installation" do
-    version redis['version'] if redis['version']
+source_list = "#{node['redisio']['src_url']}"
+puts "#{source_list}"
+location = "#{source_list}/#{tarball}"
+puts "#{location}"
+
+
+redis = node['redisio']
+#location = "#{redis['mirror']}/#{redis['base_name']}#{redis['version']}.#{redis['artifact_type']}"
+
+redisio_install "redis-installation" do
+    #version redis['version'] if redis['version']
+    version node['redisio']['version'] if node['redisio']['version']
     download_url location
     safe_install redis['safe_install']
     install_dir redis['install_dir'] if redis['install_dir']

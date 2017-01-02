@@ -177,8 +177,8 @@ if (!depends_on.nil? && !depends_on.empty? && depends_on[0][:rfcAction] != "dele
 	include_recipe "javaservicewrapper::restart"
 else
 	service "tomcat" do
-  		service_name tomcat_version_name
-  		action [:enable]
+    service_name tom_ver
+  	action [:enable]
   end
   include_recipe "tomcat::restart"
 

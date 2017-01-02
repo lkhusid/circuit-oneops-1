@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# 
+#
 # gets tomcat metrics from manager/status xml api
 #
 
@@ -18,7 +18,7 @@ arg = ARGV[0]
 perf = nil
 
 <%
-# default tomcat6
+# default tomcat
 connector_name = "http-#{node.tomcat.port}"
 
 case node.tomcat.version
@@ -44,11 +44,11 @@ elsif arg == "ThreadInfo"
   maxThreads = threadInfo["maxThreads"]
   currentThreadCount = threadInfo["currentThreadCount"]
   percentBusy = (currentThreadsBusy.to_f/maxThreads.to_f)*100
-  # no max 
+  # no max
   if maxThreads == "-1"
     percentBusy = "0.0"
   end
-  
+
   perf = "currentThreadsBusy=#{currentThreadsBusy} maxThreads=#{maxThreads} currentThreadCount=#{currentThreadCount} percentBusy=#{percentBusy}"
 
 elsif arg == "JvmInfo"

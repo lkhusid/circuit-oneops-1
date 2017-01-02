@@ -22,11 +22,43 @@ include_recipe "compute::ssh_cmd_for_remote"
 # separate ssh commands due to lenth issues
 # will be removed when os is separated from compute component
 
+ostype = ''
+begin
+  ostype = node.workorder.payLoad.os[0].ciAttributes['ostype']
+rescue
+  begin
+    ostype = node.workorder.rfcCi.ciAttributes['ostype']
+  rescue
+    ostype = node.platform
+  end
+end
+
+
 ruby_block 'repair agent' do
   block do
     
     Chef::Resource::RubyBlock.send(:include, Chef::Mixin::ShellOut)
     
+    if ostype =~ /windows/
+      #resync time with ntp server
+      cmd = "net start w32time & w32tm /resync /force"
+      rc = shell_out("#{node.ssh_cmd} \"#{cmd}\"")
+      Chef::Log.debug("#{cmd} returned: #{rc.stdout}")
+	  rc.error!	  
+	  
+	  #Kill nagios and LSF, restart the services
+      [ {:process => 'nagios', :service => 'nagios'},
+        {:process => 'logstash-forwarder', :service => 'perf-agent'}].each do |a|
+  
+        cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./circuit-oneops-1/components/cookbooks/compute/files/default/service_hard_restart.ps1 -processName '#{a[:process]}' -serviceName '#{a[:service]}' "
+        rc = shell_out("#{node.ssh_cmd} \"#{cmd}\"")
+		Chef::Log.debug("#{cmd} returned: #{rc.stdout}")
+        rc.error!
+
+      end
+    
+	else	
+		
     nagios_reset_cmd = "sudo pkill -f '^/usr/sbin/nagios -d' ; sudo /sbin/service nagios restart"
     nagios_reset = shell_out("#{node.ssh_cmd} \"#{nagios_reset_cmd}\"")
     puts nagios_reset.stdout
@@ -134,6 +166,7 @@ ruby_block 'repair agent' do
     puts postfix_var_log.stdout
     postfix_var_log.error!
     run_context.include_recipe "compute::ssh_key_file_rm"
-  
+
+    end
   end
 end

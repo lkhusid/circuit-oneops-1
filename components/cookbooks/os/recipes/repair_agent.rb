@@ -1,6 +1,23 @@
 #
 # oo:repair_agent
 #
+ostype = node[:workorder][:rfcCi][:ciAttributes][:ostype]
+
+if ostype =~ /windows/
+  #resync time with ntp server
+  execute 'net start w32time & w32tm /resync /force'
+  
+  #Kill nagios and LSF, restart the services
+  [ {:process => 'nagios', :service => 'nagios'},
+    {:process => 'logstash-forwarder', :service => 'perf-agent'}].each do |a|
+	
+	powershell_script "hard-restart-#{a[:service]}" do
+	  code = "./circuit-oneops-1/components/cookbooks/compute/files/default/service_hard_restart.ps1 -processName '#{a[:process]}' -serviceName '#{a[:service]}' "
+	end
+  end
+
+  return
+end
 
 # repair nagios
 execute "pkill -f '^/usr/sbin/nagios -d' ; /sbin/service nagios restart"

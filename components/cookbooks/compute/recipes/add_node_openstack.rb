@@ -283,7 +283,6 @@ ruby_block 'create server' do
 
           if !availability_zone.empty?
             server_request[:availability_zone] = availability_zone
-            puts "***RESULT:availability_zone=#{availability_zone}"
           end
 
           if scheduler_hints.keys.size > 0
@@ -356,6 +355,7 @@ ruby_block 'create server' do
 
     end
 
+    puts "***RESULT:availability_zone=#{availability_zone}"
     Chef::Log.info("server: "+server.inspect.gsub("\n"," ").gsub("<","").gsub(">",""))
     puts "***RESULT:instance_id="+server.id
     hypervisor = server.os_ext_srv_attr_hypervisor_hostname || ""
@@ -548,6 +548,7 @@ ruby_block 'handle ssh port closed' do
       end
 
       Chef::Log.error("ssh port closed after 5min - fail")
+      puts "***FAULT:FATAL=ssh port closed after 5min"
       e = Exception.new("no backtrace")
       e.set_backtrace("")
       raise e

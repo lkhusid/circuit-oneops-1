@@ -26,6 +26,7 @@ attribute 'deployment_yaml',
 attribute 'variables',
   :description => "Variables in yaml",
   :data_type => "hash",
+  :default => '{}',
   :format => {
     :help => 'map of variable/string to replace (key) with value',
     :category => '1.Content',

@@ -4,7 +4,7 @@
 # Local modifications will be overwritten by Chef.
 #
 
-##Source the environment variables from oneOps 
+##Source the environment variables from oneOps
 
 if [ -f /etc/profile.d/oneops.sh ];then
   source /etc/profile.d/oneops.sh
@@ -13,12 +13,12 @@ fi
 
 # Directory where the Tomcat 6 binary distribution resides.  This a read-only
 # directory that can be shared by all Tomcat instances running on the machine.
-# Default: /usr/share/tomcat6
+# Default: /usr/share/TOMCAT
 CATALINA_HOME=<%= node["tomcat"]["home"] %>
 CATALINA_PID=<%= node["tomcat"]["home"] %>/tomcat.pid
 # Directory for per-instance configuration files and webapps. It contains the
 # directories conf, logs, webapps, work and temp. See RUNNING.txt for details.
-# Default: /var/lib/tomcat6
+# Default: /var/lib/TOMCAT
 CATALINA_BASE=<%= node["tomcat"]["base"] %>
 
 # You may pass JVM startup parameters to Java here. If unset, the default
@@ -52,5 +52,3 @@ export <%=k%>="<%=v%>"
 
 LOGFILES_PATH="<%= node["tomcat"]["logfiles_path"] %>"
 CATALINA_OUT="${LOGFILES_PATH}/catalina.out"
-
-

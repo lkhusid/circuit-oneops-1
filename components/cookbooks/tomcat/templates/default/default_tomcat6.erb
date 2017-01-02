@@ -5,46 +5,46 @@
 #
 
 # Run Tomcat as this user ID. Not setting this or leaving it blank will use the
-# default of tomcat6.
-<% 
+# default of TOMCAT.
+<%
 if node["tomcat"].has_key?("tomcat_user") && !node["tomcat"]["tomcat_user"].empty?
 %>
-TOMCAT6_USER=<%= node["tomcat"]["tomcat_user"] %>
-<% 
+TOMCAT_USER=<%= node["tomcat"]["tomcat_user"] %>
+<%
 else
 %>
-TOMCAT6_USER=<%= node["tomcat"]["user"] %>
+TOMCAT_USER=<%= node["tomcat"]["user"] %>
 <%
 end
 %>
 
 # Run Tomcat as this group ID. Not setting this or leaving it blank will use
-# the default of tomcat6.
-<% 
+# the default of TOMCAT.
+<%
 if node["tomcat"].has_key?("tomcat_group")  && !node["tomcat"]["tomcat_group"].empty?
 %>
-TOMCAT6_GROUP=<%= node["tomcat"]["tomcat_group"] %>
-<% 
+TOMCAT_GROUP=<%= node["tomcat"]["tomcat_group"] %>
+<%
 else
 %>
-TOMCAT6_GROUP=<%= node["tomcat"]["group"] %>
+TOMCAT_GROUP=<%= node["tomcat"]["group"] %>
 <%
 end
 %>
 
 # The home directory of the Java development kit (JDK). You need at least
-# JDK version 1.5. If JAVA_HOME is not set, some common directories for 
+# JDK version 1.5. If JAVA_HOME is not set, some common directories for
 # OpenJDK, the Sun JDK, and various J2SE 1.5 versions are tried.
 JAVA_HOME=<%= node["java"]["java_home"] %>
 
 # Directory where the Tomcat 6 binary distribution resides.  This a read-only
 # directory that can be shared by all Tomcat instances running on the machine.
-# Default: /usr/share/tomcat6
+# Default: /usr/share/TOMCAT
 CATALINA_HOME=<%= node["tomcat"]["home"] %>
 
 # Directory for per-instance configuration files and webapps. It contains the
 # directories conf, logs, webapps, work and temp. See RUNNING.txt for details.
-# Default: /var/lib/tomcat6
+# Default: /var/lib/TOMCAT
 CATALINA_BASE=<%= node["tomcat"]["base"] %>
 
 # You may pass JVM startup parameters to Java here. If unset, the default
@@ -55,8 +55,8 @@ JAVA_OPTS="<%= node["tomcat"]["java_options"] %>"
    JSON.parse(node["tomcat"]["system_properties"]).keys.size > 0
 %>
 <% system_props = JSON.parse(node["tomcat"]["system_properties"]).map{ |k,v| "-D#{k}=#{v} " } %>
-JAVA_OPTS="${JAVA_OPTS} <%= system_props %>" 
-<% end %>  
+JAVA_OPTS="${JAVA_OPTS} <%= system_props %>"
+<% end %>
 
 
 JAVA_OPTS="${JAVA_OPTS} -Xmx<%= node["tomcat"]["mem_max"] %>"
@@ -70,9 +70,9 @@ JAVA_OPTS="${JAVA_OPTS} <%= opts %>"
 #JSP_COMPILER=javac
 
 # Use the Java security manager? (yes/no, default: no)
-TOMCAT6_SECURITY=<%= node["tomcat"]["use_security_manager"] == 'true' ? "yes" : "no" %>
+TOMCAT_SECURITY=<%= node["tomcat"]["use_security_manager"] == 'true' ? "yes" : "no" %>
 
-# Number of days to keep logfiles in /var/log/tomcat6. Default is 14 days.
+# Number of days to keep logfiles in /var/log/TOMCAT. Default is 14 days.
 #LOGFILE_DAYS=14
 
 # Location of the JVM temporary directory

@@ -2,7 +2,7 @@
 # Cookbook Name:: tomcat
 # Recipe:: restart
 #
-tomcat_service_name = "tomcat"+node[:tomcat][:version][0,1]
+tomcat_service_name = tom_ver
 depends_on=node.workorder.payLoad.DependsOn.reject{ |d| d['ciClassName'] !~ /Javaservicewrapper/ }
 
 if (!depends_on.nil? && !depends_on.empty?)

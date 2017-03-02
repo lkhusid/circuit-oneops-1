@@ -68,7 +68,6 @@ end
 
 [ 'database' ].each do |from|
   relation "#{from}::depends_on::mysql",
-    :only => [ '_default', 'single' ],
     :relation_name => 'DependsOn',
     :from_resource => from,
     :to_resource   => 'mysql',

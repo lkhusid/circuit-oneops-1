@@ -92,6 +92,7 @@ resource "secgroup",
 
 # depends_on
 [{:from => 'user-app', :to => 'compute'},
+  {:from => 'user-app', :to => 'os'},
   {:from => 'volume', :to => 'user-app'},
   {:from => 'volume-log', :to => 'volume'},
   {:from => 'volume-log', :to => 'user-app'},

@@ -77,7 +77,7 @@ attribute 'flamegraph_dir',
 		:order => 1
 	}
 
-         
+
 attribute 'app_user',
 	:description => "App User to run Commands",
 	:required => 'required',
@@ -86,6 +86,6 @@ attribute 'app_user',
 		:help => 'App User',
 		:category => '3.AppUser',
 		:order => 1
-	}	
+	}
 
 recipe 'create_graphs', 'Create Graphs'

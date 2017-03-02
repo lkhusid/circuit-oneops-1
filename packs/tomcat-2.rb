@@ -109,7 +109,7 @@ resource "tomcat",
                          'CriticalLogException' => threshold('15m', 'avg', 'logtomcat_criticals', trigger('>=', 1, 15, 1), reset('<', 1, 15, 1)),
                        }
              }
-         }
+        }
 
 restart_artifact_command=  <<-"EOF"
 execute "rm -rf /opt/tomcat/webapps/$OO_LOCAL{deployContext}"
@@ -167,7 +167,7 @@ resource "artifact",
     :install_dir => '/opt/tomcat/$OO_LOCAL{artifactId}',
     :as_user => 'tomcat',
     :as_group => 'tomcat',
-    :should_expand => 'true',
+    :should_expand => 'false',
     :restart => restart_artifact_command
   },
   :monitors => {

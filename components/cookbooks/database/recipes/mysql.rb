@@ -6,27 +6,12 @@ if node.database.has_key?("extra")
   extra = node.database.extra
 end
 
-Chef::Log.info("Using database #{dbname} with user #{username}")
+`/usr/bin/mysql -u root -D #{dbname} -e status`
 
-bash "createdb" do
-  code <<-EOH
-    /usr/bin/mysql -u root -e 'CREATE DATABASE #{dbname};'
-  EOH
-  not_if "/usr/bin/mysql -u root -D #{dbname} -e status"
-end
+execute_command("/usr/bin/mysql -u root -e 'CREATE DATABASE #{dbname};'") if !$?.success?
 
-bash "createuser" do
-  code <<-EOH
-    /usr/bin/mysql -u root -e 'GRANT ALL PRIVILEGES ON #{dbname}.* TO "#{username}"@"%" IDENTIFIED BY "#{password}"; FLUSH PRIVILEGES;'
-  EOH
-end
+execute_command("/usr/bin/mysql -u root -e 'GRANT ALL PRIVILEGES ON #{dbname}.* TO \"#{username}\"@\"%\" IDENTIFIED BY \"#{password}\"; FLUSH PRIVILEGES;'")
 
-file "/tmp/#{dbname}_extra.sql" do
-  content "#{extra}"
-end
+execute_command("echo -e '#{extra}' > /tmp/#{dbname}_extra.sql")
 
-bash "run extra" do
-  code <<-EOH
-    /usr/bin/mysql -u root -D #{dbname} < /tmp/#{dbname}_extra.sql
-  EOH
-end
+execute_command("/usr/bin/mysql -u root -D #{dbname} < /tmp/#{dbname}_extra.sql")

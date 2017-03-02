@@ -1,14 +1,22 @@
 #
-# supports openstack keypair::add
+# openstack secgroup::add
 #
-require 'fog'
+require 'fog/openstack'
 
-# create if doesn't exist  
 # openstack doesnt like '.'
 node.set["secgroup_name"] = node.secgroup_name.gsub(".","-")
 description = node.workorder.rfcCi.ciAttributes[:description] || node.secgroup_name
 
-conn = node[:iaas_provider]
+cloud_name = node['workorder']['cloud']['ciName']
+cloud = node['workorder']['services']['compute'][cloud_name]['ciAttributes']
+      
+conn = Fog::Network.new({
+  :provider => 'OpenStack',
+  :openstack_api_key => cloud[:password],
+  :openstack_username => cloud[:username],
+  :openstack_tenant => cloud[:tenant],
+  :openstack_auth_url => cloud[:endpoint]
+})
 
 security_groups = conn.security_groups.all.select { |g| g.name == node.secgroup_name}
 
@@ -18,6 +26,8 @@ if security_groups.empty?
     sg = conn.security_groups.create({:name => node.secgroup_name, :description => description})
     Chef::Log.info("create secgroup: "+sg.inspect)
   rescue Excon::Errors::Error =>e
+    
+     puts "#{e}"
      msg=""
      case e.response[:body]
      when /\"code\": 400/
@@ -48,14 +58,41 @@ node.set[:secgroup][:group_id] = sg.id
 node.set[:secgroup][:group_name] = sg.name
  
 rules = JSON.parse(node.workorder.rfcCi.ciAttributes[:inbound])
+direction = 'ingress'
+
 rules.each do |rule|
   (min,max,protocol,cidr) = rule.split(" ")
-  check = sg.rules.select { |r| r['from_port'].to_i == min.to_i && r['to_port'].to_i == max.to_i && r['ip_protocol'] == protocol && r['ip_range']['cidr'] == cidr }
+  
+  check = sg.security_group_rules.select {
+    |r| (r.port_range_min.nil? && min == 'null' || r.port_range_min.to_s == min) && 
+        (r.port_range_max.nil? && max == 'null' || r.port_range_max.to_s == max) && 
+        r.protocol == protocol &&
+        r.remote_ip_prefix == cidr
+  }
+  
   if check.empty?
-    begin
-      Chef::Log.info("rule create: #{rule}")
-      sg.create_security_group_rule(min.to_i,max.to_i,protocol,cidr)
+    begin      
+      sg_rule = {
+        :security_group_id => sg.id,
+        :direction => direction,
+        :remote_ip_prefix => cidr,
+        :protocol => protocol        
+      }
+      
+      if min != 'null'
+        sg_rule[:port_range_min] = min.to_i
+      end
+      if max != 'null'
+        sg_rule[:port_range_max] = max.to_i
+      end
+      
+      Chef::Log.info("rule create: #{sg_rule}")  
+      sg.security_group_rules.create(sg_rule)
+      
     rescue Exception => e
+      
+      puts "exception: #{e}"
+      
       if e.message =~ /already exists/
         Chef::Log.info("rule exists: #{rule}")
       elsif e.response[:body]  =~ /Invalid|Not enough parameters|not a valid ip network/
@@ -82,24 +119,27 @@ rules.each do |rule|
   end
 end  
 
-#collect existing rules to be deleted which are not in the work-order
+# rm rules not configured
 del_rules = []
 is_del = true
-sg.rules.each do |r|
+sg.security_group_rules.each do |r|
+  next if r.direction == 'egress'
   rules.each do |wo_rule|
     (min,max,protocol,cidr) = wo_rule.split(" ")
-    if((r['from_port'].to_i == min.to_i && r['to_port'].to_i == max.to_i && r['ip_protocol'] == protocol && r['ip_range']['cidr'] == cidr)) 
+    if (r.port_range_min.nil? && min == 'null' || r.port_range_min.to_s == min) && 
+       (r.port_range_max.nil? && max == 'null' || r.port_range_max.to_s == max) && 
+       r.protocol == protocol && 
+       r.remote_ip_prefix == cidr
+          
       is_del = false
       break
     end    
   end  
-  is_del ? del_rules.push(r) : Chef::Log.info("rule #{r['id']} exists in work-order")
-  # reset the boolean flag
+  is_del ? del_rules.push(r) : Chef::Log.info("rule #{r.id} exists in workorder")
   is_del = true
 end
 
-#delete rules
 del_rules.each do |dr|
   Chef::Log.info("*****deleting rule****** #{dr.inspect}")
-  sg.delete_security_group_rule(dr['id'])
+  dr.destroy
 end

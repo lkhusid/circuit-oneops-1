@@ -33,6 +33,7 @@ module OO
       def verbs=(values)
         @web_administration.writable_section_for(SECTION) do |section|
           collection = section.ChildElements.Item("Verbs").Collection
+          collection.Clear
           values.each do |name, enable|
             collection.AddElement(new_verb_type_element(collection, name, enable))
           end

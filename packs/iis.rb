@@ -3,7 +3,7 @@ include_pack "genericlb"
 name "iis"
 description "Internet Information Services(IIS)"
 type "Platform"
-category "Web Server"
+category "Web Application"
 
 environment "single", {}
 environment "redundant", {}
@@ -28,6 +28,9 @@ variable "drive_name",
   :description => 'drive name',
   :value       => 'E'
 
+resource "compute",
+         :attributes => {"size" => "M-WIN"}
+
 resource "iis-website",
   :cookbook     => "oneops.1.iis-website",
   :design       => true,
@@ -36,9 +39,10 @@ resource "iis-website",
     :help       => "Installs/Configure IIS"
   },
   :attributes   => {
-    "site_name"     => '',
-    "app_pool_name" => '',
-    "physical_path" => '$OO_LOCAL{app_directory}'
+    "physical_path" => '$OO_LOCAL{app_directory}',
+    "log_file_directory" => '$OO_LOCAL{log_directory}',
+    "dc_file_directory" => '$OO_LOCAL{log_directory}\\IISTemporaryCompressedFiles',
+    "sc_file_directory" => '$OO_LOCAL{log_directory}\\IISTemporaryCompressedFiles'
   }
 
 resource "dotnetframework",
@@ -60,7 +64,7 @@ nuget = '$OO_LOCAL{nuget_exe}'
 package_name = node.artifact.repository
 depends_on = node.workorder.payLoad.DependsOn.select {|c| c[:ciClassName] =~ /website/ }
 physical_path = depends_on.first[:ciAttributes][:physical_path]
-site_name = depends_on.first[:ciAttributes][:site_name]
+site_name = node.workorder.box.ciName
 package_physical_path = ::File.join(physical_path, package_name)
 website_physical_path = ::File.join(physical_path, site_name)
 
@@ -83,6 +87,47 @@ end
 
 
 EOF
+
+chocolatey_package_configure_cmd=  <<-"EOF"
+
+package_name = node.artifact.repository
+file_extension = File.extname(node.artifact.location)
+uri = URI.parse(node.artifact.location)
+file_name = File.basename(uri.path)
+file_physical_path = ::File.join(artifact_cache_version_path, file_name)
+
+if file_extension != 'nupkg' and File.exist?(file_physical_path)
+ package_location = ::File.join(artifact_cache_version_path, "#\{package_name\}.nupkg")
+ ::File.rename(file_physical_path,package_location)
+end
+
+chocolatey_package package_name do
+  source artifact_cache_version_path
+  options "--ignore-package-exit-codes=3010"
+  action :install
+end
+
+EOF
+
+resource "chocolatey-package",
+  :cookbook      => "oneops.1.artifact",
+  :design        => true,
+  :requires      => {
+    :constraint  => "0..*",
+    :help        => "Installs chocolatey package"
+  },
+  :attributes       => {
+     :repository    => '',
+     :location      => '',
+     :install_dir   => '$OO_LOCAL{platform_deployment}',
+     :as_user       => 'oneops',
+     :as_group      => 'oneops',
+     :should_expand => 'false',
+     :configure     => chocolatey_package_configure_cmd,
+     :migrate       => '',
+     :restart       => ''
+}
+
 
 resource "nuget-package",
   :cookbook      => "oneops.1.artifact",
@@ -143,6 +188,7 @@ resource "volume",
 
 [ { :from => 'iis-website', :to => 'dotnetframework' },
   { :from => 'dotnetframework', :to => 'os' },
+  { :from => 'chocolatey-package', :to => 'volume' },
   { :from => 'nuget-package', :to => 'iis-website' } ].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",
     :relation_name => 'DependsOn',
@@ -151,7 +197,13 @@ resource "volume",
     :attributes    => { "flex" => false, "min" => 1, "max" => 1 }
 end
 
-[ 'iis-website', 'nuget-package', 'dotnetframework', 'volume', 'os' ].each do |from|
+relation "iis-website::depends_on::certificate",
+  :relation_name => 'DependsOn',
+  :from_resource => 'iis-website',
+  :to_resource => 'certificate',
+  :attributes => {"propagate_to" => "from", "flex" => false, "min" => 1, "max" => 1}
+
+[ 'iis-website', 'nuget-package', 'dotnetframework', 'chocolatey-package' , 'volume', 'os' ].each do |from|
   relation "#{from}::managed_via::compute",
     :except => [ '_default' ],
     :relation_name => 'ManagedVia',

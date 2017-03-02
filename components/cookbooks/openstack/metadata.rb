@@ -80,6 +80,16 @@ attribute 'subnet',
     :order => 3
   }
 
+attribute 'enabled_networks',
+  :description => "Enabled Networks",
+  :data_type => "array",
+  :default => '[]',
+  :format => {
+    :help => 'Enabled Network List is optional for placement of compute instances',
+    :category => '2.Placement',
+    :order => 4
+  }  
+  
 attribute 'public_network_type',
   :description => "Public Network Type",
   :default => "flat",

@@ -62,6 +62,10 @@ module OO
             protocol_value = bindings_collection.Item(i).GetPropertyByName('protocol').Value
             binding_information_value = bindings_collection.Item(i).GetPropertyByName('bindingInformation').Value
             bindings = [{'protocol' => "#{protocol_value}", 'binding_information' => "#{binding_information_value}"}]
+            if protocol_value == 'https'
+              certificate_hash = bindings_collection.Item(i).GetPropertyByName('certificateHash').Value
+              update_attributes["certificate_hash"] = attributes["certificate_hash"] if certificate_hash.downcase != attributes["certificate_hash"].downcase
+            end
           end
 
           new_bindings = attributes["bindings"]
@@ -99,6 +103,9 @@ module OO
             binding_element.Properties.Item("protocol").Value = site_binding["protocol"]
             binding_element.Properties.Item("bindingInformation").Value = site_binding["binding_information"]
             bindings_collection.AddElement(binding_element)
+            if site_binding["protocol"] == 'https' && !attributes["certificate_hash"].empty?
+              add_ssl_certificate(binding_element, attributes)
+            end
           end
           site_collection = site_element.Collection
           application_element = site_collection.CreateNewElement("application")
@@ -130,6 +137,9 @@ module OO
               binding_element.Properties.Item("protocol").Value = site_binding["protocol"]
               binding_element.Properties.Item("bindingInformation").Value = site_binding["binding_information"]
               bindings_collection.AddElement(binding_element)
+              if site_binding["protocol"] == 'https' && !attributes["certificate_hash"].empty?
+                add_ssl_certificate(binding_element, attributes)
+              end
             end
           end
           applications = site.Collection
@@ -147,8 +157,11 @@ module OO
         reload
       end
 
-      def assign_site_properties(site, attributes)
-
+      def add_ssl_certificate(binding_element, attributes)
+        method_instance = binding_element.Methods.Item("AddSslCertificate").CreateInstance()
+        method_instance.Input.Properties.Item("certificateHash").Value = attributes["certificate_hash"]
+        method_instance.Input.Properties.Item("certificateStoreName").Value = attributes["certificate_store_name"];
+        method_instance.Execute()
       end
 
     end

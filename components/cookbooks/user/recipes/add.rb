@@ -1,52 +1,107 @@
-if node.platform =~ /windows/
-  include_recipe "user::windows_user_add"
-  return
+require 'securerandom'
+
+username = node[:user][:username]
+if node['platform'] =~ /windows/
+  home_dir = "C:/Cygwin64/home/#{username}" 
+  group_primary = 'Administrators'
+else
+  Chef::Log.info("Stopping the nslcd service")
+  `sudo killall -9  /usr/sbin/nslcd`
+  home_dir = node[:user][:home_directory]  
+  group_primary = username
 end
 
-home_dir = node[:user][:home_directory]
-node.set[:user][:home] = home_dir && !home_dir.empty? ? home_dir : "/home/#{node[:user][:username]}"
+node.set[:user][:home] = home_dir && !home_dir.empty? ? home_dir : "/home/#{username}"
 
-Chef::Log.info("Stopping the nslcd service")
-`sudo killall -9  /usr/sbin/nslcd`
+#Generate random password if needed
+password = node[:user][:password]
+if password.nil? || password.size == 0
+  password = SecureRandom.urlsafe_base64(14)
+end
 
-user "#{node[:user][:username]}" do
+user username do
+  #Common attributes
   comment node[:user][:description]
-  supports :manage_home => true
+  manage_home true
   home node[:user][:home]
-  if node[:user][:system_user] == 'true'
-    system true
-    shell '/bin/false'
-  else
-    shell node[:user][:login_shell] unless node[:user][:login_shell].empty?
+  
+  if node['platform'] =~ /windows/ 
+    #Windows-specific attributes
+    action :create
+	password password
+  else	
+    #Non-Windows specific attributes
+    if node[:user][:system_user] == 'true'
+      system true
+      shell '/bin/false'
+    else
+      shell node[:user][:login_shell] unless node[:user][:login_shell].empty?
+    end
+  
+	if node['etc']['passwd'][username]
+      action :modify
+    else
+      action :create
+    end
+  end #if node['platform'] =~ /windows/ 
+end
+
+#Manage group membership
+groups = JSON.parse(node[:user][:group])
+groups |= [group_primary]
+
+groups.each do |g|
+  group g do
+    action :create
+    members [username]
+    if node['platform'] =~ /windows/ 
+	  append true
+	end
   end
 end
 
-group "#{node[:user][:username]}"
-
-
-username = node[:user][:username]
+#Home and .ssh directories
+if node[:user].has_key?("home_directory_mode")
+  home_mode = node[:user][:home_directory_mode]
+else
+  home_mode = 0700
+end
 
 directory "#{node[:user][:home]}" do
-  owner node[:user][:username]
-  group node[:user][:username]
+  owner username
+  group group_primary
+  mode home_mode
+  if node['platform'] =~ /windows/
+    rights :full_control, 'oneops'
+	inherits false
+  end
 end
 
 directory "#{node[:user][:home]}/.ssh" do
-  owner node[:user][:username]
-  group node[:user][:username]
+  owner username
+  group group_primary
   mode 0700
+  if node['platform'] =~ /windows/
+    rights :full_control, 'oneops'
+	inherits false
+  end  
 end
 
-if node[:user].has_key?("home_directory_mode")
-  execute "chmod #{node[:user][:home_directory_mode]} #{node[:user][:home]}"
-end
-
+#SSH keys
 file "#{node[:user][:home]}/.ssh/authorized_keys" do
   owner node[:user][:username]
-  group node[:user][:username]
+  group group_primary
   mode 0600
   content JSON.parse(node[:user][:authorized_keys]).join("\n")
+  if node['platform'] =~ /windows/
+    rights :full_control, 'oneops'
+	inherits false
+  end
 end
+
+#The rest of attributes are Linux specific
+return if node['platform'] =~ /windows/
+
 
 if node[:user][:sudoer] == 'true'
   Chef::Log.info("adding #{username} to sudoers.d")

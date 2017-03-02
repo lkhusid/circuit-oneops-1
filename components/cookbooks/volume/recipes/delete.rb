@@ -23,12 +23,11 @@ if node.platform =~ /windows/
 end
 
 has_mounted = false
-
 cloud_name = node[:workorder][:cloud][:ciName]
 provider_class = node[:workorder][:services][:compute][cloud_name][:ciClassName].split(".").last.downcase
 Chef::Log.info("provider: #{provider_class}")
-
 rfcAttrs = node.workorder.rfcCi.ciAttributes
+
 if rfcAttrs.has_key?("mount_point") &&
    !rfcAttrs["mount_point"].empty?
 
@@ -39,11 +38,8 @@ if rfcAttrs.has_key?("mount_point") &&
     level :info
   end
 
-
   `grep #{mount_point} /etc/mtab`
-  if $? == 0
-    has_mounted = true
-  end
+  has_mounted = true if $? == 0
 
   case node[:platform]
   when "centos","redhat","fedora","suse"
@@ -56,71 +52,55 @@ if rfcAttrs.has_key?("mount_point") &&
   end
   cloud_name = node[:workorder][:cloud][:ciName]
   provider_class = node[:workorder][:services][:compute][cloud_name][:ciClassName].split(".").last.downcase
-
   Chef::Log.info("provider: #{provider_class}")
 
 # clear the tmpfs ramdisk entries and/or volume entries from /etc/fstab
  if(rfcAttrs["fstype"] == "tmpfs") || provider_class =~ /azure/ || provider_class =~ /cinder/
     Chef::Log.info("clearing /etc/fstab entry for fstype tmpfs")
-    result = `grep -v #{mount_point} /etc/fstab > /tmp/fstab`
+    `grep -v #{mount_point} /etc/fstab > /tmp/fstab`
     `mv /tmp/fstab /etc/fstab`
-     logical_name = node.workorder.rfcCi.ciName
-    `rm -rf "/opt/oneops/azure-restore-ephemeral-mntpts/#{logical_name}.sh"`    
-    #remove the script from rc.local on volume delete
+    logical_name = node.workorder.rfcCi.ciName
+    `rm -rf '/opt/oneops/azure-restore-ephemeral-mntpts/#{logical_name}.sh'`
     `cp /etc/rc.local tmpfile;sed -e "/\\/opt\\/oneops\\/azure-restore-ephemeral-mntpts\\/#{logical_name}.sh/d" tmpfile > /etc/rc.local;rm -rf tmpfile`
   end
 end
-
 
 ruby_block 'lvremove ephemeral' do
   block do  
     platform_name = node.workorder.box.ciName
     if ::File.exists?("/dev/#{platform_name}-eph/#{node.workorder.rfcCi.ciName}")
-      cmd = "lvremove -f #{platform_name}-eph/#{node.workorder.rfcCi.ciName}"
-      Chef::Log.info("running: #{cmd} ...")
-      out = `#{cmd}`
-      `sudo rm -rf #{mount_point}`
-      if $? != 0
-        Chef::Log.error("error in lvremove: #{out}")
-        exit 1
-      end
+      `lvremove -f #{platform_name}-eph/#{node.workorder.rfcCi.ciName}`
+      execute_command("sudo rm -rf #{mount_point}")
     end
    end
 end
 
-
 supported = true
-
-
 if provider_class =~ /virtualbox|vagrant|docker/
   Chef::Log.info(" virtual box vagrant and docker don't support iscsi/ebs via api yet - skipping")
   supported = false
 end
-
 storage = nil
-node.workorder.payLoad.DependsOn.each do |dep|
-  if dep["ciClassName"] =~ /Storage/
-    storage = dep
-    break
+if node.workorder.payLoad.has_key?('DependsOn')
+  node.workorder.payLoad.DependsOn.each do |dep|
+    if dep["ciClassName"] =~ /Storage/
+      storage = dep
+      break
+    end
   end
 end
 if storage == nil
   Chef::Log.info("no DependsOn Storage.")
 end
-
-
 include_recipe "shared::set_provider"
 
 ruby_block 'lvremove storage' do
   block do
-    
     unless storage.nil? 
         
       platform_name = node.workorder.box.ciName
       Chef::Log.info("provider_class: #{provider_class}")
-      cmd = "lvremove -f #{platform_name}"
-      Chef::Log.info("running: #{cmd}...")
-      out = `#{cmd}`
+      `lvremove -f #{platform_name}`
       
       raid_device = "/dev/md/"+ node.workorder.rfcCi.ciName
       retry_count = 0
@@ -138,19 +118,15 @@ ruby_block 'lvremove storage' do
             sleep 10
           end
         end
-    
         if ::File.exists?(raid_device)
-          Chef::Log.error("raid device still exists after many mdadm --stop "+raid_device)
-          exit 1
+          exit_with_error "raid device still exists after many mdadm --stop #{raid_device}"
         end
       end
         
       provider = node.iaas_provider
       storage_provider = node.storage_provider
-    
       instance_id = node.workorder.payLoad.ManagedVia[0]["ciAttributes"]["instance_id"]
       Chef::Log.info("instance_id: "+instance_id)
-
       device_maps = storage['ciAttributes']['device_map'].split(" ")
 
       change_count = 1
@@ -244,7 +220,7 @@ ruby_block 'lvremove storage' do
               Chef::Log.info( "volume available.")
             end
           rescue  => e
-            Chef::Log.error("exception: "+e.message + "\n" + e.backtrace.inspect)
+            exit_with_error("#{e.message}" +"\n"+ "#{e.backtrace.inspect}")
           end
         end
     
@@ -258,6 +234,5 @@ ruby_block 'lvremove storage' do
       end
   
     end
-
   end
 end

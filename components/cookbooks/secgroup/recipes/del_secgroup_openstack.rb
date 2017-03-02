@@ -58,12 +58,22 @@ ruby_block 'remove security groups' do
       begin
         sg.destroy
         Chef::Log.info("deleted secgroup: #{node.secgroup.group_name} #{node.secgroup.group_id}")
-      rescue Excon::Errors::Error => e
-        case e.response[:body]
-        when /\"code\":400/
-          msg = e.message
-          puts "***FAULT:FATAL= #{msg}"
+      rescue Excon::Error => e                
+        bad_request = JSON.parse(e.response[:body])['badRequest']
+          
+        if bad_request.has_key?('code') && bad_request['code'] == 400
+          msg = bad_request['message']
+        else
+          msg = e.response[:body]
         end
+        puts "***FAULT:FATAL=#{msg}"
+        e.set_backtrace("")
+        raise e, msg
+      rescue Exception => e      
+        puts "***FAULT:FATAL=#{e.message}"
+        e.set_backtrace("")
+        raise e, msg
+           
       end 
     end
     

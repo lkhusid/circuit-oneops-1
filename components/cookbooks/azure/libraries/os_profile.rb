@@ -26,5 +26,18 @@ module AzureCompute
 
       return os_profile
     end
+    def windows_build_profile(initial_user, pub_key, server_name)
+      win_config = Azure::ARM::Compute::Models::WindowsConfiguration.new
+      
+      os_profile = Azure::ARM::Compute::Models::OSProfile.new
+      os_profile.computer_name = initial_user.gsub(/[^a-zA-Z]/,"").capitalize
+      os_profile.admin_password = os_profile.computer_name + "123@"
+      OOLog.info("Computer Name is: #{os_profile.computer_name}")
+      os_profile.admin_username = initial_user
+      OOLog.info("Initial User is: #{os_profile.admin_username}")      
+      os_profile.windows_configuration = win_config
+
+      return os_profile
+    end
   end
 end

@@ -9,7 +9,7 @@ if node['platform_family'] == 'windows'
    if !mirror_svc.nil?
      cloud = node.workorder.cloud.ciName
      mirror = JSON.parse(mirror_svc[cloud][:ciAttributes][:mirrors])
-     mirror_pkg_source_url = mirror['chocolatey-repo']
+     mirror_pkg_source_url = mirror['chocorepo']
    end
 
    mirror_url_nil_or_empty = mirror_pkg_source_url.nil? || mirror_pkg_source_url.empty?

@@ -45,6 +45,7 @@ ruby_block 'start-backup' do
       puts cmd
       puts `#{cmd}`
       exit 1
+    end
   end
 end
 

@@ -266,6 +266,25 @@ module OO
 
       end
 
+      def site_writable_section_for(section, site_name, &block)
+        admin_manager = WIN32OLE.new("Microsoft.ApplicationHost.WritableAdminManager")
+        site_path = "#{APPHOST_PATH}/#{site_name}"
+        section = admin_manager.GetAdminSection(section, site_path)
+        yield section
+
+        admin_manager.CommitChanges
+        reload
+      end
+
+      def site_readable_section_for(section, site_name, &block)
+        admin_manager = WIN32OLE.new("Microsoft.ApplicationHost.WritableAdminManager")
+        admin_manager.CommitPath = APPHOST_PATH
+        site_path = "#{APPHOST_PATH}/#{site_name}"
+        section = admin_manager.GetAdminSection(section, site_path)
+        yield section
+
+      end
+
     end
   end
 end

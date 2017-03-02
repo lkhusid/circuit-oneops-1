@@ -27,7 +27,7 @@ begin
   ostype = node.workorder.payLoad.os[0].ciAttributes['ostype']
 rescue
   begin
-    ostype = node.workorder.rfcCi.ciAttributes['ostype']
+    ostype = node.workorder.ci.ciAttributes['ostype']
   rescue
     ostype = node.platform
   end

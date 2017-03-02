@@ -170,6 +170,24 @@ member_flags = {
 
 etcd_initial_cluster_token = primary_cloud ? 'etcd-cluster-1' : 'etcd-cluster-2'
 
+# migrate data dir
+data_dir = member_flags['ETCD_DATA_DIR']
+volumes = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Volume/ }
+if volumes.size > 0 && !File.symlink?(data_dir)
+  volume = volumes.first
+  mount_point =  volume['ciAttributes']['mount_point']
+  Chef::Log.info("moving data dir #{data_dir} to #{mount_point}")
+
+  service 'etcd' do
+    action :stop
+  end
+  execute "mv #{data_dir}/* #{mount_point}" do
+    returns [0,1]
+  end
+  execute "rm -fr #{data_dir}"
+  execute "ln -s #{mount_point} #{data_dir}"
+end
+
 etcd_initial_cluster_state = "new"
 if node.workorder.rfcCi.rfcAction == "replace"
   etcd_initial_cluster_state = "existing"

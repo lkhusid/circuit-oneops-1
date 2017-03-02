@@ -19,9 +19,7 @@
 max_retry_count = 5
 cloud_name = node[:workorder][:cloud][:ciName]
 provider_class = node[:workorder][:services][:storage][cloud_name][:ciClassName].downcase
-
 include_recipe "shared::set_provider"           
-
 dev_map = node.workorder.rfcCi.ciAttributes["device_map"]
 if provider_class =~ /azure/
   Chef::Log.info("Deleting the data disk ...")
@@ -29,13 +27,11 @@ if provider_class =~ /azure/
   return true
 end
 
-
 unless dev_map.nil?
   dev_map.split(" ").each do |dev|
     dev_parts = dev.split(":")
     vol_id = dev_parts[0]
     Chef::Log.info("destroying: "+vol_id)
-
     ok = false
     retry_count = 0
     while !ok && retry_count < max_retry_count do
@@ -65,13 +61,11 @@ unless dev_map.nil?
         Chef::Log.error("sleeping #{sleep_sec}sec between retries...")
         sleep(sleep_sec) 
       end
-
     end
-      
     if !ok
-      Chef::Log.info("couldnt destroy: "+vol_id)
-      exit 1
+      error_key=JSON.parse(e.response[:body]).keys[0]
+      msg = JSON.parse(e.response[:body])[error_key]['message']
+      exit_with_error "couldnt destroy: #{vol_id} because #{msg} .. #{error_key}"
     end
-
   end
 end       

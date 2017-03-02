@@ -25,7 +25,6 @@ puts "***RESULT:instance_name=#{node[:server_name]}"
 Chef::Log.info("ostype: #{node[:ostype]} size: #{node[:size_id]} image: #{node[:image_id]}")
 
 cloud_name = node[:workorder][:cloud][:ciName]
-Chef::Log.info("Workorder: #{node[:workorder]}")
 provider = node[:workorder][:services][:compute][cloud_name][:ciClassName].gsub("cloud.service.","").downcase.split(".").last
 node.set['cloud_provider'] = provider
 Chef::Log.info("Cloud Provider: #{provider}")
@@ -73,14 +72,7 @@ elsif provider == "docker"
   sleep_time = 1
 end
 
-Chef::Log.info("Action is: #{node.workorder.rfcCi.rfcAction}")
-
-if node.workorder.rfcCi.rfcAction !~ /update/
-  # need to sleep a long time for windows to be ready
-  if node[:ostype] =~ /windows/
-    sleep_time = 240
-  end
-end
+Chef::Log.info("Action is: #{node.workorder.rfcCi.rfcAction}") 
 
 ruby_block "wait for boot" do
   block do

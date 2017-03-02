@@ -15,8 +15,13 @@ Utils.set_proxy(node.workorder.payLoad.OO_CLOUD_VARS)
 ######################################
 cloud_name = node[:workorder][:cloud][:ciName]
 OOLog.info("Cloud Name: #{cloud_name}")
-compute_service =
-  node[:workorder][:services][:compute][cloud_name][:ciAttributes]
+compute_service = node[:workorder][:services][:compute][cloud_name][:ciAttributes]
+# ostype = node[:workorder][:services][:compute][cloud_name][:ciAttributes][:ostype]
+
+# OOLog.info("OSTYPENEWDEC22: #{ostype}")
+# OOLog.info("os type cloud : #{cloud}")
+
+
 location = compute_service[:location]
 express_route_enabled = compute_service[:express_route_enabled]
 OOLog.info('Express Route is enabled: ' + express_route_enabled )
@@ -74,10 +79,13 @@ client.subscription_id = subscription
 
 node.set['VM_exists'] = false
 #check whether the VM with given name exists already
+
+OOLog.info ('LOGO TEST')
 begin
   promise = client.virtual_machines.get(resource_group_name, server_name)
   result = promise.value!
   node.set['VM_exists'] = true
+  OOLog.info ('LOGO TEST BEGIN')
 rescue MsRestAzure::AzureOperationError => e
   OOLog.debug("Error Body: #{e.body}")
   OOLog.debug("VM doesn't exist. Leaving the VM_exists flag false")
@@ -86,8 +94,12 @@ end
 # invoke recipe to build the OS profile
 begin
   osprofilecls = AzureCompute::OsProfile.new
-  osprofile = osprofilecls.build_profile(initial_user, pub_key, server_name)
-rescue => ex
+  if compute_service[:ostype].include?("windows")
+    osprofile = osprofilecls.windows_build_profile(initial_user, pub_key, server_name)
+  else  
+     osprofile = osprofilecls.build_profile(initial_user, pub_key, server_name)
+  end
+  rescue => ex
   OOLog.fatal("Error getting os profile: #{ex.message}")
 end
 
@@ -205,8 +217,9 @@ if ip_type == 'public'
     OOLog.fatal("Error getting pip from Azure: #{ex.message}")
   end
 end
-
-include_recipe "compute::ssh_port_wait"
+if !compute_service[:ostype].include?("windows")
+  include_recipe "compute::ssh_port_wait"
+end  
 
 rfcCi = node["workorder"]["rfcCi"]
 nsPathParts = rfcCi["nsPath"].split("/")

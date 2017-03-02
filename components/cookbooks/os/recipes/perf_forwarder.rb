@@ -24,7 +24,7 @@ end
 
 service "perf-agent" do
   action [ :stop, :disable ]
-  only_if {service_exists}
+  only_if { service_exists && node['platform'] != 'ubuntu' }
 end
 
 #to stop and disable old flume agent

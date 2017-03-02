@@ -7,7 +7,7 @@ features = [
   'Web-Request-Monitor',
   'Web-Http-Tracing',
   'Web-Stat-Compression',
-  "Web-Dyn-Compression",
+  'Web-Dyn-Compression',
   'Web-Filtering',
   'Web-Basic-Auth',
   'Web-Windows-Auth',
@@ -26,6 +26,8 @@ features = [
   'Web-AppInit'
 ]
 
-powershell_script "installing windows features" do
-  code "Install-WindowsFeature #{features.join(",")}"
+powershell_script 'installing windows features' do
+  code "Install-WindowsFeature #{features.join(',')}"
+  not_if "if ((Get-WindowsFeature #{features.join(',')} | ?{ $_.Installed -match $true }).count -eq #{features.count}) { $true } else { $false }"
+  guard_interpreter :powershell_script
 end

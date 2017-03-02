@@ -1,4 +1,4 @@
-PROPERTIES = ["name", "id", "server_auto_start", "bindings", "virtual_directory_path", "virtual_directory_physical_path", "application_path", "application_pool"]
+PROPERTIES = ["name", "id", "server_auto_start", "bindings", "virtual_directory_path", "virtual_directory_physical_path", "application_path", "application_pool", "certificate_hash", "certificate_store_name" ]
 
 def whyrun_supported?
   true
@@ -51,21 +51,22 @@ action :create do
 end
 
 action :update do
+  modified = false
   if @web_site.exists?
-
     if not @web_site.resource_needs_change(get_attributes)
       converge_by("updating web site properties for #{new_resource.name}\n") do
         status = @web_site.update(get_attributes)
         if status
           @web_site.start
           Chef::Log.info "Updated web site #{new_resource.name}"
-          new_resource.updated_by_last_action(true)
+          modified = true
         else
           Chef::Log.fatal "Failed to update web site #{new_resource.name}"
         end
       end
     end
   end
+  new_resource.updated_by_last_action(modified)
 end
 
 action :delete do

@@ -51,5 +51,17 @@ module OO
       @session_state ||= OO::IIS::SessionState.new(site_name, @web_administration)
     end
 
+    def windows_authentication(site_name)
+      @windows_authentication ||= OO::IIS::WindowsAuthentication.new(@web_administration, site_name)
+    end
+
+    def anonymous_authentication(site_name)
+      @anonymous_authentication ||= OO::IIS::AnonymousAuthentication.new(@web_administration, site_name)
+    end
+
+    def mime_mapping(site_name)
+      @mime_mapping ||= OO::IIS::MimeMapping.new(@web_administration, site_name)
+    end
+
   end
 end

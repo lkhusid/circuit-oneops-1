@@ -1,9 +1,7 @@
 
 environment = node.workorder.payLoad.Environment[0][:ciAttributes][:availability]
 
-if environment=="single"
-  exit_with_error "single environment. glusterfs setup works in redundant mode only"
-end
+exit_with_error "single environment. glusterfs setup works in redundant mode only" if environment=="single"
 
 ci = node.workorder.rfcCi
 parent = node.workorder.payLoad.RealizedAs[0]
@@ -22,11 +20,11 @@ volstore_prefix = "#{ci.ciAttributes[:store]}/#{parent[:ciName]}"
 Chef::Log.info("Distributed filesystem on #{computes.size.to_s} computes with #{replicas.to_s} data replicas")
 
 cloud_name = node[:workorder][:cloud][:ciName]
-  if node[:workorder][:services].has_key? "mirror"
-    mirrors = JSON.parse(node[:workorder][:services][:mirror][cloud_name][:ciAttributes][:mirrors])
-  else
-    exit_with_error "Cloud Mirror Service has not been defined"
-  end
+if node[:workorder][:services].has_key? "mirror"
+  mirrors = JSON.parse(node[:workorder][:services][:mirror][cloud_name][:ciAttributes][:mirrors])
+else
+  exit_with_error "Cloud Mirror Service has not been defined"
+end
 
 glusterfs_source = mirrors['glusterfs']
 if glusterfs_source.nil?
@@ -52,7 +50,7 @@ end
   end
 end
 
-%w{attr psmisc}.each do |p|
+%w{attr psmisc lvm2}.each do |p|
   package p do
     action :install
   end
@@ -82,103 +80,79 @@ end
 
 include_recipe "glusterfs::remote_probe"
 
-if last_compute == "compute-#{local_cloud_index}-#{local_compute_index}"
+ruby_block "glusterfs block" do
+  block do
 
-  computes.each do |c|
-    ruby_block "adding gluster peer" do
-      block do
+    if last_compute == "compute-#{local_cloud_index}-#{local_compute_index}"
+      computes.each do |c|
         retry_count = 1
-        while retry_count < 10
-          command = "gluster peer probe #{c.ciAttributes[:private_ip]}"
-          output = `#{command} 2>&1`
-          if $?.success?
-            Chef::Log.info("#{command} got successful. #{output}")
-            break
-          else
-            Chef::Log.info("#{command} got failed. #{output}")
-            Chef::Log.info("Maximum retry count is 9. Current retry count is #{retry_count}. Sleeping 20 seconds. ")
-            sleep 20
+          while retry_count < 10
+            command = "gluster peer probe #{c.ciAttributes[:private_ip]}"
+            output = `#{command} 2>&1`
+            if $?.success?
+              Chef::Log.info("#{command} got successful. #{output}")
+              break
+            else
+              Chef::Log.info("#{command} got failed. #{output}")
+              Chef::Log.info("Maximum retry count is 9. Current retry count is #{retry_count}. Sleeping 20 seconds. ")
+              sleep 20
+            end
+            exit_with_error "#{command} got failed. #{output}" if retry_count == 9
+            retry_count += 1
           end
-          exit_with_error "#{command} got failed. #{output}" if retry_count == 9
-          retry_count += 1
+      end
+
+      execute_command("gluster peer status")
+
+      bricks = {}
+      computes.each do |c|
+        compute_bricks = find_bricks(c[:ciName].split('-').last.to_i,replicas,computes.length)
+        Chef::Log.info("Bricks for #{c[:ciName]} (#{c.ciAttributes[:private_ip]}) #{compute_bricks.inspect}")
+        compute_bricks.each do |b|
+          bricks["#{c.ciName}"] = "#{c.ciAttributes[:private_ip]}:#{volstore_prefix}/#{b}"
         end
       end
-    end
-  end
+      replicas_arg = replicas > 1 ? "replica #{replicas}" : ""
+      bricks_arg = bricks.sort.map{|b| b[1]}.join(' ')
 
-  ruby_block "peer status" do
-    block do
-      execute_command("gluster peer status")
-    end
-  end
+      `gluster volume info #{parent[:ciName]}`
+      execute_command("yes y | gluster volume create #{parent[:ciName]} #{replicas_arg} #{bricks_arg} force")  if !$?.success?
 
-  bricks = {}
-  computes.each do |c|
-    compute_bricks = find_bricks(c[:ciName].split('-').last.to_i,replicas,computes.length)
-    Chef::Log.info("Bricks for #{c[:ciName]} (#{c.ciAttributes[:private_ip]}) #{compute_bricks.inspect}")
-    compute_bricks.each do |b|
-      bricks["#{c.ciName}"] = "#{c.ciAttributes[:private_ip]}:#{volstore_prefix}/#{b}"
-    end
-  end
+      existing_bricks = `gluster volume info #{parent[:ciName]}`.scan(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}.*/)
+      new_bricks = bricks_arg.split(' ')
+      existing_peers = extract_hosts_from_bricks(existing_bricks)
+      new_peers = extract_hosts_from_bricks(new_bricks)
 
-  replicas_arg = replicas > 1 ? "replica #{replicas}" : ""
-  bricks_arg = bricks.sort.map{|b| b[1]}.join(' ')
-  ruby_block "creating volume" do
-    block do
-      execute_command("yes y | gluster volume create #{parent[:ciName]} #{replicas_arg} #{bricks_arg} force")
-    end
-    not_if "gluster volume info #{parent[:ciName]}"
-  end
+      scale = "none"
+      scale, bricks = "up", (new_bricks - existing_bricks).join(' ') if existing_bricks.length < new_bricks.length
+      scale, bricks, peers = "down", (existing_bricks - new_bricks).join(' '), existing_peers - new_peers if existing_bricks.length > new_bricks.length
 
-  existing_bricks = `gluster volume info #{parent[:ciName]}`.scan(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}.*/)
-  new_bricks = bricks_arg.split(' ')
-  existing_peers = extract_hosts_from_bricks(existing_bricks)
-  new_peers = extract_hosts_from_bricks(new_bricks)
-
-  scale = "none"
-  scale, bricks = "up", (new_bricks - existing_bricks).join(' ') if existing_bricks.length < new_bricks.length
-  scale, bricks, peers = "down", (existing_bricks - new_bricks).join(' '), existing_peers - new_peers if existing_bricks.length > new_bricks.length
-
-  case scale
-  when "up"
-    Chef::Log.info("scaling up gluster volume #{parent[:ciName]} by adding brick(s) #{bricks}")
-    ruby_block "adding brick to volume" do
-      block do
+      case scale
+      when "up"
+        Chef::Log.info("scaling up gluster volume #{parent[:ciName]} by adding brick(s) #{bricks}")
         execute_command("yes y | gluster volume add-brick #{parent[:ciName]} #{replicas_arg} #{bricks} force", false)
-      end
-    end
-  when "down"
-    Chef::Log.info("scaling down gluster volume #{parent[:ciName]} by removing brick(s) #{bricks}")
-    ruby_block "removing brick from volume" do
-      block do
+      when "down"
+        Chef::Log.info("scaling down gluster volume #{parent[:ciName]} by removing brick(s) #{bricks}")
         execute_command("yes y | gluster volume remove-brick #{parent[:ciName]} #{replicas_arg} #{bricks} force", false)
-      end
-    end
-    Chef::Log.info("scaling down gluster pool by detaching peer(s) #{peers.join(',')}")
-    ruby_block "detaching peer from pool" do
-      block do
+        Chef::Log.info("scaling down gluster pool by detaching peer(s) #{peers.join(',')}")
         peers.each do |p|
           execute_command("gluster peer detach #{p} force", false)
         end
       end
-    end
-  end
 
-  commands = ["yes y | gluster volume rebalance #{parent[:ciName]} fix-layout start",
-   "sleep 5",
-   "gluster volume start #{parent[:ciName]}",
-   "gluster volume info #{parent[:ciName]}"]
+      commands = ["yes y | gluster volume rebalance #{parent[:ciName]} fix-layout start",
+       "sleep 5",
+       "gluster volume start #{parent[:ciName]}",
+       "gluster volume info #{parent[:ciName]}"]
 
-  commands.shift if scale == "none"
+      commands.shift if scale == "none"
 
-  commands.each do |cmd|
-    ruby_block "rebalance, start and info of volume" do
-      block do
+      commands.each do |cmd|
         execute_command(cmd, false)
       end
     end
-  end
 
+  end
 end
 
 include_recipe "glusterfs::mount"

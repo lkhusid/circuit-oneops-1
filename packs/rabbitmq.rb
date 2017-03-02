@@ -78,7 +78,6 @@ resource "volume-log",
 # depends_on
 [{:from => 'os', :to => 'compute'},
   {:from => 'user-app', :to => 'os'},
-  {:from => 'fqdn', :to => 'user-app'},
   {:from => 'volume', :to => 'user-app'},
   {:from => 'volume-log', :to => 'volume'},
   {:from => 'volume-log', :to => 'user-app'},

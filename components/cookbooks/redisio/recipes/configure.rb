@@ -86,10 +86,10 @@ redis_instances.each do |current_server|
 end
 
 redis_instances.each do |current_server|
-  if redis['version'] == '3.0.1'
+  if redis['version'] != '2.6.16'
     execute "config and install redis-cluster binary" do
       cwd "/tmp"
-      command "gem install redis ; cp /tmp/redis-3.0.1/src/redis-trib.rb /usr/local/bin"
+      command "gem install redis ; cp /tmp/redis-#{node['redisio']['version']}/src/redis-trib.rb /usr/local/bin"
     end
   elsif redis['version'] == '2.6.16'
     print "version is 2.6.16"

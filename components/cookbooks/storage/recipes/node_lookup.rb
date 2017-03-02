@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 storage_cloud_name = node[:workorder][:cloud][:ciName]
 storagecloud = node[:workorder][:services][:storage][storage_cloud_name][:ciAttributes]
-if !storagecloud[:volumetypemap].nil? 
-  volumetype_map= JSON.parse(storagecloud[:volumetypemap])
-end
+volumetype_map= JSON.parse(storagecloud[:volumetypemap]) if !storagecloud[:volumetypemap].nil?
 
 if volumetype_map.count == 0
   node.set[:volume_type_from_map] = ""
@@ -30,8 +27,5 @@ Chef::Log.debug("node_lookup volume_type_selected: #{volume_type_selected}")
 if volumetype_map[volume_type_selected] != nil
    node.set[:volume_type_from_map] = volumetype_map[volume_type_selected]
 else
-   puts "***FAULT:FATAL=Volume Type #{volume_type_selected} Not found ***"
-   e = Exception.new("no backtrace")
-   e.set_backtrace("")
-   raise e
+	exit_with_error("Volume Type #{volume_type_selected} Not found")
 end

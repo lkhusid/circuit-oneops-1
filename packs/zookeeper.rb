@@ -25,15 +25,12 @@ resource "zookeeper",
          :cookbook => "oneops.1.zookeeper",
          :design => true,
          :requires => {"constraint" => "1..1"},
-         :attributes => {
-             'mirror' => "http://archive.apache.org/dist/zookeeper/"
-
-             },
+         :attributes => {},
           :monitors => {
              'zookeeperprocess' => {:description => 'ZookeeperProcess',
                            :source => '',
                            :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
-                           :cmd => 'check_process!zookeeper-server!true!QuorumPeerMain',
+                           :cmd => 'check_process!zookeeper-server!false!QuorumPeerMain',
                            :cmd_line => '/opt/nagios/libexec/check_process.sh "$ARG1$" "$ARG2$" "$ARG3$"',
                            :metrics => {
                                'up' => metric(:unit => '%', :description => 'Percent Up'),
@@ -87,19 +84,25 @@ resource 'java',
          },
          :attributes => {}
 
+
 resource "hostname",
-        :cookbook => "oneops.1.fqdn",
-        :design => true,
-        :requires => {
-             :constraint => "0..1",
-             :services => "dns",
-             :help => "optional hostname dns entry"
-         }
+  :cookbook => "oneops.1.fqdn",
+  :design => true,
+  :requires => {
+    :constraint => "1..1",
+    :services => "dns",
+    :help => "optional hostname dns entry"
+  },
+  # enable ptr and change ptr_source to 'instance'
+  :attributes => {
+    :ptr_enabled => "true",
+    :ptr_source => "instance"
+  }
 
 resource "volume-log",
   :cookbook => "oneops.1.volume",
   :design => true,
-  :requires => { "constraint" => "1..1", "services" => "compute" },
+  :requires => { "constraint" => "0..1", "services" => "compute" },
   :attributes => {  "mount_point"   => '/log',
                     "size"          => '100%FREE',
                     "device"        => '',
@@ -123,7 +126,7 @@ resource "volume-log",
 resource "volume",
   :cookbook => "oneops.1.volume",
   :design => true,
-  :requires => { "constraint" => "1..1", "services" => "compute" },
+  :requires => { "constraint" => "0..1", "services" => "compute" },
   :attributes => {  "mount_point"   => '/data',
                     "size"          => '60%VG',
                     "device"        => '',
@@ -144,7 +147,6 @@ resource "volume",
                 }
     }
 
-
 # depends_on
 [
   {:from => 'volume-log', :to => 'compute'},
@@ -160,6 +162,7 @@ resource "volume",
   {:from => 'artifact', :to => 'user-zookeeper'},
   {:from => 'artifact', :to => 'compute'},
   {:from => 'zookeeper', :to => 'volume-log'},
+  {:from => 'zookeeper', :to => 'hostname'},
   {:from => 'zookeeper', :to => 'java'}
 ].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",
@@ -183,7 +186,7 @@ relation "ring::depends_on::zookeeper",
     :relation_name => 'DependsOn',
     :from_resource => 'ring',
     :to_resource   => 'zookeeper',
-    :attributes    => {"propagate_to" => 'to', "flex" => true, "min" => 3, "max" => 10 }
+    :attributes    => {"flex" => true, "min" => 3, "max" => 10 }
 
 # managed_via
 [ 'zookeeper'].each do |from|

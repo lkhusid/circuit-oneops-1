@@ -22,6 +22,42 @@ include_recipe "shared::set_provider"
 include_recipe "compute::ssh_port_wait"
 include_recipe "compute::ssh_cmd_for_remote"
 
+ruby_block 'wait for ssh in windows' do
+  block do
+
+    #wait until we can get a response from Windows VM
+	start_time = Time.now.to_i
+	i = 1
+    win_ssh_failed = true
+    ssh_cmd = node.ssh_interactive_cmd.gsub("IP",node.ip) + "hostname > /dev/null"
+    ssh_cmd = ssh_cmd.gsub("StrictHostKeyChecking=no","StrictHostKeyChecking=no -o ConnectTimeout=5") 
+	Chef::Log.info("Started waiting for ssh response from #{node.ip}")
+    Chef::Log.info("SSH command is: #{ssh_cmd}")
+
+    #try connecting for 300 seconds
+    while Time.now.to_i - start_time < 300 do
+      Chef::Log.info( "Attempt:#{i} to get a valid ssh response from #{node.ip} ...")
+      result = system(ssh_cmd)
+
+      if result
+        win_ssh_failed = false
+        Chef::Log.info( "Received a valid response from #{node.ip}! Moving on to a next step...")
+        break
+      end
+
+      Chef::Log.info( "Did not receive a valid response from #{node.ip}. Retrying...")
+      sleep 20
+      i += 1
+    end #while
+
+    if win_ssh_failed
+      puts "***FATAL: SSH - we did not receive a valid response in 300 seconds"
+      raise("SSH - we did not receive a valid response in 300 seconds")
+    end
+
+  end
+end if node[:ostype] =~ /windows/ &&  node.workorder.rfcCi.rfcAction !~ /update/
+
 ruby_block 'install base' do
   block do
 

@@ -128,14 +128,21 @@ if [ -e /etc/redhat-release ] ; then
    fi	
 fi
 
-gem install json --version 1.7.7 --no-ri --no-rdoc
+gem_version="1.7.7"
+grep 16.04 /etc/issue
+if [ $? -eq 0 ]
+then
+  gem_version="2.0.2"
+fi
+
+gem install json --version $gem_version --no-ri --no-rdoc
 if [ $? -ne 0 ]; then
     echo "gem install using local repo failed. reverting to rubygems proxy."
     gem source --add $rubygems_proxy
     gem source --remove file://$local_gems
     gem source --remove 'http://rubygems.org/'
     gem source
-    gem install json --version 1.7.7 --no-ri --no-rdoc
+    gem install json --version $gem_version --no-ri --no-rdoc
     if [ $? -ne 0 ]; then
       echo "could not install json gem"
       exit 1

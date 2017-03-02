@@ -84,6 +84,16 @@ attribute 'sudoer',
     :form => { 'field' => 'checkbox' }
   }
 
+  attribute 'group',
+    :description => "Secondary Groups",
+    :data_type => 'array',
+    :default => '[]',
+    :format => {
+      :help => 'Enter a list of Secondary Groups for this user',
+      :category => '2.Options',
+      :order => 3
+    }
+    
 attribute 'authorized_keys',
   :description => "Authorized Keys",
   :data_type => 'array',
@@ -93,5 +103,14 @@ attribute 'authorized_keys',
     :category => '3.Access',
     :order => 1
   }
-
+  
+attribute 'password',
+  :description => "Password (currently Windows only)",
+  :encrypted => true,
+  :format => {
+    :help => 'Applies to Windows VMs only, if left blank a random password will be generated',
+    :category => '3.Access',
+    :order => 2
+  }
+  
 recipe "repair", "Repair User"

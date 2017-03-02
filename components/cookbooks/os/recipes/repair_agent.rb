@@ -1,7 +1,7 @@
 #
 # oo:repair_agent
 #
-ostype = node[:workorder][:rfcCi][:ciAttributes][:ostype]
+ostype = node[:workorder][:ci][:ciAttributes][:ostype]
 
 if ostype =~ /windows/
   #resync time with ntp server

@@ -2,13 +2,6 @@ def whyrun_supported?
   true
 end
 
-COOKIE_LESS = {
-  0 => "UseURI",
-  1 => "UseCookies",
-  2 => "AutoDetect",
-  3 => "UseDeviceProfile"
-}
-
 def resource_needs_change_for?(property)
   new_resource.send(property) != current_resource.send(property)
 end

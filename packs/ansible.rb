@@ -38,17 +38,8 @@ resource "ansible",
             :constraint => "1..1"
          }
 
-resource "ansible-role",
-         :cookbook => "oneops.1.ansiblerole",
-         :design => true,
-         :attributes => {},
-         :requires => {
-            :constraint => "0..*"
-         }
-
 # depends_on
- [{ :from => 'ansible',:to => 'os' },
-  { :from => 'ansible-role',:to => 'ansible' }].each do |link|
+ [{ :from => 'ansible',:to => 'os' }].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",
     :relation_name => 'DependsOn',
     :from_resource => link[:from],
@@ -71,7 +62,7 @@ relation "fqdn::depends_on_flex::compute",
   :attributes    => { "propagate_to" => 'from', "flex" => true, "min" => 2, "max" => 10 }
 
 #managed_via
-['ansible','ansible-role'].each do |from|
+['ansible'].each do |from|
    relation "#{from}::managed_via::compute",
      :except => [ '_default' ],
      :relation_name => 'ManagedVia',

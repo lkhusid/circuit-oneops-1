@@ -1,0 +1,13 @@
+connector.name=mysql
+connection-url=<%= @connection_url %>
+connection-user=<%= @connection_user_id %>
+connection-password=<%= @connection_password %>
+
+<%
+  connector_config = @connector_config
+  connector_config.each_key { |key|
+%>
+<%= key %>=<%= connector_config[key] %>
+<%
+  }
+%>

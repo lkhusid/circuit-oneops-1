@@ -218,7 +218,7 @@ resource "user-app",
 	:attributes => {
 	    "username" => "app",
 	    "description" => "App User",
-	    "home_directory" => "/app",
+	    "home_directory" => "/home/app",
 	    "system_account" => true,
 	    "sudoer" => true
 	}

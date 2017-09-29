@@ -26,12 +26,12 @@ ruby_block 'wait for ssh in windows' do
   block do
 
     #wait until we can get a response from Windows VM
-	start_time = Time.now.to_i
-	i = 1
+    start_time = Time.now.to_i
+    i = 1
     win_ssh_failed = true
     ssh_cmd = node.ssh_interactive_cmd.gsub("IP",node.ip) + "hostname > /dev/null"
     ssh_cmd = ssh_cmd.gsub("StrictHostKeyChecking=no","StrictHostKeyChecking=no -o ConnectTimeout=5") 
-	Chef::Log.info("Started waiting for ssh response from #{node.ip}")
+    Chef::Log.info("Started waiting for ssh response from #{node.ip}")
     Chef::Log.info("SSH command is: #{ssh_cmd}")
 
     #try connecting for 300 seconds

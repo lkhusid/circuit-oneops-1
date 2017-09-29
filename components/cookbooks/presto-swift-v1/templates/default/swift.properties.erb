@@ -1,0 +1,15 @@
+connector.name=hive-hadoop2
+hive.metastore.uri=thrift://127.0.0.1:9083
+hive.config.resources=/opt/hive/conf/core-site.xml
+hive.storage-format=ORC
+hive.compression-codec=GZIP
+hive.allow-drop-table=true
+
+<%
+  connector_config = @connector_config
+  connector_config.each_key { |key|
+%>
+<%= key %>=<%= connector_config[key] %>
+<%
+  }
+%>

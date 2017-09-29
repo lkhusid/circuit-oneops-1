@@ -23,6 +23,14 @@ module OO
         def Delete_(*attrs, &block); end
       end
 
+      APP_POOL_STATUS = {
+        0 => 'starting',
+        1 => 'started',
+        3 => 'stopping',
+        4 => 'stopped',
+        5 => 'unknown'
+      }
+
       silence_warnings do
         SECTION = "system.applicationHost/applicationPools"
         APPLICATION_POOL = "ApplicationPool"
@@ -42,8 +50,16 @@ module OO
         not @entity.nil?
       end
 
+      def status
+        APP_POOL_STATUS[@entity.getstate]
+      end
+
       def create(attributes = {})
         not exists? and @web_administration.perform { assign_attributes_on_create(attributes) }
+      end
+
+      def recycle
+        @entity.recycle if exists? and status == 'started'
       end
 
       def update(attributes)

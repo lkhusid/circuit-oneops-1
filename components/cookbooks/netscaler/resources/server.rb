@@ -16,7 +16,7 @@ attribute :name,
 attribute :ipaddress, 
   :kind_of => String,
   :required => true, 
-  :regex => Resolv::IPv4::Regex
+  :regex => [Resolv::IPv4::Regex, Resolv::IPv6::Regex]
 
 attribute :connection, 
   :kind_of => Object,

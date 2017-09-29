@@ -46,6 +46,16 @@ unless dev_map.nil?
       
       begin
         unless volume.nil?
+          data = { 'os-detach' => { 'volume_id' => "#{vol_id}" } }
+          uuid = "#{vol_id}"
+          node.storage_provider.action(uuid, data)
+        end
+      rescue => e
+        Chef::Log.error("getting volume detach exception: "+e.message)
+      end
+
+      begin
+        unless volume.nil?
           volume.destroy
         end
       rescue => e

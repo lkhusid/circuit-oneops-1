@@ -1,0 +1,48 @@
+--- 
+driver: 
+  name: vagrant
+  ssh: 
+    insert_key: false
+platforms: 
+  - 
+    name: centos-7.2
+provisioner: 
+  cookbook_files_glob: "**/*"
+  name: chef_solo
+  require_chef_omnibus: "11.18.12"
+  solo_rb: 
+    log_level: !ruby/symbol info
+    ssl_verify_mode: !ruby/symbol verify_peer
+    verify_api_cert: true
+suites: 
+  - 
+    attributes: 
+      workorder: 
+        rfcCi: 
+          ciAttributes: 
+            dir: /usr/local
+            install_method: binary
+            npm: "3.10.10"
+            npm_src_url: "http://registry.npmjs.org/npm/"
+            src_url: "https://nodejs.org/dist/"
+            version: "6.11.1"
+    name: add
+    run_list: 
+      - "recipe[kitchen-test-helper]"
+      - "recipe[node::add]"
+  - 
+    attributes: 
+      workorder: 
+        rfcCi: 
+          ciAttributes: 
+            dir: /usr/local
+            install_method: binary
+            npm: "3.10.10"
+            npm_src_url: "http://registry.npmjs.org/npm/"
+            src_url: "https://nodejs.org/dist/"
+            version: "6.11.1"
+    name: delete
+    run_list: 
+      - "recipe[kitchen-test-helper]"
+      - "recipe[node::add]"
+      - "recipe[node::delete]"

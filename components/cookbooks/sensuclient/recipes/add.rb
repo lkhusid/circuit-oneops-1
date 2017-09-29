@@ -100,8 +100,8 @@ Chef::Log.info("Total sensu endpoints are #{endpoint_count}")
 	when "rhel"
 		sensu_client_version = node[:sensuclient][:sensu_client_version]
 		system = `uname -m|tr --delete '\n'`
-		mirror = "https://sensu.global.ssl.fastly.net/yum"
-		rpm_package = sensu_client_version+"."+system+".rpm"
+		mirror = "https://sensu.global.ssl.fastly.net/yum/7"
+		rpm_package = sensu_client_version+"."+"el7"+"."+system+".rpm"
 		package_url = mirror+"/"+system+"/"+rpm_package
 
 		Chef::Log.info("Package URL is #{package_url}")

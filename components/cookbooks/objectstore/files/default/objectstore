@@ -67,7 +67,8 @@ case provider
                                 :provider => 'OpenStack',
                                 :openstack_username => creds['OS_USERNAME'],
                                 :openstack_api_key => creds['OS_PASSWORD'],
-                                :openstack_auth_url => creds['OS_AUTH_URL']+'/tokens'
+                                :openstack_auth_url => creds['OS_AUTH_URL']+'/tokens',
+                                :openstack_region => creds['OS_REGION_NAME']
                             })
   else
     puts "Provider #{provider} not supported!"

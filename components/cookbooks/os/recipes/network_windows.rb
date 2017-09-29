@@ -1,41 +1,37 @@
-#join windows domain if service exists otherwise just change hostname
-if node[:workorder][:services].has_key?("windows-domain")
+#Disable auto DNS registration
+lan_name = 'Ethernet'
+powershell_script 'Disable-DNSRegistration' do
+  code "((Get-WMIObject Win32_NetworkAdapter -filter \"NetConnectionID = '#{lan_name}'\").Getrelated('Win32_NetworkAdapterConfiguration')).SetDynamicDNSRegistration($false,$false)"
+  only_if "((Get-WMIObject Win32_NetworkAdapter -filter \"NetConnectionID = '#{lan_name}'\").Getrelated('Win32_NetworkAdapterConfiguration')).FullDNSRegistrationEnabled"
+end
+
+pw_file = '/etc/passwd'
+execute "mkpasswd -l -u oneops > #{pw_file}" do
+  guard_interpreter :powershell_script
+  not_if "(Test-Path #{pw_file}) -And (Get-Content #{pw_file}) -Like '*oneops:*/home/oneops*'"
+end
+
+#1. Rename VM and restart
+powershell_script 'Rename-Computer' do
+  code "Rename-Computer -NewName '#{node[:vmhostname]}' -Force -ErrorAction Stop"
+  only_if "$env:computername -ne '#{node[:vmhostname]}'"
+end
+
+#2. join windows domain if service exists and restart
+if node[:workorder][:services].has_key?('windows-domain')
 
   cloud_name = node[:workorder][:cloud][:ciName]
-  domain = node[:workorder][:services]["windows-domain"][cloud_name][:ciAttributes]
-  ps_code = "$domain = '#{domain[:domain]}'
-  $password = '#{domain[:password]}'| ConvertTo-SecureString -asPlainText -Force
-  $username = '#{domain[:domain]}\\#{domain[:username]}'
-  $credential = New-Object System.Management.Automation.PSCredential($username,$password)
-  $newname = '#{node.vmhostname}'
+  domain = node[:workorder][:services]['windows-domain'][cloud_name][:ciAttributes]
+  
+  ps_code = "#{Chef::Config[:file_cache_path]}/cookbooks/os/files/windows/Join-Domain.ps1"
+  ps_code += " -domain '#{domain[:domain]}' -password '#{domain[:password]}' -username '#{domain[:username]}'"
 
-  #Generate OU path
-  $oupath = 'OU=Servers,'
-  foreach ($a in $domain.Split('.')) { $oupath += 'DC='+$a + ',' }
-  $oupath = $oupath.Substring(0,$oupath.Length-1)
-
-  Rename-Computer -NewName $newname -Force 
-  try { Add-Computer -DomainName $domain -Credential $credential -Force -Options JoinWithNewName -ErrorAction Stop -OUPath $oupath }
-  catch { Add-Computer -DomainName $domain -Credential $credential -NewName $newname -Force -ErrorAction Stop -OUPath $oupath }  
-  
-  Start-Sleep -s 10"  
-  
-  execute 'mkpasswd-oneops' do
-    command 'mkpasswd -l -u oneops > /etc/passwd'
-	action :nothing
-  end
-  
   powershell_script 'Join-Domain' do
     code ps_code
+    sensitive true
     not_if '(gwmi win32_computersystem).partofdomain'
-	notifies :run, 'execute[mkpasswd-oneops]', :before
   end
-else
-  #rename windows VM
-  powershell_script 'Rename-Computer' do
-    code "Rename-Computer -NewName '#{node[:vmhostname]}' -Force -ErrorAction Stop"
-    not_if "hostname | grep #{node.vmhostname}"
-  end
+
 end
 
 
@@ -45,11 +41,11 @@ ruby_block 'declare-restart' do
     puts "***REBOOT_FLAG***"
   end
   action :nothing
-  subscribes :run, 'powershell_script[Rename-Computer]', :delayed
-  subscribes :run, 'powershell_script[Join-Domain]', :delayed
+  subscribes :run, 'powershell_script[Join-Domain]', :immediately
+  subscribes :run, 'powershell_script[Rename-Computer]', :immediately
 end
-  
+
 reboot 'perform-restart' do
   action :nothing
-  subscribes :request_reboot, 'ruby_block[declare-restart]'
+  subscribes :reboot_now, 'ruby_block[declare-restart]', :immediately
 end

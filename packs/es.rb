@@ -588,7 +588,7 @@ end
 end
 
 # managed_via
-['master-os','master-user-app','master-elasticsearch','master-java'].each do |from|
+['master-os','master-user-app','master-volume', 'master-elasticsearch','master-java'].each do |from|
   relation "#{from}::managed_via::master-compute",
            :except => ['_default'],
            :relation_name => 'ManagedVia',

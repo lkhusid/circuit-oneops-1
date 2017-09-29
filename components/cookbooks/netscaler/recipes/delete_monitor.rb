@@ -14,6 +14,11 @@ node.monitors.each do |monitor|
   
   monitor_name = monitor[:monitor_name]
     
+  if monitor_name =~ /generic-/
+    Chef::Log.info("skipping delete monitor: #{monitor_name}")
+    next
+  end
+    
   resp_obj = JSON.parse(node.ns_conn.request(
     :method=>:get, 
     :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}").body)        

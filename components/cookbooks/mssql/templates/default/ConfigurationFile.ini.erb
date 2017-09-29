@@ -32,11 +32,11 @@ INSTANCEID="<%= node['sql_server']['instance_name'] %>"
 
 ; Specifies a Setup work flow, like INSTALL, UNINSTALL, or UPGRADE. This is a required parameter.
 
-ACTION="Install"
+ACTION="<%= @action %>"
 
 ; Specifies features to install, uninstall, or upgrade. The list of top-level features include SQL, AS, RS, IS, and Tools. The SQL feature will install the database engine, replication, and full-text. The Tools feature will install Management Tools, Books online, Business Intelligence Development Studio, and other shared components.
 
-FEATURES=<%= node['sql_server']['feature_list'] %>
+FEATURES=<%= @feature_list %>
 
 ; Displays the command line parameters usage
 
@@ -211,6 +211,7 @@ SQLSVCACCOUNT="<%= node['sql_server']['sql_account'] %>"
 ; Windows account(s) to provision as SQL Server system administrators.
 
 SQLSYSADMINACCOUNTS=<%= @sqlSysAdminList %>
+ASSYSADMINACCOUNTS=<%= @sqlSysAdminList %>
 
 ; Provision current user as a Database Engine system administrator for SQL Server 2008 R2 Express.
 

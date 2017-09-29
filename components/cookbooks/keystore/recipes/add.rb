@@ -40,23 +40,47 @@ execute "rm -fr #{keystore_filename}"
 certs.each do |cert|
    #cert has string elements: cacertkey, passphrase, path, key, cert and boolean: pkcs12
    Chef::Log.info("keystore path will be: #{cert[:ciAttributes][:path]} ")
-    
-  if !cert[:ciAttributes][:cacertkey].nil? && 
-     !cert[:ciAttributes][:cacertkey].empty?
+  
+  cacert_key = ""
+  cert_content = ""
+  cert_key = ""
+
+  if !cert[:ciAttributes][:auto_provision].nil? &&
+     cert[:ciAttributes][:auto_provision] == "true" &&
+     !cert[:rfcAction].nil? && cert[:rfcAction] == "add"
+
+#If the certificate is auto-provisioned, the cert core 3 attributes are populated as bom-only 
+#and appear in ciBaseAttributes in case of add-rfc of the certficate.
+#Read it from ciBaseAttributes in that case.
+
+ 	 Chef::Log.info("Cert is an add rfc and auto-generated")
+	 cacert_key = cert[:ciBaseAttributes][:cacertkey]
+	 cert_content = cert[:ciBaseAttributes][:cert]
+    	 cert_key = cert[:ciBaseAttributes][:key]
+
+  elsif !cert[:ciAttributes][:cacertkey].nil? && 
+        !cert[:ciAttributes][:cacertkey].empty?
+
+    	cacert_key = cert[:ciAttributes][:cacertkey]
+    	cert_content = cert[:ciAttributes][:cert]
+    	cert_key = cert[:ciAttributes][:key]
+  end
+
+  if !cacert_key.empty?  && !cert_content.empty?  && !cert_key.empty?
 
     tmp_ca = "/tmp/"+ (0..16).to_a.map{|a| rand(16).to_s(16)}.join + ".crt"
     
-    File.open(tmp_ca, 'w') { |file| file.write(cert[:ciAttributes][:cacertkey]) }
+    File.open(tmp_ca, 'w') { |file| file.write(cacert_key) }
       
       
     tmp_ce = "/tmp/"+ (0..16).to_a.map{|a| rand(16).to_s(16)}.join + ".crt"
       
-    File.open(tmp_ce, 'w') { |file| file.write(cert[:ciAttributes][:cert]) }
+    File.open(tmp_ce, 'w') { |file| file.write(cert_content) }
       
 
     tmp_ck = "/tmp/"+ (0..16).to_a.map{|a| rand(16).to_s(16)}.join + ".key"
       
-    File.open(tmp_ck, 'w') { |file| file.write(cert[:ciAttributes][:key]) }
+    File.open(tmp_ck, 'w') { |file| file.write(cert_key) }
      
     # First convert to an intermediate PKCS12 format
     cmd1 = "openssl pkcs12 -export -in #{tmp_ce} -inkey #{tmp_ck} -out /tmp/intermediate.p12 -certfile #{tmp_ca} -passout pass:#{keystore_password} -passin pass:#{cert[:ciAttributes][:passphrase]}"

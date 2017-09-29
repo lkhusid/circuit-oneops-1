@@ -17,12 +17,21 @@
 #
 
 cloud_name = node[:workorder][:cloud][:ciName]
-provider = node[:workorder][:services][:compute][cloud_name][:ciClassName].gsub("cloud.service.","").downcase
+compute_service = node[:workorder][:services][:compute][cloud_name]
+provider = compute_service[:ciClassName].gsub("cloud.service.","").downcase
 Chef::Log.info("provider: #{provider} ..")
 node.set['cloud_provider'] = provider
 
 ostype = node[:workorder][:rfcCi][:ciAttributes][:ostype]
 Chef::Log.info("OS type: #{ostype} ...")
+
+#remove two out of three json gem so that it will not create conflit for azure gems
+if (ostype =~ /ubuntu-16.04/)
+  Chef::Log.info("Resolving json conflict")
+  `sudo gem uninstall json -v 2.0.2`
+  `sudo gem uninstall json -v 1.8.6`
+end
+
 
 #Symlinks for windows
 if ostype =~ /windows/
@@ -37,6 +46,7 @@ end
 #Perform common recipes (both linux and windows)
 include_recipe "os::time"
 include_recipe "os::perf_forwarder" 
+include_recipe "os::add-conf-files"
 
 platform_name = node.workorder.box.ciName
 if(platform_name.size > 32)
@@ -44,19 +54,57 @@ if(platform_name.size > 32)
   Chef::Log.info("Truncated platform name to 32 chars : #{platform_name}")
 end
 vmhostname = platform_name+'-'+node["workorder"]["cloud"]["ciId"].to_s+'-'+node["workorder"]["rfcCi"]["ciName"].split('-').last.to_i.to_s+'-'+ node["workorder"]["rfcCi"]["ciId"].to_s
+if ostype =~ /windows/ #limiting hostname to 15 characters for Windows
+  ciId_s = node["workorder"]["rfcCi"]["ciId"].to_s
+  id_length = ciId_s.to_s.length
+  vmhostname = platform_name[0..(15-id_length-2)] +'-'+ ciId_s
+end
 node.set[:vmhostname] = vmhostname.downcase
 node.set[:full_hostname] = node["vmhostname"]+'.'+node["customer_domain"].downcase
-puts "***RESULT:hostname=#{node.vmhostname}"
 
+if provider =~ /azure/ && compute_service[:ciAttributes][:express_route_enabled] == 'false'
+  Chef::Log.info("Setting DNS label on public_ip")
+  puts "***RESULT:hostname=#{node.full_hostname}"
+else
+  puts "***RESULT:hostname=#{node.vmhostname}"
+end
+
+uname_output=`uname -srvmpo`.to_s.gsub("\n","")
+puts "***RESULT:osname=#{node.platform}-#{node.platform_version} #{uname_output}"
 
 #Perform windows-specific recipes and exit
 if ostype =~ /windows/
+  `sed -i 's/.*StrictModes .*/StrictModes no/' /etc/sshd_config`
+
+  features = JSON.parse(node[:workorder][:rfcCi][:ciAttributes][:features])
+  Chef::Log.info("Features to install: #{features.inspect}")
+
+  features.each do |feature|
+    powershell_script "Install-#{feature.split(' ').first}" do
+      code "Install-WindowsFeature -Name #{feature}"
+      only_if "(Get-WindowsFeature #{feature.split(' ').first}).InstallState -eq 'Available'"
+    end
+  end
+
   include_recipe "os::logrotate_windows"
   include_recipe "os::network_windows"
+
+  #Determine if additional restart needed
+  features.each do |feature|
+    ruby_block "declare-restart-#{feature.split(' ').first}" do
+      block do
+        puts "***REBOOT_FLAG***"
+      end
+      guard_interpreter :powershell_script
+      only_if "(Get-WindowsFeature #{feature.split(' ').first}).InstallState -eq 'InstallPending'"
+      notifies :reboot_now, 'reboot[perform-restart]', :immediately
+    end
+  end
+
   return true
 end
 
-#Perform non-windows recipes	
+#Perform non-windows recipes
 # common plugins dir that components put their check scripts
 execute "mkdir -p /opt/nagios/libexec"
 
@@ -151,21 +199,4 @@ when "redhat","centos","fedora"
   end
 end
 
-
-include_recipe "os::add-conf-files"
-
-uname_output=`uname -srvmpo`.to_s.gsub("\n","")
-puts "***RESULT:osname=#{node.platform}-#{node.platform_version} #{uname_output}"
-
 include_recipe "os::postfix" unless provider == "docker"
-
-
-if provider =~ /azure/
-  Chef::Log.info("Setting DNS label on public_ip")
-# creating DNS label for FQDN
-  compute_service = node['workorder']['services']['compute'][cloud_name]['ciAttributes']
-  express_route_enabled = compute_service['express_route_enabled']
-  if express_route_enabled == 'false'
-    puts "***RESULT:hostname=#{node.full_hostname}"
-  end
-end

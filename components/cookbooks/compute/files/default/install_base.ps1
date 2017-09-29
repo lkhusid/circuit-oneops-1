@@ -91,21 +91,21 @@ if ( $proxy -ne "" -and $proxy -ne $null) {
 }
 
 if ( $chocoRepo -ne "" -and $chocoRepo -ne $null ) {
-  #choco source disable -y --name="chocolatey"
+  choco source disable -y --name="chocolatey"
   choco source add -y --name='internal' --source=$chocoRepo --priority=1
 }
 
 try {
   Write-Output "Installing ruby ..."
-  choco install -y ruby
+  choco install -y --no-progress --source=internal ruby
   $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
   Write-Output "Installing nuget.commandline ..."
-  choco install -y nuget.commandline
+  choco install -y --no-progress nuget.commandline --version 3.4.3
   $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
   Write-Output "Installing ruby2.devKit ..."
-  choco install -y ruby2.devkit
+  choco install -y --no-progress ruby2.devkit
   $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 }
 catch {
@@ -160,7 +160,7 @@ Set-Content C:\cygwin64\opt\oneops\rubygems_proxy $gemRepo
 
 #grant full access on Cygwin folders to oneops user
 @("\var\lib", "\var\cache", "\var\run", "\etc", "\opt") | % {takeown /F C:\Cygwin64$_ /D Y /R}
-@("\var\lib", "\var\cache", "\var\run", "\etc", "\opt") | % {icacls C:\Cygwin64$_ /grant oneops:`(OI`)`(CI`)F /T /C}
+@("\var\lib", "\var\cache", "\var\run", "\etc", "\opt") | % {icacls C:\Cygwin64$_ /grant oneops:`(OI`)`(CI`)F /T /C /q}
 
 Set-Location "C:\"
 Write-Output "End of windows install_base script"

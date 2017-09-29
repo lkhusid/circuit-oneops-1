@@ -1,0 +1,23 @@
+<% 
+  # check_lb_http_status.sh.erb
+  #
+  # This is the monitoring script that checks the status of the
+  # Presto coordinator.  It uses the Nagios check_http_status.sh
+  # plugin to check the http endpoint and ensure that the coordinator
+  # is accessible.
+ %>
+ #!/bin/bash
+
+# This is the FQDN of the server to check
+SERVER_FQDN=<%= @fqdn %>
+HTTP_PORT="`cat /etc/presto/config.properties |grep 'http-server.http.port' |awk -F '=' '{ print $2; }'`"
+HTTPS_PORT="`cat /etc/presto/config.properties |grep 'http-server.https.port' |awk -F '=' '{ print $2; }'`"
+HTTPS_ENABLED="`cat /etc/presto/config.properties |grep 'http-server.https.enabled' |awk -F '=' '{ print $2; }'`"
+
+if [ "$HTTPS_ENABLED" == "true" ]; then
+  # Check HTTPS.
+  /opt/nagios/libexec/check_http_status.sh "$SERVER_FQDN -S" $HTTPS_PORT "$1" $2 "$3" $4
+else
+  # Check HTTP.
+  /opt/nagios/libexec/check_http_status.sh $SERVER_FQDN $HTTP_PORT "$1" $2 "$3" $4
+fi

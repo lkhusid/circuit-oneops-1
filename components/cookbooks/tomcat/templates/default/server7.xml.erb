@@ -151,7 +151,7 @@ end
              that are performed against this UserDatabase are immediately
              available for use by the Realm.  -->
         <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
-               resourceName="UserDatabase" digest="sha-256"/>
+               resourceName="UserDatabase" />
       </Realm>
       <%
       if node["tomcat"].has_key?("autodeploy_enabled")  && !node["tomcat"]["autodeploy_enabled"].empty?

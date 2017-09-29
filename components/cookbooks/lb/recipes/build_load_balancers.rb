@@ -15,11 +15,17 @@
 cloud_name = node.workorder.cloud.ciName
 cloud_service = nil
 dns_service = nil
-if !node.workorder.services["lb"].nil? &&
-  !node.workorder.services["lb"][cloud_name].nil?
 
-  cloud_service = node.workorder.services["lb"][cloud_name]
+lb_service_type = node.lb.lb_service_type
+
+exit_with_error "#{lb_service_type} service not found. either add it or change service type" if !node.workorder.services.has_key?("#{lb_service_type}")
+
+if !node.workorder.services["#{lb_service_type}"].nil? &&
+    !node.workorder.services["#{lb_service_type}"][cloud_name].nil?
+
+  cloud_service = node.workorder.services["#{lb_service_type}"][cloud_name]
   dns_service = node.workorder.services["dns"][cloud_name]
+
 end
 
 if cloud_service.nil? || dns_service.nil?

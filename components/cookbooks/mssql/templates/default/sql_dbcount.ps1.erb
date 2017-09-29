@@ -1,0 +1,4 @@
+$instance = hostname
+$totalDB = Invoke-Sqlcmd -ServerInstance $instance -Database 'master' -Query 'select count(*) as totaldbs from sys.sysdatabases' -ConnectionTimeout 30
+$offlineDB = Invoke-Sqlcmd -ServerInstance $instance -Database 'master' -Query 'select count(*) as offlinedbs from sys.databases where state_desc != ''ONLINE''' -ConnectionTimeout 30
+write-host dbcount "|totaldbs=$($totalDB.totaldbs) offlinedbs=$($offlineDB.offlinedbs)"

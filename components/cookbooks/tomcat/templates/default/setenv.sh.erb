@@ -10,7 +10,7 @@ if [ -f /etc/profile.d/oneops.sh ];then
   source /etc/profile.d/oneops.sh
 fi
 
-
+export UMASK="0022"
 # Directory where the Tomcat 6 binary distribution resides.  This a read-only
 # directory that can be shared by all Tomcat instances running on the machine.
 # Default: /usr/share/TOMCAT

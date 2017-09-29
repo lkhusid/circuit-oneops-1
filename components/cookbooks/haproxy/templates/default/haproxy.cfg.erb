@@ -35,6 +35,9 @@ listen stats :<%= node.haproxy.stats_web_port %>
   mode http
   stats enable
   stats uri /
+  timeout connect         10s
+  timeout client          1m
+  timeout server          1m
 
 <% end -%>
 

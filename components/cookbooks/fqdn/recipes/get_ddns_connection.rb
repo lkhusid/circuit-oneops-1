@@ -17,8 +17,7 @@
 # Recipe:: get_ddns_connection
 #
 
-cloud_name = node[:workorder][:cloud][:ciName]
-service = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+service = get_dns_service
   
 auth_content = "key #{service[:keyname]} {\n"
 auth_content += "  secret \"#{service[:secret]}\";\n"

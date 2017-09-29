@@ -41,7 +41,7 @@ def delete_gslb_service_by_name(gslb_service_name)
   dc_name = gdns_cloud_service[:ciAttributes][:gslb_site_dns_id]
   vport = get_gslb_port
   monitor_name = node.workorder.box.ciId.to_s+"-#{vport}-#{dc_name}-gmon"
-    
+      
   mon_response  = JSON.parse(conn.request(
     :method=>:get,
     :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}").body)
@@ -116,6 +116,59 @@ def get_gslb_service_name_by_platform
   
   return [env_name, platform_name, asmb_name, dc_name, ci["ciId"].to_s, "gslbsrvc"].join("-")
 end
+
+
+def clear_non_generic_monitor(conn,gslb_service_name,monitor_name)
+  
+  Chef::Log.info("delete monitor to migrate to generic monitor")
+  gslbsvc_lbmon_obj = JSON.parse(conn.request(
+    :method=>:get,
+    :path=>"/nitro/v1/config/gslbservice_lbmonitor_binding/#{gslb_service_name}").body)
+    
+  if !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].nil? && 
+     !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].find{|glbmon| glbmon['monitor_name'] == monitor_name}.nil?
+       
+    binding = { :monitor_name => monitor_name, :servicename => gslb_service_name }
+    Chef::Log.info("binding being deleted for migration to generic monitor: #{binding.inspect}")
+    req = URI::encode('object={"params":{"action": "unbind"}, "gslbservice_lbmonitor_binding" : ' + JSON.dump(binding) + '}')
+    resp_obj = JSON.parse(conn.request(
+      :method=> :post,
+      :path=>"/nitro/v1/config/gslbservice_lbmonitor_binding/#{gslb_service_name}",
+      :body => req).body)
+
+    if ![0,258].include?(resp_obj["errorcode"])
+      Chef::Log.error( "delete bind #{binding.inspect} resp: #{resp_obj.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "delete bind  #{binding.inspect} resp: #{resp_obj.inspect}")
+    end
+  end
+
+  mon_response  = JSON.parse(conn.request(
+    :method=>:get,
+    :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}").body)
+    
+  mon_detail = []
+  if mon_response.has_key?('lbmonitor') 
+    mon_detail = mon_response['lbmonitor']
+  end
+      
+  if mon_detail.size > 0
+    type = mon_detail[0]['type']
+      
+    res_mon = JSON.parse(conn.request(
+      :method=>:delete,
+      :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}?args=type:#{type}").body)
+    
+    if res_mon['errorcode'] != 2131 && res_mon['errorcode'] != 0
+      Chef::Log.error( "delete monitor #{monitor_name} resp: #{res_mon.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "delete monitor #{monitor_name} resp: #{res_mon.inspect}")
+    end    
+  end     
+end
+  
 
 def create_gslb_service
   ci = node.workorder.box
@@ -260,10 +313,10 @@ def create_gslb_service
     Chef::Log.info( "bind exists: #{bindings.inspect}")
   end        
   
-# Adding GSLB Health Monitors
-
+  # Adding GSLB Health Monitors
   begin
-    ecv_map = JSON.parse(node.workorder.payLoad.DependsOn[0].ciAttributes.ecv_map)
+    lb = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Lb/ }.first
+    ecv_map = JSON.parse(lb['ciAttributes']['ecv_map'])    
   rescue Exception => e
     ecv_map = {}
   end
@@ -271,16 +324,52 @@ def create_gslb_service
   vport = @new_resource.port
   iport = @new_resource.iport
   vprotocol = @new_resource.servicetype.downcase
-  if !ecv_map.has_key?(iport)
+  if !ecv_map.has_key?(iport.to_s)
     ecv = "GET /"
+  else
+    ecv = ecv_map[iport.to_s]
   end
-  ecv = ecv_map[iport.to_s]
   monitor_name = ci["ciId"].to_s+"-#{vport}-#{dc_name}-gmon"
   if monitor_name.length > 31 #This can happen only becuase of dc_name rest all characters will max sum upto 24, including the max port no. allowed
     #monitor_name would take the 1st and last 2 characters of dc_name
     monitor_name = ci["ciId"].to_s+"-#{vport}-#{dc_name[0]}#{dc_name[/.{,#{2}}\z/m]}-gmon"
     dc_name = "#{dc_name[0]}#{dc_name[/.{,#{2}}\z/m]}"
   end
+  
+  # use generic monitors
+  if ["get /","head /"].include?(ecv.downcase)
+    # remove old one
+    clear_non_generic_monitor(conn, gslb_service_name, monitor_name)
+    # use generic one
+    monitor_name = "generic-" + ecv.downcase.gsub(' ','-').gsub('/',vprotocol)
+    if ['tcp', 'udp'].include?(vprotocol)
+	monitor_name = "generic-" + vprotocol
+    end
+  else
+    # unbind generic
+    resp_obj = JSON.parse(conn.request(:method=>:get, :path=>"/nitro/v1/config/gslbservice_lbmonitor_binding/#{gslb_service_name}").body)
+    if resp_obj.has_key?('gslbservice_lbmonitor_binding')
+      resp_obj['gslbservice_lbmonitor_binding'].each do |binding|
+        if binding['monitor_name'] =~ /generic-/
+          binding = { :monitor_name => binding['monitor_name'], :servicename => gslb_service_name }
+          Chef::Log.info("binding being deleted: #{binding.inspect}")
+          req = URI::encode('object={"params":{"action": "unbind"}, "gslbservice_lbmonitor_binding" : ' + JSON.dump(binding) + '}')
+          resp_obj = JSON.parse(conn.request(
+            :method=> :post,
+            :path=>"/nitro/v1/config/gslbservice_lbmonitor_binding/#{gslb_service_name}",
+            :body => req).body)
+  
+          if ![0,258].include?(resp_obj["errorcode"])
+            Chef::Log.error( "delete bind #{binding.inspect} resp: #{resp_obj.inspect}")
+            exit 1
+          else
+            Chef::Log.info( "delete bind  #{binding.inspect} resp: #{resp_obj.inspect}")
+          end
+        end
+      end
+    end
+  end 
+  
   monitor = {
     :monitorname => monitor_name,
     :type => 'HTTP',
@@ -326,12 +415,16 @@ def create_gslb_service
   else
     existing_monitor = resp_obj["lbmonitor"][0]
     Chef::Log.info("existing monitor: #{existing_monitor.inspect}")
-    if existing_monitor["type"] != monitor[:type]
+    
+    if existing_monitor["type"] != monitor[:type] && !monitor_name.start_with?("generic")
       Chef::Log.info("delete monitor due to different types: existing: #{existing_monitor['type']} current: #{monitor[:type]}")
       gslbsvc_lbmon_obj = JSON.parse(conn.request(
         :method=>:get,
         :path=>"/nitro/v1/config/gslbservice_lbmonitor_binding/#{gslb_service_name}").body)
-      if !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].nil? && !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].find{|glbmon| glbmon['monitor_name'] == monitor_name}.nil?
+        
+      if !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].nil? && 
+         !gslbsvc_lbmon_obj['gslbservice_lbmonitor_binding'].find{|glbmon| glbmon['monitor_name'] == monitor_name}.nil?
+           
         binding = { :monitor_name => monitor_name, :servicename => gslb_service_name }
         Chef::Log.info("binding being deleted: #{binding.inspect}")
         req = URI::encode('object={"params":{"action": "unbind"}, "gslbservice_lbmonitor_binding" : ' + JSON.dump(binding) + '}')
@@ -456,6 +549,8 @@ def create_gslb_service
   if resp_obj["errorcode"] == 0 && !resp_obj["gslbservice_lbmonitor_binding"][0].nil?
     #if !resp_obj["gslbservice_lbmonitor_binding"][0]["monitor_name"].include?dc_name
     resp_obj["gslbservice_lbmonitor_binding"].find_all{ |v| !v['monitor_name'].include?dc_name }.each do |old_mon|
+
+        next if old_mon["monitor_name"].start_with?("generic")
         #binding = { :monitor_name => resp_obj["gslbservice_lbmonitor_binding"][0]["monitor_name"], :servicename => gslb_service_name }
         binding = { :monitor_name => old_mon["monitor_name"], :servicename => gslb_service_name }
         Chef::Log.info("binding being deleted: #{binding.inspect}")

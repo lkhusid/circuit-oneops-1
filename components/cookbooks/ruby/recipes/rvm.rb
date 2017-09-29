@@ -83,8 +83,13 @@ end
 # install ruby
 bash "install ruby-#{version}" do
   code <<-EOH
+if [ -f ~/.bash_profile ]; then
+  source ~/.bash_profile
+fi
 source /etc/profile.d/rvm.sh
 rvm mount -r #{ruby_binary} --verify-downloads 2
+cd #{src_dir}/rvm
+./install --auto-dotfiles
 rvm use #{version} --default
 EOH
 end

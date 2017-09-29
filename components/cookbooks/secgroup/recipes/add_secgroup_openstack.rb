@@ -2,6 +2,7 @@
 # openstack secgroup::add
 #
 require 'fog/openstack'
+require 'resolv'
 
 # openstack doesnt like '.'
 node.set["secgroup_name"] = node.secgroup_name.gsub(".","-")
@@ -71,12 +72,20 @@ rules.each do |rule|
   }
   
   if check.empty?
-    begin      
+    begin
+      ethertype = ''
+      ip_addr = cidr.split("/")
+      if ip_addr[0] =~ Resolv::IPv4::Regex
+        ethertype = 'ipv4'
+      elsif ip_addr[0] =~ Resolv::IPv6::Regex || ip_addr[0] =~ Resolv::IPv6::Regex_CompressedHex || ip_addr[0] =~ Resolv::IPv6::Regex_6Hex4Dec || ip_addr[0] =~ Resolv::IPv6::Regex_8Hex || ip_addr[0] =~ Resolv::IPv6::Regex_CompressedHex4Dec
+        ethertype = 'ipv6'
+      end
       sg_rule = {
         :security_group_id => sg.id,
         :direction => direction,
         :remote_ip_prefix => cidr,
-        :protocol => protocol        
+        :protocol => protocol,
+        :ethertype => ethertype
       }
       
       if min != 'null'

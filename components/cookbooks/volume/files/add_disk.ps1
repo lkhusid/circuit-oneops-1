@@ -1,88 +1,105 @@
 param(
-	[parameter(Mandatory=$true)]
-	[string]$letter
-) 
+	[parameter(Mandatory=$True)]
+	[string]$DriveLetter,
+	[parameter(Mandatory=$false)]
+	[string]$vol_id,
+	[parameter(Mandatory=$false)]
+	[int64]$storage_size
+)
+$ErrorActionPreference = "Stop"
+#Logging
+$Date    = Get-Date
+$LogPath = "C:\tmp"
+$script:LogFile = Join-Path $LogPath 'Execute-elevated-command.log'
+$script:LogError  = Join-Path $LogPath 'Execute-elevated-command.err'
 
-# Get the ID and security principal of the current user account
-$myWindowsID=[System.Security.Principal.WindowsIdentity]::GetCurrent()
-$myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWindowsID)
-# Get the security principal for the Administrator role
-$adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
- 
-# Check to see if we are currently running "as Administrator"
-if (!$myWindowsPrincipal.IsInRole($adminRole))
-   {
-        # We are not running "as Administrator" - so relaunch as administrator
-        # Create a new process object that starts PowerShell
-        $newProcess = new-object System.Diagnostics.ProcessStartInfo "PowerShell";
-        # Specify the current script path and name as a parameter
-        $newProcess.Arguments = $myInvocation.MyCommand.Definition + " " + $letter
-        # Indicate that the process should be elevated
-        $newProcess.Verb = "runas";
-        # Start the new process
-        [System.Diagnostics.Process]::Start($newProcess);
-        exit
-   }
 
-Write-Host "Trying to enable" $letter "drive"
-if (($letter.length -gt 1) -or !($letter -match '[e-z]')) {
-    Write-Host $letter "is not a valid letter for a Windows Drive"
-    return 1
+#Log initial details
+$Admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
+$Whoami = whoami # Simple, could use $env as well
+"Running script $($MyInvocation.MyCommand.Path) at $Date" | Out-File $script:LogFile -Append
+"Admin: $Admin" | Out-File $script:LogFile -Append
+"User: $Whoami" | Out-File $script:LogFile -Append
+"Bound parameters: $($PSBoundParameters | Out-String)" | Out-File $script:LogFile -Append
+
+
+function Output-CustomError ([string]$ErrMsg, [System.Exception]$Err)
+{
+  If (!$Err) {$Err = New-Object System.Exception ($ErrMsg)}
+
+  $Err | Format-List -Force| Out-File $script:LogFile -Append
+  $Err.Message | Out-File $script:LogError
+  Write-Error $Err
+  $ErrCode = 1
+  if ($Err.HResult -gt 0) {$ErrCode = $Err.HResult}
+  [System.Environment]::Exit($ErrCode)
 }
 
-$LogicalDisks = get-wmiobject Win32_LogicalDisk
-foreach($Disk in $LogicalDisks)
-{
-    if ($letter -eq $Disk.DeviceID.Substring(0,1))
-    {
-        Write-Host $letter "is already in use"
-        return 0
-    }
+
+
+#Ephemeral disk: does not depend on storage, so vol_id and storage_size are empty
+#Assuming size is in gb
+
+$GB = [math]::pow(1024,3)
+
+#Get offline disks and switch them online
+#Conditions:
+#1 - nonsystem, bigger than 1GB
+#2 - if vol_id is empty - Serialnumber should be empty too, else serialnumber is a substring of vol_id
+#3 - storage_size is either empty, or equals Size
+
+$disk = Get-Disk | Where-Object { $_.IsSystem -eq $False -and $_.Size -gt $GB`
+  -and ( ($_.SerialNumber -and $vol_id -like "$($_.SerialNumber)*") -or (!($vol_id) -and !($_.SerialNumber) ) )`
+  -and (!($storage_size) -or $storage_size*$GB -eq $_.Size) }
+
+if (!$disk) 
+{ Write-Host "About to call Output-CustomerError 1"
+  #Output-CustomError "ERROR1"
+  Output-CustomError -ErrMsg "The specified disk was not found. Make sure the appropriate storage is attached to the compute."
 }
 
-#Check for offline disks on server.
-$offlinedisk = "list disk" | diskpart | where {$_ -match "offline"}
-if($offlinedisk)
+if ($disk.Length -gt 1) {Output-CustomError -ErrMsg "Multiple disks matched given vol_id: $vol_id"}
+
+$DiskNum = $disk.Number
+
+#Check if a partition with this DriveLetter already exists on another disk
+If (Get-Disk | Get-Partition | Where-Object {$_.DriveLetter -eq $DriveLetter -and $_.DiskNumber -ne $DiskNum})
+  {Output-CustomError -ErrMsg "The drive letter $DriveLetter is already in use"}
+
+try 
 {
-    Write-Host "Following Offline disk found.."
-    $offlinedisk
-    foreach($offdisk in $offlinedisk)
-    {
-        Write-Host "Enabling $offdiskS with letter $letter"
-        $offdiskS = $offdisk.Substring(2,6)
 
-#Creating command parameters for selecting disk, making disk online and setting off the read-only flag.
-$OnlineDisk = @"
-select $offdiskS
-online disk
-attributes disk clear readonly
-clean
-create partition primary
-select part 1
-format fs=ntfs quick
-assign letter $letter
-"@
+  # Stops the Hardware Detection Service
+  Stop-Service -Name ShellHWDetection 
 
-        #Sending parameters to diskpart
-        $noOut = $OnlineDisk | diskpart
-        sleep 6      
-        break
-    }
+  #1. Switch online
+  if ((Get-Disk -Number $DiskNum).IsOffline) {Set-Disk -Number $DiskNum -IsOffline $False}
 
-    #If selfhealing failed throw the alert.
-    if(($offlinedisk = "list disk" | diskpart | where {$_ -match "offline"} ))
-    {
-        Write-Host "Failed to bring the disk online"
-    }
-    else
-    {
-        Write-Host "Disk $letter are now online."
-        return 0
-    }
+  #1a. Make sure the disk is writeable
+  if ((Get-Disk -Number $DiskNum).IsReadOnly) {Set-Disk -Number $DiskNum -IsReadOnly $False}
+
+  #2. Initialize disk
+  if ((Get-Disk -Number $DiskNum).PartitionStyle -eq "RAW") {Initialize-Disk -Number $DiskNum}
+
+  #3. Create a partition
+  if (!(Get-Partition -DiskNumber $DiskNum | Where-Object Type -ne "Reserved")) 
+    {New-Partition -DiskNumber $DiskNum -UseMaximumSize -DriveLetter $DriveLetter}
+
+  $Partition = Get-Partition -DiskNumber $DiskNum| Where-Object {$_.Type -ne "Reserved"}
+
+  #4. Re-assign drive letter
+  If ($Partition.DriveLetter -ne $DriveLetter) 
+    {$Partition | Set-Partition -NewDriveLetter $DriveLetter}
+
+  #5. Format the volume
+  If (!(Get-Volume -DriveLetter $DriveLetter).FileSystem) {Format-Volume -DriveLetter $DriveLetter -Confirm:$false}
 }
-else #If no offline disk exist.
+catch 
 {
-    #All disk(s) are online.
-    Write-Host "There is not a new disk to get online"
-    return 1
+    Output-CustomError -Err $_.Exception
+}
+finally 
+{  
+  #Starts the Hardware Detection Service again 
+  Start-Service -Name ShellHWDetection
 }

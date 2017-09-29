@@ -1,0 +1,11 @@
+connector.name=cassandra
+cassandra.contact-points=<%= @connection_contact_points %>
+
+<%
+  connector_config = @connector_config
+  connector_config.each_key { |key|
+%>
+<%= key %>=<%= connector_config[key] %>
+<%
+  }
+%>

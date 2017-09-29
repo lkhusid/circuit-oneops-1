@@ -18,14 +18,14 @@ resource 'secgroup',
          :attributes => {
            # Port configuration:
            #
-           #    -1:  Ping
+           #  null:  Ping
            #    22:  SSH
            #    80:  Ganglia Server
            # 8800-8899: Server gmond instances
            # 60000:  For mosh
            #
            "inbound" => '[
-               "-1 -1 icmp 0.0.0.0/0",
+               "null null 4 0.0.0.0/0",
                "22 22 tcp 0.0.0.0/0",
                "80 80 tcp 0.0.0.0/0",
                "8800 8899 udp 0.0.0.0/0",

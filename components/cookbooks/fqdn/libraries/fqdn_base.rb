@@ -5,6 +5,90 @@
 #
 # Author : OneOps
 # Apache License, Version 2.0
+require 'resolv'
+require 'ipaddr'
+
+def get_ostype
+
+  ostype = 'linux'
+  os = node[:workorder][:payLoad][:DependsOn].select {|d| (d.ciClassName.split('.').last == 'Os')}
+  if node[:workorder][:payLoad].has_key?('os_payload') && node[:workorder][:payLoad][:os_payload].first[:ciAttributes][:ostype] =~ /windows/
+    ostype = 'windows'
+  elsif !os.empty? && os.first[:ciAttributes][:ostype] =~ /windows/
+    ostype = 'windows'
+  end
+
+  return ostype
+end #def get_ostype
+
+def get_dns_service
+  cloud_name = node[:workorder][:cloud][:ciName]
+  service_attrs = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+
+  #Find zone subservices satisfying the criteria
+  zone_services = []
+  node[:workorder][:services][:dns].each do |s|
+ 
+    if s.first =~ /#{cloud_name}\// && s.last[:ciAttributes].has_key?('criteria_type')
+
+      #platform check
+      if s.last[:ciAttributes][:criteria_type] == 'platform' && get_ostype == s.last[:ciAttributes][:criteria_value]
+        zone_services.push(s.last)
+      end
+    end
+  end
+
+  if zone_services.uniq.size > 1
+    Chef::Log.warn("Multiple zone subservices with satisfying criteria have been found. Using the default service...")
+  end
+
+  #One and only one satisfying zone subservice is found - use it instead of default dns service
+  if zone_services.uniq.size == 1
+    service_attrs = zone_services.first[:ciAttributes]
+  end
+
+  return service_attrs
+end #def get_dns_service
+
+def get_windows_domain_service
+  cloud_name = node[:workorder][:cloud][:ciName]
+  windows_domain = nil
+  if node[:workorder][:payLoad].has_key?('windowsdomain')
+    windows_domain = node[:workorder][:payLoad][:windowsdomain].first
+  elsif node[:workorder][:services].has_key?('windows-domain')
+    windows_domain = node[:workorder][:services]['windows-domain'][cloud_name]
+  end
+  return windows_domain
+end #def get_windows_domain_service
+
+def is_windows
+  return ( get_ostype == 'windows' && get_windows_domain_service )
+end #def is_windows
+
+def get_windows_domain
+
+  if get_dns_service[:zone].split('.').last(2) == get_windows_domain_service[:ciAttributes][:domain].split('.').last(2)
+    return get_windows_domain_service[:ciAttributes][:domain].downcase
+  else
+    return get_dns_service[:zone].downcase
+  end
+
+end #def get_windows_domain
+
+def get_customer_domain
+  #environment.assembly.cloud_id.zone
+  if is_windows
+    arr = [node[:workorder][:payLoad][:Environment][0][:ciName], node[:workorder][:payLoad][:Assembly][0][:ciName], get_dns_service[:cloud_dns_id], get_windows_domain]
+    customer_domain = '.' + arr.join('.').downcase
+  else
+    customer_domain = node[:customer_domain].downcase
+  end
+
+  if customer_domain !~ /^\./
+    customer_domain = '.' + customer_domain
+  end
+  return customer_domain
+end #def get_customer_domain
 
 module Fqdn
 
@@ -37,13 +121,20 @@ module Fqdn
         cmd = "dig +short PTR #{ptr_name} @#{ns}"
         Chef::Log.info(cmd)
         existing_dns += `#{cmd}`.split("\n").map! { |v| v.gsub(/\.$/,"") }
+      elsif dns_name =~ Resolv::IPv6::Regex ###check this !!
+        ptr_name= IPAddr.new(dns_name).reverse
+        cmd = "dig +short PTR #{ptr_name} @#{ns}"
+        Chef::Log.info(cmd)
+        existing_dns += `#{cmd}`.split("\n").map! { |v| v.gsub(/\.$/,"") }
       else
-        ["A","CNAME"].each do |record_type|
+        ["A", "AAAA", "CNAME"].each do |record_type|
           Chef::Log.info("dig +short #{record_type} #{dns_name} @#{ns}")
           vals = `dig +short #{record_type} #{dns_name} @#{ns}`.split("\n").map! { |v| v.gsub(/\.$/,"") }
           # skip dig's lenient A record lookup thru CNAME
-          next if record_type == "A" && vals.size > 1 && vals[0] !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/
+          next if (record_type == "A" && vals.size > 1 && vals[0] !~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) || (record_type == "AAAA" && vals.size > 1 && vals[0] !~ Resolv::IPv6::Regex
+          )
           existing_dns += vals
+
         end
       end
       Chef::Log.info("existing: "+existing_dns.sort.inspect)
@@ -55,16 +146,22 @@ module Fqdn
     def get_record_type (dns_name, dns_values)
       record_type = "cname"
       ips = dns_values.grep(/\d+\.\d+\.\d+\.\d+/)
+      dns_values.each do |dns_value|
+        if dns_value =~ Resolv::IPv6::Regex
+          record_type = "aaaa"
+        end
+      end
+
+
       if ips.size > 0
         record_type = "a"
       end
-      if dns_name =~ /^\d+\.\d+\.\d+\.\d+$/
+      if dns_name =~ /^\d+\.\d+\.\d+\.\d+$/ || dns_name =~ Resolv::IPv6::Regex
         record_type = "ptr"
       end
       if dns_name =~ /^txt-/
         record_type = "txt"
       end
-    
       return record_type
     end
     
@@ -117,7 +214,7 @@ module Fqdn
           # dns_record must be all lowercase
           dns_record.downcase!
           # unless ends w/ . or is an ip address
-          dns_record += '.' unless dns_record =~ /,|\.$|^\d+\.\d+\.\d+\.\d+$/
+          dns_record += '.' unless dns_record =~ /,|\.$|^\d+\.\d+\.\d+\.\d+$/ || dns_record =~ Resolv::IPv6::Regex
         end
     
         if dns_record.empty?
@@ -136,6 +233,10 @@ module Fqdn
         
     
     def verify(dns_name, dns_values, ns, max_retry_count=30)
+      if dns_values.count > max_retry_count
+        max_retry_count = dns_values.count + 1
+      end
+
       retry_count = 0
       dns_type = get_record_type(dns_name, dns_values)
   
@@ -149,6 +250,8 @@ module Fqdn
           dns_lookup_name = dns_name
           if dns_name =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/
             dns_lookup_name = $4 +'.' + $3 + '.' + $2 + '.' + $1 + '.in-addr.arpa'
+          elsif dns_name =~ Resolv::IPv6::Regex
+            dns_lookup_name = IPAddr.new(dns_name).reverse
           end
           
           puts "dig +short #{dns_type} #{dns_lookup_name} @#{ns}"
@@ -190,6 +293,6 @@ module Fqdn
       end
       
     end
-            
+
   end
 end

@@ -9,7 +9,7 @@ require 'xmlsimple'
 
 port = <%= node.tomcat.port %>
 
-stats = XmlSimple.xml_in(`curl -s --user admin:admin "http://127.0.0.1:#{port}/manager/status?XML=true"`,{ 'KeyAttr' => 'name', 'ForceArray' => false })
+stats = XmlSimple.xml_in(`curl -s --user admin:<%= node['tomcat']['manager']['key'] %> "http://127.0.0.1:#{port}/manager/status?XML=true"`,{ 'KeyAttr' => 'name', 'ForceArray' => false })
 
 #puts "stats="+stats.inspect
 #"connector"=>{"http-8080"=>{"threadInfo"=>{
@@ -19,11 +19,15 @@ perf = nil
 
 <%
 # default tomcat
-connector_name = "http-#{node.tomcat.port}"
+connector_name = '"http-nio-'+node.tomcat.port+'"'
 
-case node.tomcat.version
-when "7.0"
+case node.tomcat.protocol
+when 'org.apache.coyote.http11.Http11Protocol'
 	connector_name = '"http-bio-'+node.tomcat.port+'"'
+when 'HTTP/1.1'
+	if node['tomcat']['version'].gsub(/\..*/,"") == '7'
+		connector_name = '"http-bio-'+node.tomcat.port+'"'
+	end
 end
 %>
 

@@ -7,4 +7,4 @@
 # All rights reserved - Do Not Redistribute
 #
 default[:dotnetcli][:folderpath] = "/usr/share/dotnet"
-default[:dotnetcli][:ostype]  = "centos-7.0"
+default[:dotnetcli][:ostype]  = "centos-7.3"

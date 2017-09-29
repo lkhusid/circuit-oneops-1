@@ -156,7 +156,7 @@ class VirtualMachineManager
     fail ArgumentError, 'secondary_volume is invalid' if secondary_volume.nil?
     fail ArgumentError, 'instance_id is invalid' if @instance_id.nil? || @instance_id.empty?
 
-    secondary_volume.server_id = @instance_id
+    secondary_volume.server.id = @instance_id
     secondary_volume.unit_number = 0
     begin
       add_controller
@@ -184,10 +184,7 @@ class VirtualMachineManager
     rescue => e
       error = 'Cloning instance failed. '
       Chef::Log.error("#{error}" + e.to_s)
-
       if (!@instance_id.nil?) && (is_debug == 'false')
-        error = 'Deleting failed instance. '
-        Chef::Log.error("#{error}" + e.to_s)
         delete
       end
       puts "***FAULT:FATAL=#{error}"
@@ -272,18 +269,13 @@ class VirtualMachineManager
 
     is_deleted = false
     begin
-      virtual_machine = get_virtual_machine
-      if !virtual_machine.nil?
-        if power_off(force = true)
-          response = @compute_provider.vm_destroy({'instance_uuid' => @instance_id})
-          is_deleted = true if response['task_state'] == 'success'
-        end
-      else
-        Chef::Log.warn("VM Not Found")
+      if power_off(force = true)
+        Chef::Log.info("deleting instance ")
+        response = @compute_provider.vm_destroy({'instance_uuid' => @instance_id})
+        is_deleted = true if response['task_state'] == 'success'
+        Chef::Log.info("instance deleted") if is_deleted == true
       end
     rescue => e
-      response = @compute_provider.vm_destroy({'instance_uuid' => @instance_id})
-      is_deleted = true if response['task_state'] == 'success'
       Chef::Log.error('Deleting instance failed: ' + e.to_s) if is_deleted == false
       exit 1
     end

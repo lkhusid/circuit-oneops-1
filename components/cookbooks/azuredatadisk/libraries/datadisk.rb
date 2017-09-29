@@ -319,6 +319,13 @@ class Datadisk < AzureBase::ResourceGroupManager
 
     def update_vm_properties(vm)
       begin
+
+        #create_or_update is not accepting the result from get()
+        #https://github.com/Azure/azure-sdk-for-java/issues/600
+        #if this hasworked in past then this must be a reinforcement by azure api server
+        #setting resources to null helps in fixing the issue
+        vm.resources = nil
+
         start_time = Time.now.to_i
         vm_promise = @compute_client.virtual_machines.create_or_update(@rg_name, @instance_name, vm)
         my_vm = vm_promise.value!

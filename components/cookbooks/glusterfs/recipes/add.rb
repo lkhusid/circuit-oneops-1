@@ -56,6 +56,15 @@ end
   end
 end
 
+%w{rsyslog-mmjsonparse nfs-utils}.each do |p|
+  ruby_block "installing dependencies" do
+    block do
+      `yum --assumeyes install #{p}`
+    end
+    only_if { node.platform_version.start_with?("7") }
+  end
+end
+
 %w{glusterfs-client glusterfs-server glusterfs-common glusterfs-devel}.each do |p|
   bash "installing package #{p}" do
     code <<-EOH

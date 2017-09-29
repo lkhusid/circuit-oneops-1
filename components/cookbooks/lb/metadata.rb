@@ -6,7 +6,7 @@ maintainer_email "support@oneops.com"
 license          "Apache License, Version 2.0"
 depends          "netscaler"
 depends          "azure_lb"
-depends          "neutron"
+depends          "octavia"
 depends          "f5-bigip"
 depends          "haproxy"
 
@@ -26,8 +26,8 @@ attribute 'listeners',
     :important => true,
     :category => '1.Global',
     :order => 1,
-    :pattern => '(http|https|tcp|udp|ssl_bridge|any) (\d+|all|\d+:\/.*?) (http|https|tcp|udp|ssl_bridge|any) (\d+|all)',
-    :help => 'Virtual/External protocol and port, then Internal/Compute-Level protocol and port.  4 values space separated: "vprotocol vport iprotocol iport" ex) "https 443 http 8080" or "tcp 5432 tcp 5432"'
+    :pattern => '(http|https|tcp|udp|ssl_bridge|any|terminated_https) (\d+|all|\d+:\/.*?) (http|https|tcp|udp|ssl_bridge|any) (\d+|all)',
+    :help => 'Virtual/External protocol and port, then Internal/Compute-Level protocol and port.  4 values space separated: "vprotocol vport iprotocol iport" ex) "https 443 http 8080" or "tcp 5432 tcp 5432" or "terminated_https 443 http 8080"'
   }
 
 attribute 'lbmethod',
@@ -39,7 +39,7 @@ attribute 'lbmethod',
     :help => 'Select the protocol type',
     :category => '1.Global',
     :order => 2,
-    :form => { 'field' => 'select', 'options_for_select' => [['RoundRobin','roundrobin'],['Least Connections','leastconn']] }
+    :form => { 'field' => 'select', 'options_for_select' => [['RoundRobin','roundrobin'],['Least Connections','leastconn'],['Source IP Hash','sourceiphash']] }
   }
 
 attribute 'stickiness',
@@ -145,6 +145,25 @@ attribute 'required_availability_zone',
     :order => 10
   }
 
+attribute 'connection_limit',
+          :description => "Connection Limit",
+          :default => "-1",
+          :format => {
+              :help => 'Applicable only for software loadbalancers. The maximum number of connections per second allowed for the vip. Valid values: a positive integer or -1 for unlimited (default).',
+              :category => '1.Global',
+    }
+
+attribute 'lb_service_type',
+  :description => "LB Service Type",
+  :required => "required",
+  :default => "lb",
+  :format => {
+    :important => true,
+    :help => 'Select the service type. lb for netscaler; slb for octavia',
+    :category => '1.Global',
+    :order => 1,
+    :form => { 'field' => 'select', 'options_for_select' => [['lb','lb'],['slb','slb']] }
+  }
 
 attribute 'ecv_map',
   :description => "ECV",

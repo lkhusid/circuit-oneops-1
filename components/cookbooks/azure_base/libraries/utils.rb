@@ -1,3 +1,4 @@
+require 'azure_mgmt_resources'
 require File.expand_path('../../libraries/logger.rb', __FILE__)
 
 module Utils
@@ -194,12 +195,52 @@ module Utils
     end
   end
 
+  def get_resource_tags(node)
+    owner = node.workorder.payLoad.Assembly[0].ciAttributes["owner"] || "Unknown"
+    return {'OwnerName' => owner}
+  end
+
+  def update_resource_tags(creds, subscription_id, resource_group_name, resource, tags)
+    OOLog.info("Updating #{resource.name} with tags: #{tags}")
+    client = Azure::ARM::Resources::ResourceManagementClient.new(creds)
+    client.subscription_id = subscription_id
+
+    type_arr = resource.type.split('/')
+    resource_provider = type_arr.shift
+    resource_type = type_arr.pop
+    resource_parent = '/' + type_arr.join('/')
+
+    case resource_provider
+      when /Compute/
+        api_version = '2017-03-30'
+      when /Network/
+        api_version = '2017-03-01'
+      when /Storage/
+        api_version = '2016-12-01'
+    end
+
+    # Get the resource via ResourceManagementClient
+    resource = (client.resources.get(resource_group_name, resource_provider, resource_parent,
+                                     resource_type, resource.name, api_version).value!).body
+
+    # Add the tags to the resource
+    resource.tags = tags
+
+    # Update the resource via ResourceManagementClient
+    resource = (client.resources.create_or_update(resource_group_name, resource_provider, resource_parent,
+                                                  resource_type, resource.name, api_version, resource).value!).body
+    OOLog.info("Finished updating #{resource.name}")
+    return resource
+  end
+
   module_function :get_credentials,
                   :set_proxy,
                   :set_proxy_from_env,
                   :get_component_name,
                   :get_dns_domain_label,
                   :abbreviate_location,
-                  :is_prm
+                  :is_prm,
+                  :get_resource_tags,
+                  :update_resource_tags
 
 end

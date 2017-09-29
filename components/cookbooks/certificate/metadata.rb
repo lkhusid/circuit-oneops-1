@@ -4,10 +4,11 @@ version          "0.1"
 maintainer       "OneOps"
 maintainer_email "support@oneops.com"
 license          "Apache License, Version 2.0"
+depends          "barbican"
 
 grouping 'default',
   :access => "global",
-  :packages => [ 'base', 'mgmt.catalog', 'mgmt.manifest', 'catalog', 'manifest', 'bom' ]
+  :packages => [ 'base', 'mgmt.catalog', 'mgmt.manifest', 'catalog', 'manifest' ]
 
 grouping 'bom',
   :access => "global",
@@ -104,9 +105,8 @@ attribute 'common_name',
   :description => "Common Name",
   :default => "",
   :format => {
-    :pattern => '^[^.]*$',
     :filter => {'all' => {'visible' => 'auto_provision:eq:true'}},
-    :help => 'Enter the common name for the certificate to be provisioned. Do not use dot (.) OneOps will append the domain. Use the field below to add specific SANs',
+    :help => 'Enter the common name for the certificate to be provisioned',
     :category => '1.Certificate',
     :order => 9 
   }
@@ -140,6 +140,17 @@ attribute 'domain',
     :help => 'Required for internet facing cert. Optional field if requesting internal certificate',
     :category => '1.Certificate',
     :order => 12
+  }
+
+attribute 'owner_email',
+  :description => "Application Owner Email DL (Mandatory)",
+  :default => "",
+  :format => {
+    :filter => {'all' => {'visible' => 'auto_provision:eq:true'}},
+    :help => 'Email alias of the application team that owns this certificate',
+    :category => '1.Certificate',
+    :pattern => "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}",
+    :order => 13
   }
 
 attribute 'path',

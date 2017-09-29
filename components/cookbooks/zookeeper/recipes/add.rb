@@ -6,6 +6,9 @@
 #
 #
 
+#Production cloud topology check for prod environments.
+include_recipe "zookeeper::validate_config"
+
 zk_basename = "zookeeper-#{node[:zookeeper][:version]}"
 ci = node.workorder.rfcCi.ciAttributes;
 zk_base_url = ci['mirror']

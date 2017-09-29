@@ -1,0 +1,28 @@
+---
+driver:
+  name: vagrant
+provisioner:
+  name: chef_solo
+platforms:
+  - name: centos-7.2
+suites:
+  - name: add
+    run_list:
+      - recipe[kitchen-test-helper]
+      - recipe[user::add]
+    attributes:
+      user:
+        username: 'app'
+        login_shell: '/bin/bash'
+        group: '["app"]'
+        authorized_keys: '["changeme"]'
+  - name: delete
+    run_list:
+      - recipe[kitchen-test-helper]
+      - recipe[User::add]
+      - recipe[User::delete]
+    attributes:
+      user:
+        username: 'app'
+        login_shell: '/bin/bash'
+        group: '["app"]'

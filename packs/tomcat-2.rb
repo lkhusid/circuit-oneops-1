@@ -4,6 +4,7 @@ description   "Tomcat"
 type          "Platform"
 category      "Web Application"
 version       "2"
+enabled false
 
 environment "single", {}
 environment "redundant", {}
@@ -294,7 +295,6 @@ relation "keystore::depends_on::certificate",
   :to_resource => 'certificate',
   :attributes => {"propagate_to" => "from", "flex" => false, "min" => 1, "max" => 1}
 
-
 # managed_via
 [ 'tomcat', 'artifact', 'build', 'java','keystore', 'tomcat-daemon'].each do |from|
   relation "#{from}::managed_via::compute",
@@ -304,3 +304,9 @@ relation "keystore::depends_on::certificate",
     :to_resource   => 'compute',
     :attributes    => { }
 end
+
+policy "vulnerable-tomcat-version",
+  :description => 'Using a known vulnerable version of Tomcat',
+  :query => 'ciClassName:("bom.oneops.1.Tomcat-2") AND NOT ciAttributes.version:("8.5.12")',
+  :docUrl => '',
+  :mode => 'passive'

@@ -18,7 +18,7 @@ attribute 'username',
     :category => '1.Global',
     :editable => false,
     :order => 1,
-    :pattern => '^[a-z0-9_-]{3,15}$'
+    :pattern => "(^[a-z][a-z0-9_-]{1,60}\\\\|^)[a-z0-9_-]{3,15}$"
   }
 attribute 'ulimit',
   :description => "Max Open Files",

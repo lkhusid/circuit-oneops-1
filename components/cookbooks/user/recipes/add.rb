@@ -3,48 +3,60 @@ require 'securerandom'
 username = node[:user][:username]
 if node['platform'] =~ /windows/
   home_dir = "C:/Cygwin64/home/#{username}" 
+  if username.include?('\\')
+    home_dir = "C:/Cygwin64/home/#{username.split('\\').last.to_s}"
+  end
   group_primary = 'Administrators'
 else
+  #Backslash in username is only allowed for Windows
+  if username.include?('\\')
+    msg = "Username cannot contain backslash for non-Windows platforms"
+    puts "***FAULT:FATAL=#{msg}"
+    Chef::Application.fatal!(msg)
+  end
   Chef::Log.info("Stopping the nslcd service")
   `sudo killall -9  /usr/sbin/nslcd`
-  home_dir = node[:user][:home_directory]  
+  home_dir = node[:user][:home_directory]
   group_primary = username
 end
 
 node.set[:user][:home] = home_dir && !home_dir.empty? ? home_dir : "/home/#{username}"
 
-#Generate random password if needed
-password = node[:user][:password]
-if password.nil? || password.size == 0
-  password = SecureRandom.urlsafe_base64(14)
-end
+if !username.include?('\\')
+  #Generate random password if needed
+  password = node[:user][:password]
+  if password.nil? || password.size == 0
+    password = SecureRandom.urlsafe_base64(14)
+  end
 
-user username do
-  #Common attributes
-  comment node[:user][:description]
-  manage_home true
-  home node[:user][:home]
+  user username do
+    #Common attributes
+    comment node[:user][:description]
+    manage_home true
+    home node[:user][:home]
   
-  if node['platform'] =~ /windows/ 
-    #Windows-specific attributes
-    action :create
-	password password
-  else	
-    #Non-Windows specific attributes
-    if node[:user][:system_user] == 'true'
-      system true
-      shell '/bin/false'
-    else
-      shell node[:user][:login_shell] unless node[:user][:login_shell].empty?
-    end
-  
-	if node['etc']['passwd'][username]
-      action :modify
-    else
+    if node['platform'] =~ /windows/
+      #Windows-specific attributes
       action :create
-    end
-  end #if node['platform'] =~ /windows/ 
-end
+      password password
+    else
+      #Non-Windows specific attributes
+      if node[:user][:system_user] == 'true'
+        system true
+        shell '/bin/false'
+      else
+        shell node[:user][:login_shell] unless node[:user][:login_shell].empty?
+      end
+  
+      if node['etc']['passwd'][username]
+        action :modify
+      else
+        action :create
+      end
+    end #if node['platform'] =~ /windows/
+  end
+end #if !username.include?('\\')
+
 
 #Manage group membership
 groups = JSON.parse(node[:user][:group])
@@ -54,9 +66,9 @@ groups.each do |g|
   group g do
     action :create
     members [username]
-    if node['platform'] =~ /windows/ 
-	  append true
-	end
+    if node['platform'] =~ /windows/
+      append true
+    end
   end
 end
 
@@ -73,7 +85,7 @@ directory "#{node[:user][:home]}" do
   mode home_mode
   if node['platform'] =~ /windows/
     rights :full_control, 'oneops'
-	inherits false
+    inherits false
   end
 end
 
@@ -83,7 +95,7 @@ directory "#{node[:user][:home]}/.ssh" do
   mode 0700
   if node['platform'] =~ /windows/
     rights :full_control, 'oneops'
-	inherits false
+    inherits false
   end  
 end
 
@@ -95,7 +107,7 @@ file "#{node[:user][:home]}/.ssh/authorized_keys" do
   content JSON.parse(node[:user][:authorized_keys]).join("\n")
   if node['platform'] =~ /windows/
     rights :full_control, 'oneops'
-	inherits false
+    inherits false
   end
 end
 
@@ -128,7 +140,7 @@ if !docker
       `echo "#{username} hard nofile #{ulimit}" >> /etc/security/limits.conf`
 
   else
-  	Chef::Log.info("ulimit attribute not found. Not writing to the limits.conf")
+      Chef::Log.info("ulimit attribute not found. Not writing to the limits.conf")
   end
 else
   Chef::Log.info("changing limits.conf not supported on containers")

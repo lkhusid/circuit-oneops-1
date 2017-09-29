@@ -22,6 +22,9 @@ wrapper.java.command = /usr/bin/java
 # YAJSW: required dll are encapsulated in jar files -> only library path of your application required
 # wrapper.java.library.path.1=../lib
 
+# changes the boot priority of the wrapper to make sure that it starts after the machine is fully setup
+wrapper.daemon.update_rc=91
+
 # Java Additional Parameters
 #wrapper.java.additional.1=
 

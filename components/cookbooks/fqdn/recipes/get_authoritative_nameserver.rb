@@ -1,6 +1,5 @@
 # get authoratative NS's and find one we can connect to
-cloud_name = node[:workorder][:cloud][:ciName]
-service_attrs = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+service_attrs = get_dns_service
 ns_list = `dig +short NS #{service_attrs[:zone]}`.split("\n")
 ns = nil
 ns_list.each do |n|

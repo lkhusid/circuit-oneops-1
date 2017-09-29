@@ -28,23 +28,32 @@ def delete_record (dns_name, dns_value)
 
   Chef::Log.info("delete #{delete_type}: #{dns_name} to #{dns_value}")
 
+  api_version = "v1.0"
+
   record = { :name => dns_name.downcase }
   case delete_type
-  when "cname"
-    record["canonical"] = dns_value.downcase
-  when "a"
-    record["ipv4addr"] = dns_value.downcase
-  when "ptr"
-    record = {"ipv4addr" => dns_name,
-              "ptrdname" => dns_value}
-  when "txt"
+    when "cname"
+      record["canonical"] = dns_value.downcase
+    when "a"
+      record["ipv4addr"] = dns_value.downcase
+    when "aaaa"
+      record["ipv6addr"] = dns_value.downcase
+    when "ptr"
+      if dns_name =~ Resolv::IPv4::Regex
+        record = {"ipv4addr" => dns_name,
+                  "ptrdname" => dns_value}
+      elsif dns_name =~ Resolv::IPv6::Regex
+        record = {"ipv6addr" => dns_name,
+                  "ptrdname" => dns_value}
+        api_version = "v1.2" #ipv6addr attribute is recognized only in infoblox api version >= 1.1
+      end
+    when "txt"
       record = {"name" => dns_name,
                 "text" => dns_value}
-              
   end
 
   records = JSON.parse(node.infoblox_conn.request(:method=>:get,
-    :path=>"/wapi/v1.0/record:#{delete_type}", :body => JSON.dump(record) ).body)
+    :path=>"/wapi/#{api_version}/record:#{delete_type}", :body => JSON.dump(record) ).body)
 
   if records.size == 0
     Chef::Log.info("record already deleted")
@@ -52,7 +61,7 @@ def delete_record (dns_name, dns_value)
   else
     records.each do |r|
       ref = r["_ref"]
-      resp = node.infoblox_conn.request(:method => :delete, :path => "/wapi/v1.0/#{ref}")
+      resp = node.infoblox_conn.request(:method => :delete, :path => "/wapi/#{api_version}/#{ref}")
       Chef::Log.info("status: #{resp.status}")
       if (resp.status.to_i != 200)
         Chef::Log.error("response: #{resp.inspect}")
@@ -88,7 +97,7 @@ end
 def set_is_hijackable_record(dns_name)
   
   # 'txt-' prefix due to cnames and txt records cannot exist for same name in infoblox 
-  record = { :name => 'txt-' + dns_name, :text => "hijackable_from_#{node.customer_domain}" }
+  record = { :name => 'txt-' + dns_name, :text => "hijackable_from_#{get_customer_domain}" }
   
   records = JSON.parse(node.infoblox_conn.request(:method=>:get,
     :path=>"/wapi/v1.0/record:txt", :body => JSON.dump(record) ).body)
@@ -112,9 +121,7 @@ end
 
 include_recipe "fqdn::get_infoblox_connection"
 
-cloud_name = node[:workorder][:cloud][:ciName]
-domain_name = node[:workorder][:services][:dns][cloud_name][:ciAttributes][:zone]
-view_attribute = node[:workorder][:services][:dns][cloud_name][:ciAttributes][:view_attr]
+view_attribute = get_dns_service[:view_attr]
 
 Chef::Log.debug("view_attribute: #{view_attribute}")
 
@@ -164,7 +171,7 @@ node[:entries].each do |entry|
       set_is_hijackable_record(dns_name)
     elsif node.workorder.rfcCi.ciBaseAttributes.has_key?('hijackable_full_aliases') &&
       node.workorder.rfcCi.ciBaseAttributes.hijackable_full_aliases == 'true'
-      delete_record('txt-' + dns_name,"hijackable_from_#{node.customer_domain}")
+      delete_record('txt-' + dns_name,"hijackable_from_#{get_customer_domain}")
     end
   end
     
@@ -184,8 +191,15 @@ node[:entries].each do |entry|
 
          delete_record(dns_name, existing_entry)
       end
-    end
 
+      # First check to make sure we have dc_entry attribute
+      if node[:dc_entry] 
+        if dns_name.downcase.eql?(node[:dc_entry][:name].downcase)
+          # Delete existing entry only if it's not dc_entry (active dc_entry)
+          delete_record(dns_name, existing_entry) if !node[:dc_entry][:values].include?(existing_entry)
+        end
+      end
+    end
   end
 
   # delete workorder skips the create call
@@ -211,27 +225,35 @@ node[:entries].each do |entry|
     end
     
     record = {
-       :name => dns_name,
+       :name => dns_name.downcase,
        :view => view_attribute,
        :ttl => ttl
     }
-
+    api_version = "v1.0"
     case dns_type
-    when "cname"
-      record[:canonical] = dns_value.gsub(/\.+$/,"")
-    when "a"
-      record[:ipv4addr] = dns_value
-    when "ptr"
-      record[:ipv4addr] = dns_name
-      record[:ptrdname] = dns_value
-      record.delete(:name)
+      when "cname"
+        record[:canonical] = dns_value.gsub(/\.+$/,"")
+      when "a"
+        record[:ipv4addr] = dns_value
+      when "aaaa"
+        record[:ipv6addr] = dns_value.gsub(/\.+$/,"")
+      when "ptr"
+        if dns_name =~ Resolv::IPv6::Regex
+          record[:ipv6addr] = dns_name
+          api_version = "v1.2" #ipv6addr attribute is recognized only in infoblox api version >= 1.1
+        elsif dns_name =~ Resolv::IPv4::Regex
+          record[:ipv4addr] = dns_name
+        end
+        record.delete(:name)
+        record[:ptrdname] = dns_value
+        
     end
 
     Chef::Log.debug("record: #{record.inspect}")
 
     handle_response node.infoblox_conn.request(
       :method => :post,
-      :path => "/wapi/v1.0/record:#{dns_type}",
+      :path => "/wapi/#{api_version}/record:#{dns_type}",
       :body => JSON.dump(record))
     
   end

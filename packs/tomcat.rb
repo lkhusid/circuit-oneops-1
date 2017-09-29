@@ -1,7 +1,9 @@
 include_pack "genericlb"
 
 name "tomcat"
-description "Tomcat"
+owner "brett.bourquin@walmartlabs.com"
+description "Provides a Tomcat Servlet Container to deploy java web workloads"
+version "1.1"
 type "Platform"
 category "Web Application"
 
@@ -150,7 +152,7 @@ resource "keystore",
 resource "artifact",
   :cookbook => "oneops.1.artifact",
   :design => true,
-  :requires => { "constraint" => "0..*" },
+  :requires => { "constraint" => "0..*", "services" => "*maven" },
   :attributes => {
 
   },
@@ -220,7 +222,7 @@ resource "secgroup",
          :cookbook => "oneops.1.secgroup",
          :design => true,
          :attributes => {
-             "inbound" => '[ "22 22 tcp 0.0.0.0/0", "8080 8080 tcp 0.0.0.0/0", "8009 8009 tcp 0.0.0.0/0", "8443 8443 tcp 0.0.0.0/0" ]'
+             "inbound" => '[ "22 22 tcp 0.0.0.0/0", "8080 8080 tcp 0.0.0.0/0", "8443 8443 tcp 0.0.0.0/0" ]'
          },
          :requires => {
              :constraint => "1..1",
@@ -290,6 +292,13 @@ relation "tomcat-daemon::depends_on::keystore",
   :to_resource => 'keystore',
   :attributes => {"propagate_to" => "from", "flex" => false, "min" => 1, "max" => 1}
 
+relation "tomcat-daemon::depends_on::certificate",
+  :relation_name => 'DependsOn',
+  :from_resource => 'tomcat-daemon',
+  :to_resource => 'certificate',
+  :attributes => {"propagate_to" => "from", "flex" => false, "min" => 1, "max" => 1}
+
+
 relation "keystore::depends_on::certificate",
   :relation_name => 'DependsOn',
   :from_resource => 'keystore',
@@ -306,3 +315,10 @@ relation "keystore::depends_on::certificate",
     :to_resource   => 'compute',
     :attributes    => { }
 end
+
+
+policy "vulnerable-tomcat-version",
+  :description => 'Using a known vulnerable version of Tomcat',
+  :query => 'ciClassName:("bom.Tomcat") AND NOT (ciAttributes.version:("7.0.75") OR ciAttributes.version:("7.0.78") OR ciAttributes.version:("8.5.12") OR ciAttributes.version:("8.5.14"))',
+  :docUrl => '',
+  :mode => 'passive'

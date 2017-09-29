@@ -24,21 +24,21 @@ max_retry_count = 5
 env_name = node.workorder.payLoad["Environment"][0]["ciName"]
 cloud_name = node.workorder.cloud.ciName
 
+lb_service_type = node.lb.lb_service_type
+
+exit_with_error "#{lb_service_type} service not found. either add it or change service type" if !node.workorder.services.has_key?("#{lb_service_type}")
+
 cloud_service = nil
-if !node.workorder.services["lb"].nil? &&
-  !node.workorder.services["lb"][cloud_name].nil?
+if !node.workorder.services["#{lb_service_type}"].nil? &&
+  !node.workorder.services["#{lb_service_type}"][cloud_name].nil?
 
-  cloud_service = node.workorder.services["lb"][cloud_name]
+  cloud_service = node.workorder.services["#{lb_service_type}"][cloud_name]
 end
 
-if cloud_service.nil?
-  Chef::Log.error("no cloud service defined. services: "+node.workorder.services.inspect)
-  exit 1
-end
+exit_with_error "no cloud service defined or empty" if cloud_service.nil?
 
 include_recipe "lb::build_load_balancers"
 lb_name = node[:lb_name]
-
 
 instances = Array.new
 computes = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Compute/ }
@@ -51,7 +51,6 @@ end
 security_group_parts = node.workorder.rfcCi.nsPath.split("/")
 security_group = security_group_parts[3]+'.'+security_group_parts[2]+'.'+security_group_parts[1]
 Chef::Log.info("security_group: "+security_group)
-
 
 lb_dns_name = ""
 Chef::Log.info("Cloud Service: #{cloud_service[:ciClassName]}")
@@ -100,9 +99,9 @@ when /haproxy/
   include_recipe "haproxy::add_lb"
   lb_dns_name = node.lb_dns_name
 
-when /neutron/
+when /octavia/
 
-  include_recipe "neutron::add_lb"
+  include_recipe "octavia::add_lb"
   lb_dns_name = node.lb_dns_name
       
 when /elb/

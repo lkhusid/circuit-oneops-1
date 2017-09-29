@@ -118,7 +118,7 @@ end
 #extract the tar
 execute "tar zxf #{dest_file}" do
     cwd "#{node['activemq']['installpath']}"
-
+    only_if { ::File.exists?(dest_file) }
 end
 
 arch = (node['kernel']['machine'] == 'x86_64') ? 'x86-64' : 'x86-32'

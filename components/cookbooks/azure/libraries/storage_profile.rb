@@ -88,6 +88,11 @@ module AzureCompute
         i += 1
         sleep 30
       end
+
+      # get the storage account and add the tags
+      storage_account = get_storage_account(storage_account_name)
+      tags = Utils.get_resource_tags(node)
+      Utils.update_resource_tags(@creds, @subscription, @resource_group_name, storage_account, tags)
         
       OOLog.info("ImageID: #{node['image_id']}")
 
@@ -217,6 +222,21 @@ private
        rescue => ex
          OOLog.fatal("Error getting properties of #{storage_account_name}: #{ex.message}")
        end
+    end
+
+    def get_storage_account(storage_account_name)
+      begin
+        promise =
+            @storage_client.storage_accounts.get_properties(@resource_group_name, storage_account_name)
+        response = promise.value!
+        result = response.body
+        return result
+      rescue  MsRestAzure::AzureOperationError => e
+        OOLog.info("#ERROR Body: #{e.body}")
+        return false
+      rescue => ex
+        OOLog.fatal("Error getting properties of #{storage_account_name}: #{ex.message}")
+      end
     end
 
     def create_storage_account(storage_account_name, account_type)

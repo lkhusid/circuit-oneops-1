@@ -121,6 +121,21 @@ action :update do
   end
 end
 
+action :recycle do
+  if @app_pool.exists?
+    status = @app_pool.status
+    if status == 'started'
+      @app_pool.recycle
+      Chef::Log.info "Recycled application pool #{new_resource.name}"
+      new_resource.updated_by_last_action(true)
+    else
+      Chef::Log.warn "Application pool #{new_resource.name} has not started. Application pool status is #{status}"
+    end
+  else
+    Chef::Log.warn "Application pool #{new_resource.name} does not exist"
+  end
+end
+
 def build_message(options)
   property_name = options[:property_name]
   current_value = property_name.include?("password") ? "********" : options[:current_value]

@@ -1,0 +1,17 @@
+# Created On : <%= Time.now.getutc %>
+
+client_directory: '/opt/oneops/keywhiz/keysync/clients'
+secrets_directory: "<%= @secrets_dir %>"
+ca_file: '/opt/oneops/keywhiz/keysync/CA/cacert.crt'
+yaml_ext: yaml
+chown_files: true
+server: '<%= @server %>'
+# tmpfs fs_type
+filesystem_type: 16914836
+debug: false
+default_user: "<%= @user %>" 
+default_group: "<%= @group %>" 
+metrics_prefix: 'keysync'
+api_port: 31738
+poll_interval: 30s
+

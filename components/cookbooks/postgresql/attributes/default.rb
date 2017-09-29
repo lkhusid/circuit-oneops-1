@@ -52,8 +52,8 @@ when "fedora"
 
 when "redhat","centos"
 
-  set[:postgresql][:dir] = "/var/lib/pgsql/#{node.postgresql.version}/data"
-  set[:postgresql][:data] = "/var/lib/pgsql/#{node.postgresql.version}/data"
+  set[:postgresql][:dir] = "/var/lib/pgsql/#{node[:postgresql][:version]}/data"
+  set[:postgresql][:data] = "/var/lib/pgsql/#{node[:postgresql][:version]}/data"
 
 when "suse"
 

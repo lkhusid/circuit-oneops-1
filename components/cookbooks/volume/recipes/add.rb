@@ -21,17 +21,24 @@
 # create a volume group vgcreate with the name of the platform
 # create a logical volume lvcreate with the name of the resource /dev/<resource>
 # use storage dep to gen a raid and lvm ontop
+
+#Baremetal condition: Redirect to raid volume recipe
+compute_baremetal = node.workorder.payLoad.ManagedVia[0]["ciAttributes"]["is_baremetal"]
+if !compute_baremetal.nil? && compute_baremetal =~/true/
+        Chef::Log.info("This is a baremetal compute. Should have RAID config")
+        `sudo touch /var/tmp/expected_devices`
+        include_recipe "volume::add_raid"
+        return
+end
+
 if node.platform =~ /windows/
   include_recipe "volume::windows_vol_add"
   return
 end
+
 storage = nil
-node.workorder.payLoad[:DependsOn].each do |dep|
-  if dep["ciClassName"] =~ /Storage/
-    storage = dep
-    break
-  end
-end
+storage,device_maps = get_storage()
+
 include_recipe "shared::set_provider"
 
 size = node.workorder.rfcCi.ciAttributes["size"].gsub(/\s+/, "")
@@ -39,7 +46,6 @@ size = node.workorder.rfcCi.ciAttributes["size"].gsub(/\s+/, "")
 storage_provider = node.storage_provider_class
 if (storage_provider =~ /azure/) && !storage.nil?        
        dev_id=nil
-       device_maps = storage['ciAttributes']['device_map'].split(" ")
        node.set[:device_maps] = device_maps
        device_maps.each do |dev_vol|
             dev_id = dev_vol.split(":")[4]
@@ -122,7 +128,6 @@ ruby_block 'create-iscsi-volume-ruby-block' do
         Chef::Log.info("instance_id: "+instance_id)
         compute = provider.servers.get(instance_id)
 
-        device_maps = storage['ciAttributes']['device_map'].split(" ")
         vols = Array.new
         dev_list = ""
         i = 0
@@ -200,7 +205,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
                   Chef::Log.error("attached already, no way to determine device")
                   # mdadm sometime reassembles with _0
                   new_raid_device = `ls -1 #{raid_device}* 2>/dev/null`.chop
-		              non_raid_device  = `ls -1 /dev/#{platform_name}/#{node.workorder.rfcCi.ciName}* 2>/dev/null`.chop
+                  non_raid_device  = `ls -1 /dev/#{platform_name}/#{node.workorder.rfcCi.ciName}* 2>/dev/null`.chop
                   if new_raid_device.empty? && non_raid_device.empty?
                     Chef::Log.warn("Cleanup Failed Attempt ")
                     vol.detach instance_id, vol_id
@@ -213,7 +218,7 @@ ruby_block 'create-iscsi-volume-ruby-block' do
                       raid_device = new_raid_device
                       no_raid_device = new_raid_device
                     end
-		          next
+                  next
                   end
                 end
 
@@ -453,12 +458,12 @@ ruby_block 'create-ephemeral-volume-on-azure-vm' do
     `echo "mkdir -p #{_mount_point}" >> #{script_fullpath_name}`
     `echo "mount /dev/#{platform_name}-eph/#{logical_name} #{_mount_point}" >> #{script_fullpath_name}`
     `sudo chmod +x #{script_fullpath_name}`
-     awk_cmd = "awk /#{logical_name}.sh/ /etc/rc.local | wc -l"   
+     awk_cmd = "awk /#{logical_name}.sh/ /etc/rc.d/rc.local | wc -l"
     `echo "count=\\$(#{awk_cmd})">> #{script_fullpath_name}` # Check whether script is already added to rc.local, add restore script if not present.
     `echo "if [ \\$count == 0 ];then" >> #{script_fullpath_name}` 
-     `echo "sudo echo \\"sh #{script_fullpath_name}\\" >> \/etc\/rc.local" >> #{script_fullpath_name}`
+     `echo "sudo echo \\"sh #{script_fullpath_name}\\" >> \/etc\/rc.d\/rc.local" >> #{script_fullpath_name}`
      `echo "fi" >> #{script_fullpath_name}`
-    `sudo chmod +x /etc/rc.local`
+    `sudo chmod +x /etc/rc.d/rc.local`
      Chef::Log.info("executing #{script_fullpath_name} script")
     `sudo sh "#{script_fullpath_name}"`
   end
@@ -624,8 +629,53 @@ ruby_block 'create-storage-non-ephemeral-volume' do
         Chef::Log.warn("logical volume #{platform_name}/#{logical_name} already exists and hence cannot recreate .. prefer replacing compute")
     end
 
-    if rfc_action == "update" && storageUpdated
-      execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}")
+
+    #lvextend will add size to existing one and extend it keeping data intact, that size should be difference between new_size and old_size
+    #Conditions covered
+    #1. User can extend peristent volume if space is available on storage
+    #2. User can extend storage and can extend volume
+    #3. Replace storage doesn't do anything, so it will not allow usre to change volume component too
+
+    check_persistent = false
+    node.workorder.payLoad[:DependsOn].each do |dep|
+      if dep["ciClassName"] =~ /Storage/
+        check_persistent = true
+        break
+      end
+    end
+
+    if ((check_persistent && rfc_action == "update" && token_class =~ /openstack/) || (rfc_action == "update" && storageUpdated))
+      new_size = node.workorder.rfcCi.ciAttributes["size"].gsub(/\s+/, "")
+      old_size = node.workorder.rfcCi.ciBaseAttributes[:size]
+
+      #if old_size is not availabe in workorder, setting old_size from actual mount point of compute
+      if old_size.nil? || old_size =~ /%/
+        details = `df -h /dev/#{platform_name}/#{logical_name}`
+        old_size = details.gsub(/\s+/m, ' ').strip.split(" ")[8]
+      end
+
+      #cheecks if user is increasing or decreasing size
+      if new_size =~ /G/ && old_size =~ /G/
+        new_size = new_size.gsub!(/[^0-9]/, '')
+        old_size = old_size.gsub!(/[^0-9]/, '')
+        size = new_size.to_i - old_size.to_i
+        if size < 0
+          exit_with_error "you cant decrese volume size"
+        end
+        size = size.to_s
+        size = size+"G"
+        Chef::Log.info("we are extending by #{size}")
+      else
+        Chef::Log.info("extending will consider volume")
+      end
+
+      #will not run if there is no change in updated volume size
+      if (size == "0G" || ((!storageUpdated) && size =~ /%/))
+        Chef::Log.info("Storage is not extended")
+      else
+        execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}")
+      end
+
     end
 
     execute_command("vgchange -ay #{platform_name}")
@@ -678,13 +728,13 @@ ruby_block 'filesystem' do
       if rfc_action == "update"
         has_resized = false
         if _fstype == "xfs"
-	        `xfs_growfs #{_mount_point}`
-	        Chef::Log.info("Extending the xfs filesystem" )
-	        has_resized = true
-	      elsif (_fstype == "ext4" || _fstype == "ext3") && File.exists?("/dev/#{platform_name}/#{logical_name}")
+          `xfs_growfs #{_mount_point}`
+          Chef::Log.info("Extending the xfs filesystem" )
+          has_resized = true
+        elsif (_fstype == "ext4" || _fstype == "ext3") && File.exists?("/dev/#{platform_name}/#{logical_name}")
           `resize2fs /dev/#{platform_name}/#{logical_name}`
-           Chef::Log.info("Extending the filesystem" )
-           has_resized = true
+          Chef::Log.info("Extending the filesystem" )
+          has_resized = true
         end
         if has_resized && $? != 0
           exit_with_error "Error in extending filesystem"

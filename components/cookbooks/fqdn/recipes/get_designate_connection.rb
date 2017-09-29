@@ -20,8 +20,7 @@
 require 'excon'
 require 'json'
 
-cloud_name = node[:workorder][:cloud][:ciName]
-service = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+service = get_dns_service
 domain_name = service[:zone] 
 domain_name += "."
 

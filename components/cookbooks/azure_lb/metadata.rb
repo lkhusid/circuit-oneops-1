@@ -67,7 +67,8 @@ attribute 'location',
                   ['North Central US','northcentralus'],
                   ['South Central US','southcentralus'],
                   ['West US','westus'],
-                  ['Japan East','japaneast']
+                  ['Japan East','japaneast'],
+                  ['East Asia','eastasia']
                   ]
               }
           }

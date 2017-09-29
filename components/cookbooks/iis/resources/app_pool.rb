@@ -1,4 +1,4 @@
-actions :create, :update
+actions :create, :update, :recycle
 default_action :create
 
 # These attributes are defined in http://msdn.microsoft.com/en-us/library/ms690608(v=vs.90).aspx

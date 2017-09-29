@@ -20,7 +20,7 @@ require 'fog'
 
 cloud_name = node[:workorder][:cloud][:ciName]
 service_class = node[:workorder][:services][:dns][cloud_name][:ciClassName].split(".").last.downcase
-dns_attrs = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+dns_attrs = get_dns_service
   
 dns = nil
 domain_name = dns_attrs[:zone] 

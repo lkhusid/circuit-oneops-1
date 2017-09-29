@@ -21,6 +21,57 @@ n = netscaler_connection "conn" do
 end
 n.run_action(:create)
 
+def clear_non_generic_monitor(conn,servicegroup_name,monitor_name)
+  
+  Chef::Log.info("delete monitor to migrate to generic monitor")
+  binding_obj = JSON.parse(conn.request(
+    :method=>:get,
+    :path=>"/nitro/v1/config/servicegroup_lbmonitor_binding/#{servicegroup_name}").body)
+    
+  if !binding_obj['servicegroup_lbmonitor_binding'].nil? && 
+     !binding_obj['servicegroup_lbmonitor_binding'].find{|sg| sg['monitor_name'] == monitor_name}.nil?
+       
+    binding = { :monitor_name => monitor_name, :servicegroupname => servicegroup_name }
+    Chef::Log.info("binding being deleted for migration to generic monitor: #{binding.inspect}")
+    req = URI::encode('object={"params":{"action": "unbind"}, "servicegroup_lbmonitor_binding" : ' + JSON.dump(binding) + '}')
+    resp_obj = JSON.parse(conn.request(
+      :method=> :post,
+      :path=>"/nitro/v1/config/servicegroup_lbmonitor_binding/#{servicegroup_name}",
+      :body => req).body)
+
+    if ![0,258].include?(resp_obj["errorcode"])
+      Chef::Log.error( "delete bind #{binding.inspect} resp: #{resp_obj.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "delete bind  #{binding.inspect} resp: #{resp_obj.inspect}")
+    end
+  end
+
+  mon_response  = JSON.parse(conn.request(
+    :method=>:get,
+    :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}").body)
+    
+  mon_detail = []
+  if mon_response.has_key?('lbmonitor') 
+    mon_detail = mon_response['lbmonitor']
+  end
+      
+  if mon_detail.size > 0
+    type = mon_detail[0]['type']
+      
+    res_mon = JSON.parse(conn.request(
+      :method=>:delete,
+      :path=>"/nitro/v1/config/lbmonitor/#{monitor_name}?args=type:#{type}").body)
+    
+    if res_mon['errorcode'] != 2131 && res_mon['errorcode'] != 0
+      Chef::Log.error( "delete monitor #{monitor_name} resp: #{res_mon.inspect}")
+      exit 1
+    else
+      Chef::Log.info( "delete monitor #{monitor_name} resp: #{res_mon.inspect}")
+    end    
+  end
+       
+end
 
 sg_names = []
 lbs = [] + node.loadbalancers + node.dcloadbalancers
@@ -245,14 +296,18 @@ lbs.each do |lb|
     end
 
   end
-
   
   include_recipe "netscaler::add_monitor"  
 
   # bind monitors
-  node.monitors.each do |mon|
+  node.monitors.each do |mon|    
     next if mon[:iport] != lb[:iport]
     
+    # migrate 
+    if mon.has_key?('orig_monitor_name')
+      clear_non_generic_monitor(node.ns_conn, sg_name, mon[:orig_monitor_name])
+    end
+      
     binding = { :monitorname => mon[:monitor_name], :servicegroupname => sg_name}
     req = '{ "lbmonitor_servicegroup_binding" : '+JSON.dump(binding)+ '}'  
   

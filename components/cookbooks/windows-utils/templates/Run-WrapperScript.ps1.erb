@@ -1,0 +1,13 @@
+$ErrorActionPreference = 'Stop'
+
+$ErrFile = $MyInvocation.InvocationName -replace  ".ps1", ".err"
+
+try
+{
+  <%= @script %> <%= @arglist %>
+}
+catch
+{
+  $_.Exception.Message > $ErrFile
+  [System.Environment]::Exit($_.Exception.HResult)
+}

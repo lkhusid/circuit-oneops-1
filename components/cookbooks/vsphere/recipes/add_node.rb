@@ -4,6 +4,7 @@ require File.expand_path('../../libraries/models/volume_model', __FILE__)
 require File.expand_path('../../libraries/models/nic_model', __FILE__)
 require File.expand_path('../../libraries/models/cdrom_model', __FILE__)
 require File.expand_path('../../libraries/models/tenant_model', __FILE__)
+require File.expand_path('../../libraries/drs_rule_manager', __FILE__)
 
 def get_volume(compute_provider, datastore, name, disk_mode, thin_provisioned, disk_size)
   volume_model = VolumeModel.new(datastore)
@@ -55,6 +56,7 @@ def get_virtual_machine_attributes(service_compute, cpu_size, memory_size, volum
 
   return virtual_machine_model.serialize_object
 end
+
 #--------------------------------------------------
 rfcCi = node[:workorder][:rfcCi]
 cloud_name = node[:workorder][:cloud][:ciName]
@@ -74,6 +76,10 @@ Chef::Log.info("Data Center " + service_compute[:datacenter].to_s)
 Chef::Log.info("Cluster " + service_compute[:cluster].to_s)
 tenant_model = TenantModel.new(service_compute[:endpoint], service_compute[:username], service_compute[:password], service_compute[:vsphere_pubkey])
 compute_provider = tenant_model.get_compute_provider
+
+Chef::Log.info("checking availibility zones")
+drs_rule_manager = DrsRuleManager.new(compute_provider, service_compute)
+drs_rule_manager.create_one_hostgroup_per_vhost
 
 volumes = Array.new
 Chef::Log.info("configuring disks")
@@ -102,6 +108,28 @@ else
   total_time = Time.now - start_time
   Chef::Log.info("Total time to create " + total_time.to_s)
 end
-
 node.set[:ip] = virtual_machine_manager.ip_address
+
+nsPathParts = node[:workorder][:rfcCi][:nsPath].split('/')
+org = nsPathParts[1]
+assembly = nsPathParts[2]
+environment = nsPathParts[3]
+platform = nsPathParts[5]
+platform_ci_id = node[:workorder][:box][:ciId]
+
+if (node[:workorder][:box][:ciAttributes][:availability] == "redundant") && (rfc_action != 'update')
+  requires_computes = node[:workorder][:payLoad][:RequiresComputes]
+  instance_index = node[:workorder][:rfcCi][:ciName].split("-").last.to_i + platform_ci_id
+  availability_zones = drs_rule_manager.availability_zones
+  index = instance_index % availability_zones.size
+  vmgroup_name_prefix = org[0..15] + '_' + assembly[0..15] + '_' + platform_ci_id.to_s + '_' + environment[0..15]
+  vm_name_prefix = platform + '-' + environment[0..15] + '-' + assembly[0..15] + '-' + org[0..15]
+  vmgroup_name = vmgroup_name_prefix + '_' + availability_zones[index]
+
+  drs_rule_manager.destroy_rule(vmgroup_name)
+  drs_rule_manager.destroy_vm_group(vmgroup_name)
+
+  drs_rule_manager.create_drs_rules(vmgroup_name_prefix, vm_name_prefix, platform_ci_id, requires_computes)
+end
+
 Chef::Log.info("Exiting vSphere add_node ")

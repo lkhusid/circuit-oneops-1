@@ -1,12 +1,13 @@
 #VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure("2") do |config|
-  config.vm.box = 'win2012r2chef121118'
+  config.vm.box = 'windows2016'
   config.vm.guest = :windows
 
   config.vm.provider "virtualbox" do |v|
     v.gui = false
   end
+
   config.vm.communicator = "winrm"
   config.winrm.timeout = 24000
   config.winrm.max_tries = 20
@@ -22,40 +23,50 @@ Vagrant.configure("2") do |config|
     chef.add_recipe("iis-website::add")
     chef.json = {
       "iis-website": {
-        "compression_max_disk_usage": "100",
-        "session_state_cookieless": "UseCookies",
-        "runtime_version": "v4.0",
-        "requestfiltering_file_extension_allow_unlisted": "true",
-        "requestfiltering_max_url": "4096",
-        "sc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/atom+xml\":\"true\",\n    \"application/json\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
-        "dc_cpu_usage_to_reenable": "50",
-        "enable_dynamic_compression": "true",
-        "requestfiltering_allow_double_escaping": "false",
-        "url_compression_dc_before_cache": "false",
-        "identity_type": "ApplicationPoolIdentity",
-        "binding_type": "http",
-        "requestfiltering_allow_high_bit_characters": "true",
-        "sc_cpu_usage_to_disable": "90",
-        "windows_authentication": "true",
-        "session_time_out": "20",
-        "requestfiltering_max_allowed_content_length": "30000000",
-        "binding_port": "80",
-        "dc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
-        "compresion_min_file_size": "2400",
-        "anonymous_authentication": "true",
-        "requestfiltering_verbs": "{ \"TRACE\": \"true\",\n    \"DEBUG\": \"true\" }",
-        "session_state_cookie_name": "ASP.NET_SessionId",
-        "dc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
-        "sc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
-        "static_mime_types": "{\n    \".dat\":\"application/text\",\n    \".fat\":\"application/octet-stream\"\n  }",
-        "requestfiltering_max_query_string": "2048",
-        "dc_level": "0",
-        "sc_level": "7",
-        "dc_cpu_usage_to_disable": "90",
-        "sc_cpu_usage_to_reenable": "50",
-        "physical_path": "c:\\apps",
-        "log_file_directory": "c:\\logs",
-        "enable_static_compression": "true"
+      "compression_max_disk_usage": "100",
+      "session_state_cookieless": "UseCookies",
+      "static_mime_types": "{}",
+      "runtime_version": "v4.0",
+      "requestfiltering_file_extension_allow_unlisted": "true",
+      "requestfiltering_max_url": "4096",
+      "sc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/atom+xml\":\"true\",\n    \"application/json\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
+      "enabled": "true",
+      "dc_cpu_usage_to_reenable": "50",
+      "logs_retention_days": "7",
+      "logs_cleanup_up_time": "02:00:00",
+      "enable_dynamic_compression": "true",
+      "logtargetw3c": "1",
+      "url_compression_dc_before_cache": "false",
+      "requestfiltering_allow_double_escaping": "false",
+      "repository_url": "http://repo.nuget/service/local/nuget/nuget-snapshots/",
+      "identity_type": "LocalService",
+      "binding_type": "https",
+      "requestfiltering_allow_high_bit_characters": "true",
+      "sc_cpu_usage_to_disable": "90",
+      "period": "Daily",
+      "windows_authentication": "false",
+      "requestfiltering_max_allowed_content_length": "30000000",
+      "session_time_out": "20",
+      "binding_port": "443",
+      "dc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
+      "version": "latest",
+      "iis_iusrs_group_service_accounts": "[]",
+      "compresion_min_file_size": "2400",
+      "anonymous_authentication": "true",
+      "requestfiltering_verbs": "{ \"TRACE\": \"false\" }",
+      "session_state_cookie_name": "ASP.NET_SessionId",
+      "dc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
+      "sc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
+      "requestfiltering_max_query_string": "2048",
+      "package_name": "AFNetSampleApplication",
+      "logformat": "W3C",
+      "dc_level": "0",
+      "sc_level": "7",
+      "sc_cpu_usage_to_reenable": "50",
+      "dc_cpu_usage_to_disable": "90",
+      "physical_path": "c:\\apps",
+      "log_file_directory": "c:\\logs",
+      "enable_static_compression": "true"
       },
       "workorder": {
         "rfcCi": {
@@ -64,9 +75,13 @@ Vagrant.configure("2") do |config|
             "runtime_version": "v4.0",
             "binding_port": "443",
             "identity_type": "ApplicationPoolIdentity",
-            "physical_path": "C:\\apps"
+            "physical_path": "C:\\apps",
+            "version": "latest",
+            "package_name": "AFNetSampleApplication",
+            "repository_url": "http://repo.nuget/service/local/nuget/nuget-snapshots/"
           },
           "ciClassName": "bom.oneops.1.Iis-website",
+          "rfcAction": "create"
         },
         "cloud": {
           "nsId": 110104,

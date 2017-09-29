@@ -7,8 +7,36 @@ license          "Apache License, Version 2.0"
 
 grouping 'default',
   :access => "global",
-  :packages => [ 'base', 'mgmt.cloud.service', 'cloud.service' ],
+  :packages => [ 'base', 'mgmt.cloud.service', 'cloud.service', 'cloud.zone.service' ],
   :namespace => true
+
+grouping 'zone',
+  :access => "global",
+  :packages => ['cloud.zone.service'],
+  :namespace => true
+
+attribute 'criteria_type',
+  :grouping => 'zone',
+  :description => "Type",
+  :default => "",
+  :format => {
+    :help => 'Type of criteria that will determine whether the zone sub-service is selected over the default service',
+    :category => '3.Selection Criteria',
+    :order => 1,
+    :form => { 'field' => 'select', 'options_for_select' => [
+        ['Platform','platform'],
+      ] }
+  }
+
+attribute 'criteria_value',
+  :grouping => 'zone',
+  :description => "Value",
+  :default => "",
+  :format => {
+    :help => 'Criteria value that will determine whether the zone sub-service is selected over the default service',
+    :category => '3.Selection Criteria',
+    :order => 2
+  }
 
 
 attribute 'host',

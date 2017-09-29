@@ -223,6 +223,40 @@ attribute 'autopurge_snapretaincount',
     :pattern => "[0-9]+"
   }
 
+
+attribute 'prod_level_checks_enabled',
+  :description => 'Enable production level checks',
+  :required => 'required',
+  :default => 'false',
+  :format => {
+    :help => 'Enabling this parameter will enforce deployments with Minimum number of clouds and computes.',
+    :category => '3. Production level checks',
+    :order => 1,
+    :form => { 'field' => 'checkbox' }
+}
+
+attribute 'min_clouds',
+  :description  => 'Minimum number of Clouds',
+  :default  => "2",
+  :format => {
+    :category => '3. Production level checks',
+    :help => 'It is recommended to provision Zookeeper ensemble in at least 2 separate clouds for production deployment',
+    :order => 2,
+    :pattern => "[0-9]+",
+    :filter => {"all" => {"visible" => ('prod_level_checks_enabled:eq:true')}}
+}
+
+attribute 'min_computes_per_cloud',
+:description  => 'Minimum number of Computes per Cloud',
+:default  => "2",
+:format => {
+    :category => '3. Production level checks',
+    :help => 'It is recommended to provision Zookeeper ensemble at least 2 nodes per clouds for production deployment',
+    :order => 3,
+    :pattern => "[0-9]+",
+    :filter => {"all" => {"visible" => ('prod_level_checks_enabled:eq:true')}}
+}
+
 recipe "status", "Zookeeper Status"
 recipe "start", "Start Zookeeper"
 recipe "stop", "Stop Zookeeper"

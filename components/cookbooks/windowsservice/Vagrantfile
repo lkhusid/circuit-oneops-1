@@ -1,0 +1,62 @@
+#VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = 'windows2016'
+  config.vm.guest = :windows
+
+  config.vm.provider "virtualbox" do |v|
+    v.gui = false
+  end
+
+  config.vm.communicator = "winrm"
+  config.winrm.timeout = 24000
+  config.winrm.max_tries = 20
+
+  config.winrm.host = '127.0.0.1'
+  config.winrm.username = 'vagrant'
+  config.winrm.password = 'vagrant'
+
+  config.vm.provision :chef_solo do |chef|
+    chef.log_level         = :info
+    chef.cookbooks_path = [".."]
+    chef.add_recipe("windowsservice::add")
+    chef.json = {
+      "windowsservice": {
+        "package_name": "",
+        "service_name": "",
+        "physical_path": "",
+        "path": "",
+        "service_display_name": "",
+        "startup_type": "",
+        "username": "",
+        "password": "",
+        "user_account": "",
+        "version": "",
+        "repository_url": "http://nuget.org/api/v2",
+      },
+      "workorder": {
+        "rfcCi": {
+          "rfcAction": "update"
+          },
+          "payLoad": {
+            "OO_GLOBAL_VARS": [
+              {
+                "ciAttributes": {
+                  "value": "dev2"
+                },
+                "ciBaseAttributes": {},
+                "ciAttrProps": {},
+                "rfcId": 0,
+                "releaseId": 0,
+                "ciId": 0,
+                "ciClassName": "manifest.Globalvar",
+                "ciName": "env_name",
+                "execOrder": 0,
+                "isActiveInRelease": false
+              }
+            ],
+          }
+      }
+    }
+  end
+end

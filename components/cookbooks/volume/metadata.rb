@@ -5,6 +5,7 @@ maintainer       "OneOps"
 maintainer_email "support@oneops.com"
 license          "Apache License, Version 2.0"
 depends 'azuredatadisk'
+depends 'os'
 
 grouping 'default',
   :access => "global",
@@ -46,6 +47,14 @@ attribute 'mode',
     :order => 3
   }
 
+attribute 'based_on_storage',
+  :description => "Based on Storage",
+  :format => {
+    :help => 'When multiple storage components are used specify the name of the storage component this volume component will depend on.',
+    :category => '1.Global',
+    :order => 4
+  }
+
 attribute 'fstype',
   :description => "Filesystem Type",
   :default => 'ext3',
@@ -58,12 +67,12 @@ attribute 'fstype',
   }
 
 attribute 'mount_point',
-  :description => "Mount Point. (For Windows specify the the drive letter)",
+  :description => "Mount Point.",
   :required => 'required',
   :default => '/volume',
   :format => {
     :important => true,
-    :help => 'Directory path where the volume should be mounted',
+    :help => 'Directory path where the volume should be mounted. For Windows specify the the drive letter.',
     :category => '2.Filesystem',
     :order => 2
   }
@@ -74,6 +83,30 @@ attribute 'options',
     :help => 'Specify mount options such as ro,async,noatime etc.',
     :category => '2.Filesystem',
     :order => 3
+  }
+
+attribute 'has_raid',
+  :description => 'Enable RAID',
+  :default => 'false',
+  :format => {
+      :help => 'Enable/Disable RAID',
+      :tip => 'NOTE:  RAID Option depends on compute type. Please select only if your cloud is baremetal. DO NOT select if it is not baremetal cloud.',
+      :category => '3.RAID Selection',
+      :form => { 'field' => 'checkbox' },
+      :order => 1
+  }
+
+attribute 'raid_options',
+  :description => "RAID Options",
+  :default => "RAID 0",
+  :format => {
+    :filter => {'all' => {'visible' => 'has_raid:eq:true'}},
+    :help => 'Select from desired RAID options',
+    :category => '3.RAID Selection',
+    :order => 2,
+    :form => { 'field' => 'select', 'options_for_select' => [
+          ['RAID0','RAID 0'],
+          ['RAID1','RAID 1']]}
   }
 
 recipe "repair", "Repair Volume"

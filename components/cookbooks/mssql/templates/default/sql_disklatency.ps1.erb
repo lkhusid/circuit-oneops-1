@@ -1,0 +1,11 @@
+$logical = Get-Counter -Counter '\LogicalDisk(*)\avg. disk sec/transfer' |
+  Select-Object -ExpandProperty CounterSamples |
+  Where-Object {$_.InstanceName -eq '_total'} |
+  Select-Object CookedValue
+
+$physical = Get-Counter -Counter '\PhysicalDisk(*)\avg. disk sec/transfer' |
+  Select-Object -ExpandProperty CounterSamples |
+  Where-Object {$_.InstanceName -eq '_total'} |
+  Select-Object CookedValue
+
+write-host latencies "|logical=$($logical.CookedValue) physical=$($physical.CookedValue)"

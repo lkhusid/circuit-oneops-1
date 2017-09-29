@@ -15,6 +15,55 @@ platform :attributes => {
         }
 
 # dns service needed for ptr record cleanup on replace
+
+resource "filebeat",
+  :cookbook => "oneops.1.filebeat",
+  :design => true,
+  :requires => {
+       "constraint" => "0..10",
+       :services => "mirror"
+  },
+  :monitors => {
+    'filebeatprocess' => {:description => 'FilebeatProcess',
+      :source => '',
+      :enable => 'true',
+      :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
+      :cmd => 'check_process_count!filebeat',
+      :cmd_line => '/opt/nagios/libexec/check_process_count.sh "$ARG1$"',
+      :metrics => {
+            'count' => metric(:unit => '', :description => 'Running Process'),
+      },
+      :thresholds => {
+            'FilebeatProcessLow' => threshold('1m', 'avg', 'count', trigger('<', 1, 1, 1), reset('>=', 1, 1, 1)),
+            'FilebeatProcessHigh' => threshold('1m', 'avg', 'count', trigger('>=', 200, 1, 1), reset('<', 200, 1, 1))
+      }
+    }
+  }
+
+resource "telegraf",
+  :cookbook => "oneops.1.telegraf",
+  :design => true,
+  :requires => {
+       "constraint" => "0..10",
+       :services => "mirror"
+  },
+  :monitors => {
+    'telegrafprocess' => {:description => 'TelegrafProcess',
+      :source => '',
+      :enable => 'true',
+      :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
+      :cmd => 'check_process_count!telegraf',
+      :cmd_line => '/opt/nagios/libexec/check_process_count.sh "$ARG1$"',
+      :metrics => {
+            'count' => metric(:unit => '', :description => 'Running Process'),
+      },
+      :thresholds => {
+            'TelegrafProcessLow' => threshold('1m', 'avg', 'count', trigger('<', 1, 1, 1), reset('>=', 1, 1, 1)),
+            'TelegrafProcessHigh' => threshold('1m', 'avg', 'count', trigger('>=', 200, 1, 1), reset('<', 200, 1, 1))
+      }
+    }
+  }
+
 resource "compute",
   :cookbook => "oneops.1.compute",
   :design => true,
@@ -60,7 +109,7 @@ resource "os",
   :cookbook => "oneops.1.os",
   :design => true,
   :requires => { "constraint" => "1..1", "services" => "compute,dns,*mirror,*ntp,*windows-domain" },
-  :attributes => { "ostype"  => "centos-7.0",
+  :attributes => { "ostype"  => "centos-7.2",
                    "dhclient"  => 'true'
                  },
   :monitors => {
@@ -492,6 +541,67 @@ resource "fqdn",
              }
            ]
       }'
+    },
+    'os_payload' => {
+     'description' => 'Os payload',
+     'definition' => '{
+       "returnObject": false,
+       "returnRelation": false,
+       "relationName": "base.RealizedAs",
+       "direction": "to",
+       "targetClassName": "manifest.oneops.1.Fqdn",
+       "relations": [
+         { "returnObject": false,
+           "returnRelation": false,
+           "relationName": "manifest.Requires",
+           "direction": "to",
+           "targetClassName": "manifest.Platform",
+           "relations": [
+             { "returnObject": true,
+               "returnRelation": false,
+               "relationName": "manifest.Requires",
+               "direction": "from",
+               "targetClassName": "manifest.oneops.1.Os"
+             }
+            ]
+         }
+       ]
+     }'
+   },
+   'windowsdomain' => {
+       'description' => 'Windows-domain service',
+       'definition' => '{
+           "returnObject": false,
+           "returnRelation": false,
+           "relationName": "base.RealizedAs",
+           "direction": "to",
+           "targetClassName": "manifest.oneops.1.Fqdn",
+           "relations": [
+             { "returnObject": false,
+               "returnRelation": false,
+               "relationName": "manifest.Requires",
+               "direction": "to",
+               "targetClassName": "manifest.Platform",
+               "relations": [
+                 { "returnObject": false,
+                   "returnRelation": false,
+                   "relationName": "base.Consumes",
+                   "direction": "from",
+                   "targetClassName": "account.Cloud",
+                   "relations": [
+                     { "returnObject": true,
+                       "returnRelation": false,
+                       "relationName": "base.Provides",
+                       "relationAttrs":[{"attributeName":"service", "condition":"eq", "avalue":"windows-domain"}],
+                       "direction": "from",
+                       "targetClassName": "cloud.service.Windows-domain"
+                     }
+                   ]
+                 }
+               ]
+             }
+           ]
+      }'
     }
   }
 
@@ -671,10 +781,10 @@ resource "certificate",
                     'days_remaining'   => metric( :unit => 'count', :description => 'Days remaining to Expiry', :dstype => 'GAUGE')
                   },
                   :thresholds => {
-			  'cert-expiring-soon' => threshold('1m','avg','days_remaining',trigger('<=',30,1,1),reset('>',90,1,1))
+                    'cert-expiring-soon' => threshold('1m','avg','days_remaining',trigger('<=',30,1,1),reset('>',90,1,1))
                   }
                 }
-        }	 
+        }
 
 
 resource "hostname",
@@ -684,8 +794,44 @@ resource "hostname",
     :constraint => "0..1",
     :services => "dns",
     :help => "optional hostname dns entry"
+  },
+  :payloads => {
+   'windowsdomain' => {
+       'description' => 'Windows-domain service',
+       'definition' => '{
+           "returnObject": false,
+           "returnRelation": false,
+           "relationName": "base.RealizedAs",
+           "direction": "to",
+           "targetClassName": "manifest.oneops.1.Fqdn",
+           "relations": [
+             { "returnObject": false,
+               "returnRelation": false,
+               "relationName": "manifest.Requires",
+               "direction": "to",
+               "targetClassName": "manifest.Platform",
+               "relations": [
+                 { "returnObject": false,
+                   "returnRelation": false,
+                   "relationName": "base.Consumes",
+                   "direction": "from",
+                   "targetClassName": "account.Cloud",
+                   "relations": [
+                     { "returnObject": true,
+                       "returnRelation": false,
+                       "relationName": "base.Provides",
+                       "relationAttrs":[{"attributeName":"service", "condition":"eq", "avalue":"windows-domain"}],
+                       "direction": "from",
+                       "targetClassName": "cloud.service.Windows-domain"
+                     }
+                   ]
+                 }
+               ]
+             }
+           ]
+      }'
+    }
   }
-
 resource "sensuclient",
    :cookbook => "oneops.1.sensuclient",
    :design => true,
@@ -726,7 +872,26 @@ resource "firewall",
      }'
    }
  }
- 
+
+resource "secrets-client",
+   :cookbook => "oneops.1.secrets-client",
+   :design => true,
+   :requires => {"constraint" => "0..1", 'services' => '*certificate,*secret'},
+   :monitors => {
+       'SecretsClientProcess' => {:description => 'SecretsClientProcess',
+                     :source => '',
+                     :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
+                     :cmd => 'check_process!:::node.secrets_client_service_name:::!true',
+                     :cmd_line => '/opt/nagios/libexec/check_process.sh "$ARG1$" "$ARG2$"',
+                     :metrics => {
+                         'up' => metric(:unit => '%', :description => 'Percent Up'),
+                     },
+                     :thresholds => {
+                         'SecretsClientProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
+                     }
+       }
+    }
+
 resource "artifact",
   :cookbook => "oneops.1.artifact",
   :design => true,
@@ -750,6 +915,10 @@ end
   { :from => 'share',       :to => 'os' },
   { :from => 'logstash',    :to => 'os' },
   { :from => 'logstash',    :to => 'compute' },
+  { :from => 'telegraf',    :to => 'os' },
+  { :from => 'telegraf',    :to => 'compute' },
+  { :from => 'filebeat',    :to => 'os' },
+  { :from => 'filebeat',    :to => 'compute' },
   { :from => 'storage',     :to => 'compute' },
   { :from => 'share',       :to => 'volume'  },
   { :from => 'volume',      :to => 'user' },
@@ -763,6 +932,10 @@ end
   { :from => 'sensuclient', :to => 'compute'  },
   { :from => 'library',     :to => 'os' },
   { :from => 'objectstore',  :to => 'compute'},
+  { :from => 'secrets-client',  :to => 'os'},
+  { :from => 'secrets-client',  :to => 'user'},
+  { :from => 'secrets-client',  :to => 'certificate'},
+  { :from => 'secrets-client',  :to => 'volume'},
   { :from => 'objectstore',  :to => 'user'}
 ].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",
@@ -809,8 +982,8 @@ end
 end
 
 # managed_via
-[ 'os', 'user', 'job', 'file', 'volume', 'share', 'download', 'library', 'daemon', 
-  'certificate', 'logstash', 'sensuclient', 'artifact', 'objectstore'].each do |from|
+[ 'os', 'telegraf', 'filebeat', 'user', 'job', 'file', 'volume', 'share', 'download', 'library', 'daemon', 
+  'certificate', 'logstash', 'sensuclient', 'artifact', 'objectstore', 'secrets-client'].each do |from|
   relation "#{from}::managed_via::compute",
     :except => [ '_default' ],
     :relation_name => 'ManagedVia',

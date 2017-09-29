@@ -7,7 +7,7 @@ license          "Apache License, Version 2.0"
 
 grouping 'default',
   :access => "global",
-  :packages => [ 'base', 'mgmt.cloud.service', 'cloud.service' ],
+  :packages => [ 'base', 'mgmt.cloud.service', 'cloud.service', 'service.windows-domain' ],
   :namespace => true
 
 

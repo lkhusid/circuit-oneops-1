@@ -1,7 +1,7 @@
 {::options template="document" /}
 
-Ganglia Pack (RC7 Build)
-========================
+Ganglia Pack (V1 Build)
+=======================
 This pack is used to deploy a Ganglia monitoring server.
 
 Deployment Layout
@@ -44,8 +44,3 @@ In the operations view, the status of all deployed components can be viewed.
 
 * **CheckGMeta** - This monitor reports whether the gmetad instance on the Ganglia server is still running and accessible.
 
-Other Notes
------------
-The Ganglia deployment guide can be found at:
-
-<https://confluence.walmart.com/display/DTBFDP/Ganglia+Deployment+Guide>

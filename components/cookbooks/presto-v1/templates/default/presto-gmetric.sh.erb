@@ -1,0 +1,38 @@
+#!/usr/bin/python
+
+import sys,json
+import urllib
+from subprocess import call
+
+is_coord = False
+
+try:
+  coordLink = "http://localhost:<%= @metrics_port %>/v1/info/coordinator"
+  coordData = urllib.urlopen(coordLink)
+  if coordData.getcode() == 200:
+    is_coord = True
+except:
+  pass
+
+if is_coord:
+  # Pull the metrics from the REST api and convert them into
+  # calls to gmetric to report them to Ganglia
+  try:
+    metricsLink = "http://localhost:<%= @metrics_port %>/<%= @metrics_path %>"
+    metricsData = urllib.urlopen(metricsLink)
+    dataString = metricsData.read()
+  except:
+    pass
+
+  # Presto includes a large number of metrics in the jmx connector.
+  # Don't report all of them...just include the ones necessary for
+  # reporting through gmetric.
+
+  try:
+    jsonData = json.loads(dataString)
+    for metricObj in jsonData["attributes"]:
+      if metricObj["name"] == "RunningQueries":
+        call(["gmetric", "--name", "cluster.jobs_running", "--value", str(metricObj["value"]), "--type", "uint16", "--group", "presto"])
+
+  except:
+    pass

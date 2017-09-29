@@ -1,5 +1,4 @@
 require 'date'
-
 cloud_name = node[:workorder][:cloud][:ciName]
 provider = ""
 auto_provision = node.workorder.rfcCi.ciAttributes.auto_provision
@@ -17,6 +16,11 @@ expires_on = node[:expiry_time]
 if !auto_provision.nil? && auto_provision == "true" && !provider.nil? && !provider.empty?
 	include_recipe provider + "::add_certificate" 
 	expires_on = node[:expiry_time]
+end
+
+#if key-managment service barbican is present in the workload , invoke the barbican::add recipe here
+if node[:workorder][:services].has_key?("keymanagement")
+  include_recipe "barbican::add"
 end
 
 expires_in_value_changed = false
@@ -51,7 +55,7 @@ if expires_on.nil? || expires_in_value_changed == true #auto provision is turned
 	end
 end
 
-if !expires_on.nil?
+if !expires_on.nil? && defined?(node.workorder.payLoad.ManagedVia)
 	Chef::Log.info("expiry time to be set in monitor metrics: " + Time.parse(expires_on.to_s).to_i.to_s)
 	node.set[:expiry_date_in_seconds] = Time.parse(expires_on.to_s).to_i
 

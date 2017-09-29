@@ -20,18 +20,10 @@
 major_version = node.tomcat.version.gsub(/\..*/,"")
 docBase = "/usr/share/tomcat#{major_version}-admin/manager"
 
-if node.tomcat.install_type == "repository"
-
-  case node.platform
-  when "redhat","centos","fedora"
-    docBase = "/usr/share/tomcat#{major_version}/webapps/manager"
-  end
-
-else
   # install via tarball - use the manager webapp that comes with it
   docBase = node.tomcat.tomcat_install_dir + "/tomcat" +major_version+ "/webapps/manager"
-end
-%> 
+
+%>
  docBase="<%= docBase %>"
  antiResourceLocking="false" privileged="true">
  <Valve className="org.apache.catalina.valves.RemoteAddrValve"

@@ -22,13 +22,10 @@ extend Fqdn::Base
 Chef::Resource::RubyBlock.send(:include, Fqdn::Base)
 
 cloud_name = node[:workorder][:cloud][:ciName]
-service_attrs = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
-  
+service_attrs = get_dns_service
+
 # ex) customer_domain: env.asm.org.oneops.com
-customer_domain = node.customer_domain.downcase
-if node.customer_domain.downcase !~ /^\./
-  customer_domain = '.'+node.customer_domain.downcase
-end
+customer_domain = get_customer_domain
 
 # entries Array of {name:String, values:Array}
 entries = Array.new
@@ -40,9 +37,25 @@ if !node.workorder.payLoad.has_key?(:DependsOn)
   fail_with_fault "missing DependsOn payload"
 end
 
-lbs = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Lb/ }
+lbs = node[:workorder][:payLoad][:DependsOn].select { |d| d[:ciClassName] =~ /Lb/ }
+os = node[:workorder][:payLoad][:DependsOn].select { |d| d[:ciClassName] =~ /Os/ }
+cluster = node[:workorder][:payLoad][:DependsOn].select { |d| d[:ciClassName] =~ /Cluster/ }
 
-if node.workorder.payLoad.has_key?("Entrypoint")
+#in windows domains some dns entries (vm hostname and cluster name) are accompanied with Active Directory objects 
+ad_ci = nil
+if is_windows && os.size == 1
+  ad_ci = os
+  ad_object_name = 'hostname'
+elsif is_windows && cluster.size == 1
+  ad_ci = cluster
+  ad_object_name = 'cluster_name'
+end
+
+if ad_ci
+  dns_name = (ad_ci[0][:ciAttributes][ad_object_name] + '.' + get_windows_domain).downcase
+  is_hostname_entry = true if os.size == 1
+
+elsif node.workorder.payLoad.has_key?("Entrypoint")
  ci = node.workorder.payLoad.Entrypoint[0]
  dns_name = (ci[:ciName] +customer_domain).downcase
 
@@ -56,7 +69,6 @@ elsif lbs.size > 0
  dns_name = (ci_name + customer_domain).downcase
 
 else
-  os = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Os/ }
 
   if os.size == 0
 
@@ -111,6 +123,11 @@ end
 deps = node.workorder.payLoad[:DependsOn].select { |d| d[:ciAttributes].has_key? "dns_record" }
 values = get_dns_values(deps)
 
+# check if dependent component creation is a success or else fail the reciepe execution
+if values.nil? || values.empty?
+   exit_with_error "Empty dns_record. Please check whether the compute/lb deployment step passed successfully"
+end
+
 # cloud-level add entry - will loop thru and cleanup & create them later
 entries.push({:name => dns_name, :values => values })
 Chef::Log.info("cloud level dns: #{dns_name} values: "+values.to_s)
@@ -130,8 +147,11 @@ end
 
 
 # platform-level remove cloud_dns_id for primary entry
-primary_platform_dns_name = dns_name.gsub("\."+service_attrs[:cloud_dns_id]+"\."+service_attrs[:zone],"."+service_attrs[:zone]).downcase
-
+if ad_ci
+  primary_platform_dns_name = dns_name.split('.').first + get_customer_domain.split('.').select{|i| (i != service_attrs[:cloud_dns_id])}.join('.')
+else
+  primary_platform_dns_name = dns_name.split('.').select{|i| (i != service_attrs[:cloud_dns_id])}.join('.')
+end
 
 if node.workorder.rfcCi.ciAttributes.has_key?("ptr_enabled") &&
   node.workorder.rfcCi.ciAttributes.ptr_enabled == "true"
@@ -146,7 +166,7 @@ if node.workorder.rfcCi.ciAttributes.has_key?("ptr_enabled") &&
   end
 
   values.each do |ip|
-    next unless ip =~ /^\d+\.\d+\.\d+\.\d+$/
+    next unless ip =~ /^\d+\.\d+\.\d+\.\d+$/ || ip =~ Resolv::IPv6::Regex
     ptr = {:name => ip, :values => ptr_value.downcase}
     Chef::Log.info("ptr: #{ptr.inspect}")
     entries.push(ptr)
@@ -180,7 +200,7 @@ else
   
   is_a_record = false
   value_array.each do |val|
-    if val =~ /^\d+\.\d+\.\d+\.\d+$/
+    if val =~ /^\d+\.\d+\.\d+\.\d+$/ || val =~ Resolv::IPv6::Regex
       is_a_record = true
     end
   end

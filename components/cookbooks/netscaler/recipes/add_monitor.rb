@@ -10,10 +10,13 @@ node.old_monitor_names.each do |old_monitor_name|
 
   cloud_name = node[:workorder][:cloud][:ciName]
   cloud_service = node[:workorder][:services][:lb][cloud_name][:ciAttributes]
+  az = node.workorder.rfcCi.ciAttributes.availability_zone
+  az_map = JSON.parse(cloud_service[:availability_zones])
+  ns_host = az_map[az]
 
   ENV['HOME'] = '/tmp'
   require 'net/ssh'
-  ssh = Net::SSH.start(cloud_service[:host], cloud_service[:username],
+  ssh = Net::SSH.start(ns_host, cloud_service[:username],
                        :password => cloud_service[:password], :paranoid => Net::SSH::Verifiers::Null.new)
 
   lbs = [] + node.cleanup_loadbalancers + node.loadbalancers
@@ -34,6 +37,9 @@ node.old_monitor_names.each do |old_monitor_name|
     end
   end
   ssh.close
+  
+  # skip deleting generic monitors
+  next if old_monitor_name =~ /generic-/
   
   resp_obj = JSON.parse(node.ns_conn.request(:method=>:get,
   :path=>"/nitro/v1/config/lbmonitor/#{old_monitor_name}").body)
@@ -98,7 +104,7 @@ node.monitors.each do |mon|
       :method => :get, 
       :path =>"/nitro/v1/config/lbmonitor/#{monitor_name}").body)        
     
-    if resp_obj["message"] !~ /No such resource/
+    if (resp_obj["message"] !~ /No such resource/) && !(monitor_name.start_with? 'generic')
       type = resp_obj['lbmonitor'][0]['type']
 
       Chef::Log.info("removing monitor: #{monitor_name} from previous az / netscaler.")              
@@ -164,7 +170,7 @@ node.monitors.each do |mon|
       Chef::Log.info("delete monitor due to different types: existing: #{existing_monitor['type']} current: #{monitor[:type]}")
 
       binding = { :monitorname => monitor_name, :servicegroupname => sg_name }
-      Chef::Log.info("beinding being deleted: #{binding.inspect}")
+      Chef::Log.info("binding being deleted: #{binding.inspect}")
       req = 'object={"params":{"action": "unbind"}, "lbmonitor_servicegroup_binding" : ' + JSON.dump(binding) + '}'
       resp_obj = JSON.parse(node.ns_conn.request(
         :method=> :post,

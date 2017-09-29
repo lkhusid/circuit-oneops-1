@@ -44,7 +44,7 @@ listeners = JSON.parse( lb[:ciAttributes][:listeners] )
 listeners.each do |l|
   lb_attrs = l.split(" ") 
   gslb_protocol = lb_attrs[0].upcase
-  if gslb_protocol == "HTTPS"
+  if gslb_protocol == "HTTPS" || gslb_protocol == "TERMINATED_HTTPS"
     gslb_protocol = "SSL"
   end
   gslb_port = lb_attrs[1].to_i

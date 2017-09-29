@@ -21,10 +21,7 @@
 require 'excon'
    
 # ex) customer_domain: env.asm.org.oneops.com
-customer_domain = node.customer_domain
-if node.customer_domain !~ /^\./
-  customer_domain = '.'+node.customer_domain
-end
+customer_domain = get_customer_domain
 
 # entries Array of {name:String, values:Array}
 entries = Array.new
@@ -92,8 +89,7 @@ aliases.each do |a|
   end
 
   if node.workorder.cloud.ciAttributes.priority == "1"
-     cloud_name = node.workorder.cloud.ciName
-     service = node[:workorder][:services][:dns][cloud_name][:ciAttributes]
+     service = get_dns_service
      if service[:cloud_dns_id].nil? || service[:cloud_dns_id].empty?
        Chef::Log.info(" no cloud_dns_id - service: #{service.inspect} ")
        next

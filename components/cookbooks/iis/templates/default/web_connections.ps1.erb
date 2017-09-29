@@ -1,0 +1,9 @@
+import-module webadministration
+
+$instance = $env:COMPUTERNAME
+
+$current_connections=((Get-Counter "web service(_total)\current connections" -ComputerName $instance).CounterSamples).CookedValue
+
+$performance_counters="CurrentConnections=$current_connections"
+
+write-host "$performance_counters|$performance_counters"

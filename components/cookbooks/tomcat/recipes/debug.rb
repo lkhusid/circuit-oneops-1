@@ -1,13 +1,7 @@
+#Deprecated - Will be removed in future releases
+
+include_recipe "tomcat::generate_variables"
 include_recipe "tomcat::stop"
-
-#TODO needs refactoring
-node.set['tomcat_owner'] = node['tomcat']['user']
-node.set['tomcat_group'] = node['tomcat']['group']
-
-
-if node['tomcat'].has_key?("tomcat_user") && !node['tomcat']['tomcat_user'].empty?
-  node.set['tomcat_owner'] = node['tomcat']['tomcat_user']
-end
 
 version=node.tomcat.version.gsub(/\..*/,"")
 Chef::Log.info("Starting to debug with user #{node.tomcat_owner}");

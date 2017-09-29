@@ -1,12 +1,14 @@
 #TODO: add checks in each method for rg_name
 require File.expand_path('../../../azuresecgroup/libraries/network_security_group.rb', __FILE__)
+require File.expand_path('../../../azure_base/libraries/custom_exceptions.rb', __FILE__)
+require 'ipaddr'
 # module to contain classes for dealing with the Azure Network features.
 module AzureNetwork
 
   # class to implement all functionality needed for an Azure NIC.
   class NetworkInterfaceCard
 
-    attr_accessor :location, :rg_name, :private_ip, :profile, :ci_id
+    attr_accessor :location, :rg_name, :private_ip, :profile, :ci_id, :flag
 
     attr_reader :creds, :subscription
 
@@ -86,10 +88,17 @@ module AzureNetwork
       begin
         OOLog.info("Updating NIC '#{network_interface.name}' ")
         start_time = Time.now.to_i
-        promise =
-          @client.network_interfaces.create_or_update(@rg_name,
-                                                      network_interface.name,
-                                                      network_interface)
+
+        begin
+          if(@flag)
+            promise = @client.network_interfaces.get(@rg_name, network_interface.name)
+          else
+            promise =
+                @client.network_interfaces.create_or_update(@rg_name,
+                                                            network_interface.name,
+                                                            network_interface)
+          end
+        end
 
         response = promise.value!
         result = response.body
@@ -100,15 +109,37 @@ module AzureNetwork
         OOLog.info("NIC '#{network_interface.name}' was updated in #{duration} seconds")
         result
       rescue MsRestAzure::AzureOperationError => e
-        OOLog.fatal("Error creating/updating NIC.  Exception: #{e.body}")
+        error_msg = e.body.to_s
+        if error_msg.include? "\"code\"=>\"SubnetIsFull\""
+          raise AzureBase::CustomExceptions::SubnetIsFullError, error_msg
+        elsif error_msg.include? "\"code\"=>\"ResourceNotFound\""
+          Chef::Log.error('***FAULT:FATAL= NIC is no more available, please consider replacing compute')
+          Chef::Log.error('***FAULT:FATAL=' + error_msg)
+        else
+          OOLog.fatal("Error creating/updating NIC.  Exception: #{e.body}")
+        end
       rescue => ex
         OOLog.fatal("Error creating/updating NIC.  Exception: #{ex.message}")
       end
     end
 
+    #function to check available ip belongs to which subnet
+    def ip_belongs_to_subnet(subnets, available_ip)
+      my_ip = IPAddr.new(available_ip)
+      subnets.each do |subnet|
+        OOLog.info(subnet.properties.address_prefix)
+        check = IPAddr.new(subnet.properties.address_prefix)
+        if(check.include?(my_ip))
+          OOLog.info('IP belongs to subnet : '+subnet.properties.address_prefix)
+          return subnet
+        end
+      end
+      return nil
+    end
+
     # this manages building the network profile in preperation of creating
     # the vm.
-    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_name)
+    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_name, tags)
       # get the objects needed to build the profile
       virtual_network = AzureNetwork::VirtualNetwork.new(creds, subscription)
       virtual_network.location = @location
@@ -147,26 +178,59 @@ module AzureNetwork
       end
 
       subnetlist = network.body.properties.subnets
-      # get the subnet to use for the network
-      subnet =
-          subnet_cls.get_subnet_with_available_ips(subnetlist,
-                                                   express_route_enabled)
 
-      # define the NIC ip config object
-      nic_ip_config = define_nic_ip_config(ip_type, subnet)
+      #ips from gatewaysubnet should not be used to create NICs
+      subnetlist.delete_if{|s| s.name.downcase == 'gatewaysubnet'}
 
-      # define the nic
-      network_interface = define_network_interface(nic_ip_config)
+      begin
+        # get the subnet to use for the network
 
-      #include the network securtiry group to the network interface
-      nsg = AzureNetwork::NetworkSecurityGroup.new(creds, subscription)
-      network_security_group = nsg.get(@rg_name, security_group_name)
-      if !network_security_group.nil?
-        network_interface.properties.network_security_group = network_security_group
+        if(@flag)
+          OOLog.info("getting subnet which belongs that ip")
+          subnet = ip_belongs_to_subnet(subnetlist, @private_ip)
+        else
+          OOLog.info("checking in subnet")
+          subnet =
+              subnet_cls.get_subnet_with_available_ips(subnetlist,
+                                                       express_route_enabled)
+        end
+
+
+
+        # define the NIC ip config object
+        nic_ip_config = define_nic_ip_config(ip_type, subnet)
+
+        # define the nic
+        network_interface = define_network_interface(nic_ip_config)
+
+        #include the network securtiry group to the network interface
+        nsg = AzureNetwork::NetworkSecurityGroup.new(creds, subscription)
+        network_security_group = nsg.get(@rg_name, security_group_name)
+        if !network_security_group.nil?
+          network_interface.properties.network_security_group = network_security_group
+        end
+
+        # create the nic
+        nic = create_update(network_interface)
+
+      rescue AzureBase::CustomExceptions::SubnetIsFullError => e
+        OOLog.info("subnet is full: #{subnet.name}")
+        #Azure already said that this subnet doesn't have available ips. take it out from list and look for next available subnet
+        subnetlist.delete_if{|s| s.name == subnet.name}
+
+        if(subnetlist.empty?)
+          #No more subnets to try
+          OOLog.fatal('No subnets with available ip addresses are found')
+        else
+          #retry creating NIC with next available subnet
+          retry
+        end
+      rescue => ex
+        OOLog.fatal("Error in build_network_profile.  Exception: #{ex.message}")
       end
 
-      # create the nic
-      nic = create_update(network_interface)
+      # update the nic with tags
+      Utils.update_resource_tags(@creds, @subscription, @rg_name, nic, tags)
 
       # retrieve and set the private ip
       @private_ip =

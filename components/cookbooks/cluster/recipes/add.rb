@@ -2,6 +2,10 @@
 # Cookbook Name:: cluster
 # Recipe:: add
 #
+if node.platform =~ /windows/
+  include_recipe "cluster::add_windows"
+  return
+end
 
 # number retries for backend calls
 max_retry_count = 5

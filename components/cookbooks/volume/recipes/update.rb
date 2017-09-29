@@ -12,21 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_recipe "shared::set_provider"
-
- storage = nil
- node.workorder.payLoad[:DependsOn].each do |dep|
-   if dep["ciClassName"] =~ /Storage/
-      storage = dep
-      break
-    end
-  end
-
-if storage != nil
-  include_recipe "volume::add"
-else
-  if node.platform =~ /windows/
-    include_recipe "volume::delete"
-  end
-  include_recipe "volume::add"
-end
+include_recipe "volume::add"

@@ -4,6 +4,7 @@ Erubis::Context.send(:include, Extensions::Templates)
 
 include_recipe 'es::wire_ci_attr'
 elasticsearch = "elasticsearch-#{node.elasticsearch[:version]}"
+version = "#{node.elasticsearch[:version]}"
 
 # service 'elasticsearch' do
   # action :stop
@@ -232,9 +233,11 @@ end
 
 if node.elasticsearch[:download_url].include? "download.elastic.co"
   install_plugin 'lmenezes/elasticsearch-kopf' , 'version' => "#{node.elasticsearch[:version]}"
-else
+elsif version.start_with?("5")
+       puts "No KOPF plugin for Elastic search version 5.0 and above"
+elsif
   url = node.elasticsearch[:base_url]
-  install_plugin "elasticsearch-kopf", 'url' => "#{url}", 'version' => "#{node.elasticsearch[:version]}"
+  install_plugin 'elasticsearch-kopf', 'url' => "#{url}", 'version' => "#{node.elasticsearch[:version]}"
 end
 
 #

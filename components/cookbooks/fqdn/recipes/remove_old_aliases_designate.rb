@@ -17,10 +17,7 @@
 #
           
 # ex) customer_domain: env.asm.org.oneops.com
-customer_domain = node.customer_domain
-if node.customer_domain !~ /^\./
-  customer_domain = '.'+node.customer_domain
-end
+customer_domain = get_customer_domain
 
 # entries Array of {name:String, values:Array}
 entries = Array.new

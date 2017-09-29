@@ -1,0 +1,11 @@
+$service = get-service w3svc
+$hostname = hostname
+
+if ($service.status -eq "Running")
+{
+  write-host $hostname $service.name "up| up=100"
+}
+else
+{
+  write-host $hostname $service.name "down| up=0"
+}

@@ -63,6 +63,7 @@ if env.has_key?("global_dns") && env["global_dns"] == "true" &&
     include_recipe "azuretrafficmanager::delete"
   else
     include_recipe "netscaler::get_gslb_domain"
+    include_recipe "netscaler::get_dc_lbvserver"
     include_recipe "netscaler::delete_gslb_service"
     include_recipe "netscaler::delete_gslb_vserver"
     include_recipe "netscaler::logout"

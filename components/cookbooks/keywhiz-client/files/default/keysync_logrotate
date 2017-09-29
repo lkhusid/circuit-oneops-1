@@ -1,0 +1,10 @@
+/opt/oneops/log/keysync.log
+{
+ copytruncate
+ daily
+ size 10M
+ rotate 8
+ missingok
+ maxage 7
+}
+

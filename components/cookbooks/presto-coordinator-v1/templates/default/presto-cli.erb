@@ -1,0 +1,28 @@
+bindir="$(cd "$(dirname "${BASH_SOURCE[0]}")"; pwd)"
+
+<% if @enable_ssl %>
+presto_url="https://<%= @coordinator_fqdn %>:<%= @port %>"
+
+# Check the certificate
+if [ -e "/tmp/presto.jks" ]; then
+  :
+else
+  # Get the cert
+  openssl s_client -connect "<%= @coordinator_fqdn %>:<%= @port %>" </dev/null 2>/dev/null |openssl x509 -outform PEM > /tmp/${USER}-presto-coordinator.pem
+
+  # Put it in the keystore
+  keytool -import -alias presto-coordinator -keystore /tmp/presto.jks -storepass presto -file /tmp/${USER}-presto-coordinator.pem -noprompt
+
+  # Allow other users to read the keystore
+  chmod 777 /tmp/presto.jks
+
+  # Remove intermediate PEM file
+  rm "/tmp/${USER}-presto-coordinator.pem"
+fi
+
+${bindir}/presto-cli-executable.jar --keystore-path /tmp/presto.jks --keystore-password presto --server "${presto_url}" --user "${USER}" --password "$@"
+<% else %>
+presto_url="http://<%= @coordinator_fqdn %>:<%= @port %>"
+
+${bindir}/presto-cli-executable.jar --server "${presto_url}" --user "${USER}" --password "$@"
+<% end %>

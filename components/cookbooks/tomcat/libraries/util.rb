@@ -4,12 +4,7 @@ def get_attribute_value(attr_name)
 end
 
 def tom_ver
-	case node.tomcat.install_type
-	when "repository"
-		return "tomcat"
-	when "binary"
-		return "tomcat"+node[:tomcat][:version][0,1]
-	end
+	return "tomcat"+node[:tomcat][:version][0,1]
 end
 
 def exit_with_error(msg)

@@ -1,0 +1,37 @@
+coordinator=<%= @coordinator %>
+node-scheduler.include-coordinator=<%= @include_coordinator %>
+http-server.http.port=<%= @http_port %>
+discovery-server.enabled=true
+discovery.uri=http://<%= @coordinator_ip %>:<%= @http_port %>
+event.http-client.keep-alive-interval=5s
+plugin.bundles=\
+    /usr/lib/presto/lib/plugin/atop,\
+    /usr/lib/presto/lib/plugin/blackhole,\
+    /usr/lib/presto/lib/plugin/cassandra,\
+    /usr/lib/presto/lib/plugin/example-http,\
+    /usr/lib/presto/lib/plugin/hive-hadoop2,\
+    /usr/lib/presto/lib/plugin/jmx,\
+    /usr/lib/presto/lib/plugin/kafka,\
+    /usr/lib/presto/lib/plugin/localfile,\
+    /usr/lib/presto/lib/plugin/ml,\
+    /usr/lib/presto/lib/plugin/mongodb,\
+    /usr/lib/presto/lib/plugin/mysql,\
+    /usr/lib/presto/lib/plugin/postgresql,\
+    /usr/lib/presto/lib/plugin/raptor,\
+    /usr/lib/presto/lib/plugin/redis,\
+    /usr/lib/presto/lib/plugin/teradata-functions,\
+    /usr/lib/presto/lib/plugin/tpch
+
+<% if @enable_ssl %>
+http-server.https.enabled=true
+http-server.https.port=<%= @https_port %>
+
+http-server.https.keystore.path=<%= @keystore_file %>
+http-server.https.keystore.key=<%= @keystore_password %>
+<% else %>
+http-server.https.enabled=false
+<% end %>
+
+http-server.authentication.type=LDAP
+authentication.ldap.url=ldaps://<%= @ldap_server %>:636
+authentication.ldap.user-bind-pattern=${USER}@<%= @ldap_domain %>

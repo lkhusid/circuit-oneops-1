@@ -82,5 +82,5 @@ end
      
 # ensure the service is running
 service 'logstash' do
-  action :start
+  action [:enable, :start]
 end          

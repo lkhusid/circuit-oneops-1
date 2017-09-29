@@ -1,9 +1,16 @@
-include_pack "generic_ring"
+include_pack "genericlb"
 
 name "rabbitmq"
 description "RabbitMQ"
 type "Platform"
 category "Messaging"
+
+platform :attributes => {'autoreplace' => 'false'}
+
+resource 'compute',
+         :cookbook => 'oneops.1.compute',
+         :attributes => {'size' => 'M'
+         }
 
 resource 'user-app',
          :cookbook => 'oneops.1.user',
@@ -17,18 +24,80 @@ resource 'user-app',
              :sudoer => true
          }
   
-resource "rabbitmq",
-  :cookbook => "oneops.1.rabbitmq",
+resource "rabbitmq_server",
+  :cookbook => "oneops.1.rabbitmq_server",
+  :design => true,
+  :requires => { "constraint" => "1..1", "services" => "*mirror" }
+
+resource "rabbitmq_cluster",
+  :cookbook => "oneops.1.rabbitmq_cluster",
   :design => true,
   :requires => { "constraint" => "1..1" },
-  :attributes => {
-    "version"      => "3.4.2",
-    "port"         => "5672",
-    "datapath"     => "/data/rabbitmq/mnesia",
-    "erlangcookie" => "DEFAULTCOOKIE"
+  :payloads => { 'RequiresOs' => {
+    'description' => 'os',
+    'definition' => '{
+       "returnObject": false,
+       "returnRelation": false,
+       "relationName": "base.RealizedAs",
+       "direction": "to",
+       "targetClassName": "manifest.oneops.1.Rabbitmq_cluster",
+       "relations": [
+         { "returnObject": false,
+           "returnRelation": false,
+           "relationName": "manifest.DependsOn",
+           "direction": "from",
+           "targetClassName": "manifest.oneops.1.Os",
+           "relations": [
+             { "returnObject": true,
+               "returnRelation": false,
+               "relationName": "base.RealizedAs",
+               "direction": "from",
+               "targetClassName": "bom.oneops.1.Os"
+             }
+           ]
+         }
+       ]
+    }'
+  },
+  'RequiresKeys' => {
+    'description' => 'keys',
+    'definition' => '{
+       "returnObject": false,
+       "returnRelation": false,
+       "relationName": "base.RealizedAs",
+       "direction": "to",
+       "targetClassName": "manifest.oneops.1.Rabbitmq_cluster",
+       "relations": [
+         { "returnObject": false,
+           "returnRelation": false,
+           "relationName": "manifest.Requires",
+           "direction": "to",
+           "targetClassName": "manifest.Platform",
+           "relations": [
+             { "returnObject": false,
+               "returnRelation": false,
+               "relationName": "manifest.Requires",
+               "direction": "from",
+               "targetClassName": "manifest.oneops.1.Keypair",
+               "relations": [
+                   {"returnObject": true,
+                   "returnRelation": false,
+                   "relationName": "base.RealizedAs",
+                   "direction": "from",
+                   "targetClassName": "bom.oneops.1.Keypair" 
+                   }  
+                ]
+             }
+           ]
+         }
+       ]
+    }'
   }
+}
 
-resource "volume",
+resource "volume-data",
+  :cookbook => "oneops.1.volume",
+  :design => true,
   :requires => { "constraint" => "1..1", "services" => "compute" },
   :attributes => {  "mount_point"   => '/data',
                     "device"        => '',
@@ -49,7 +118,6 @@ resource "volume",
                   },
                 }
     }
-
 
 resource "volume-log",
   :cookbook => "oneops.1.volume",
@@ -74,14 +142,27 @@ resource "volume-log",
                   },
                 },
     }
-  
+
+resource "secgroup",
+         :cookbook => "oneops.1.secgroup",
+         :design => true,
+         :attributes => {
+             "inbound" => '[ "22 22 tcp 0.0.0.0/0", "5672 5672 tcp 0.0.0.0/0", "5673 5673 tcp 0.0.0.0/0", "15672 15672 tcp 0.0.0.0/0", "25672 25672 tcp 0.0.0.0/0", "4369 4369 tcp 0.0.0.0/0" ]'
+         },
+         :requires => {
+             :constraint => "1..1",
+             :services => "compute"
+         }
+
 # depends_on
 [{:from => 'os', :to => 'compute'},
   {:from => 'user-app', :to => 'os'},
-  {:from => 'volume', :to => 'user-app'},
-  {:from => 'volume-log', :to => 'volume'},
+  {:from => 'volume-data', :to => 'user-app'},
+  {:from => 'volume-log', :to => 'volume-data'},
   {:from => 'volume-log', :to => 'user-app'},
-    {:from => 'rabbitmq', :to => 'volume-log'}].each do |link|
+  {:from => 'rabbitmq_server', :to => 'volume-log'},
+  {:from => 'rabbitmq_cluster', :to => 'os'},
+  {:from => 'rabbitmq_cluster', :to => 'rabbitmq_server'}].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",
            :relation_name => 'DependsOn',
            :from_resource => link[:from],
@@ -89,27 +170,8 @@ resource "volume-log",
            :attributes => {"flex" => false, "min" => 1, "max" => 1}
 end
 
-resource "secgroup",
-         :cookbook => "oneops.1.secgroup",
-         :design => true,
-         :attributes => {
-             "inbound" => '[ "22 22 tcp 0.0.0.0/0", "5672 5672 tcp 0.0.0.0/0", "5673 5673 tcp 0.0.0.0/0", "15672 15672 tcp 0.0.0.0/0", "25672 25672 tcp 0.0.0.0/0" ]'
-         },
-         :requires => {
-             :constraint => "1..1",
-             :services => "compute"
-         }
-
-relation "ring::depends_on::rabbitmq",
-    :except => [ '_default', 'single' ],
-    :relation_name => 'DependsOn',
-    :from_resource => 'ring',
-    :to_resource   => 'rabbitmq',
-    :attributes    => { "flex" => true, "min" => 1, "max" => 10 } 
-
-    
 # managed_via
-[ 'user-app', 'volume-log', 'volume', 'rabbitmq'].each do |from|
+[ 'user-app', 'volume-log', 'volume-data', 'rabbitmq_server', 'rabbitmq_cluster'].each do |from|
   relation "#{from}::managed_via::compute",
     :except => [ '_default' ],
     :relation_name => 'ManagedVia',

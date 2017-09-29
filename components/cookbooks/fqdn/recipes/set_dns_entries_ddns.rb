@@ -46,8 +46,7 @@ end
 
 include_recipe "fqdn::get_ddns_connection"
 
-cloud_name = node[:workorder][:cloud][:ciName]
-domain_name = node[:workorder][:services][:dns][cloud_name][:ciAttributes][:zone]
+domain_name = get_dns_service[:zone]
 cmd_file = node.ddns_key_file + '-cmd'
 ns = node.ns
 

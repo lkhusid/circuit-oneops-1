@@ -218,6 +218,8 @@ Array(1..slice_count).each do |i|
     vols.push(volume.to_s+":"+dev)
     node.set["device_map"] = vols.join(" ")
     include_recipe "azuredatadisk::add" #Create datadisk, but doesn't attach it to the compute
+    Chef::Log.info("Attaching storage to compute")
+    include_recipe "azuredatadisk::attach"
   else
     Chef::Log.info("added "+volume.id.to_s)
     vols.push(volume.id.to_s+":"+dev)

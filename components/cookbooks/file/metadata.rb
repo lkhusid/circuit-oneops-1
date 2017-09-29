@@ -29,12 +29,22 @@ attribute 'path',
     :order => 1
   }
 
+attribute 'file_mode',
+  :description => "File Mode",
+  :required => "required",
+  :default => '0755',
+  :format => {
+    :help => 'File mode / permissions that the file should be created with',
+    :category => '3.Run',
+    :order => 1
+  }
+
 attribute 'exec_cmd',
   :description => "Execute Command",
   :format => {
     :help => 'Optional commands to execute after downloading the file from remote source and/or saving the included file content',
     :category => '3.Run',
-    :order => 1
+    :order => 2
   }
 
 recipe "repair", "Repair"

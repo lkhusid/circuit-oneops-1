@@ -1,3 +1,4 @@
+require 'fog'
 
 class VolumeModel
   module Mode
@@ -13,6 +14,8 @@ class VolumeModel
     @id = id
     @disk_mode = 'PERSISTENT'
     @thin = true
+    @server = Fog::Compute::Vsphere::Server.new
+    @service = ''
   end
 
   attr_reader :datastore, :id, :name, :disk_mode, :thin_provisioned, :size_gb
@@ -42,6 +45,9 @@ class VolumeModel
     object[:mode] = @disk_mode
     object[:thin] = @thin_provisioned
     object[:size_gb] = @size_gb
+    @server.volumes = [Fog::Compute::Vsphere::Volume.new(object)]
+    object[:server] = @server
+    object[:service] = @service
 
     return object
   end

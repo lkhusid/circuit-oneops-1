@@ -1,0 +1,30 @@
+$service = get-service *MSSQL*
+$agent = get-service *SQLSERVERAGENT*
+$mssqlup = 100
+$agentup = 0
+$hostname = hostname
+
+if ($service.count -ge 1)
+{
+    if ($service.status -eq "Running")
+    {
+        $mssqlup=100
+    }
+    else
+    {
+        $mssqlup=0
+    }
+}
+if ($agent.count -ge 1)
+{
+    if ($agent.status -eq "Running")
+    {
+        $agentup=100
+    }
+    else
+    {
+        $agentup=0
+    }
+}
+
+write-host sqlstatuscheck "|mssqlup=$($mssqlup) agentup=$($agentup)"

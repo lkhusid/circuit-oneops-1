@@ -14,11 +14,11 @@ grouping 'default',
 attribute 'version',
           :description => "Tomcat Version",
           :required => "required",
-          :default => "8.5.9",
+          :default => "8.5.12",
           :format => {
               :important => true,
               :help => "Specify the version of Tomcat you wish to install.",
-              :form => {"field" => "select", "options_for_select" => [["8.5.8", "8.5.8"],["8.5.9", "8.5.9"]]},
+              :form => {"field" => "select", "options_for_select" => [["8.5.12", "8.5.12"]]},
               :pattern => "[0-9\.]+",
               :category => "1.Global",
               :order => 1

@@ -476,13 +476,17 @@ get_compute_nat_rules(subscription_id, resource_group_name, lb_name, frontend_ip
 # Configure LB properties
 lb_props = AzureNetwork::LoadBalancer.create_lb_props(frontend_ipconfigs, backend_address_pools, lb_rules, nat_rules, probes)
 
-
 # Create LB
 lb_svc = AzureNetwork::LoadBalancer.new(credentials, subscription_id)
 
 lb = nil
 begin
   lb = lb_svc.create_update(location, resource_group_name, lb_name, lb_props)
+
+  # update the lb with tags
+  tags = Utils.get_resource_tags(node)
+  Utils.update_resource_tags(credentials, subscription_id, resource_group_name, lb, tags)
+
   OOLog.info("Load Balancer '#{lb_name}' created!")
 rescue
 

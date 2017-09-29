@@ -1,0 +1,10 @@
+import-module webadministration
+
+$instance = $env:COMPUTERNAME
+
+$exceptions_per_sec=((Get-Counter ".NET CLR Exceptions(w3wp*)\# of Exceps Thrown / sec" -ComputerName $instance)).CounterSamples.CookedValue
+$commited_bytes=((Get-Counter ".NET CLR Memory(w3wp*)\# Total Committed Bytes" -ComputerName $instance)).CounterSamples.CookedValue
+
+$performance_counters="ExceptionsPerSecond=$exceptions_per_sec TotalCommittedBytes=$commited_bytes"
+
+write-host "$performance_counters|$performance_counters"

@@ -63,5 +63,9 @@ module OO
       @mime_mapping ||= OO::IIS::MimeMapping.new(@web_administration, site_name)
     end
 
+    def logging(site_name)
+      @logging ||= OO::IIS::Logging.new(@web_administration, site_name)
+    end
+
   end
 end

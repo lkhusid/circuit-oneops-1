@@ -1,0 +1,12 @@
+import-module webadministration
+
+$instance = $env:COMPUTERNAME
+
+$cpu_usage=[math]::Round(((Get-Counter "\Processor(_total)\% Processor Time" -ComputerName $instance).CounterSamples).CookedValue)
+$queue_length=((Get-Counter "\System\Processor Queue Length" -ComputerName $instance).CounterSamples).CookedValue
+$memory_available=((Get-Counter "\Memory\Available MBytes" -ComputerName $instance).CounterSamples).CookedValue
+$memory_pages=((Get-Counter "\Memory\Pages/sec" -ComputerName $instance)).CounterSamples.CookedValue
+
+$performance_counters="CpuUsage=$cpu_usage QueueLength=$queue_length MemoryAvailable=$memory_available MemoryPages=$memory_pages"
+
+write-host "$performance_counters|$performance_counters"

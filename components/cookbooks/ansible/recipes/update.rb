@@ -1,1 +1,1 @@
-include_recipe "ansible::add"
+include_recipe 'ansible::add'

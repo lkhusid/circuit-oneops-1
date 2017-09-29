@@ -8,10 +8,22 @@ build_version = get_attribute_value("build_version")
 major_version = major_and_minor_version.gsub(/\..*/,"")
 full_version = "#{major_and_minor_version}.#{build_version}"
 
+ruby_block "Stop tomcat service" do
+	only_if { File.exists?("/etc/init.d/tomcat#{major_version}") }
+	block do
+		Chef::Resource::RubyBlock.send(:include, Chef::Mixin::ShellOut)
+
+		shell_out!("service tomcat#{major_version} stop ",
+							 :live_stream => Chef::Log::logger)
+	end
+end
+
+include_recipe "tomcat::stop"
+
 tomcat_install_dir = get_attribute_value("tomcat_install_dir")
 webapp_install_dir = get_attribute_value("webapp_install_dir")
 
-install_type = get_attribute_value("install_type")
+install_type = "binary"
 dest_file = "#{tomcat_install_dir}/apache-tomcat-#{full_version}.tar.gz"
 service_script = "/etc/init.d/tomcat"+ major_version
 

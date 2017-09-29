@@ -21,4 +21,5 @@ end
 default[:swift][:username] = username
 default[:swift][:password] = password
 default[:swift][:authstrategy] = cloud_service[:ciAttributes][:authstrategy]
+default[:swift][:regionname] = cloud_service[:ciAttributes][:regionname]
 default[:swift][:homepath]= '/etc'

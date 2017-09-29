@@ -1,0 +1,17 @@
+import-module webadministration
+
+$instance = $env:COMPUTERNAME
+
+$request_count=((Get-Counter "\ASP.NET Applications(*)\Requests/Sec" -ComputerName $instance).CounterSamples).CookedValue
+$requests_total=((Get-Counter "\ASP.NET Applications(*)\Requests Total" -ComputerName $instance).CounterSamples).CookedValue
+$errors_total_per_sec=((Get-Counter "\ASP.NET Applications(*)\Errors Total/Sec" -ComputerName $instance).CounterSamples).CookedValue
+$requests_executing=((Get-Counter "\ASP.NET Applications(*)\Requests Executing" -ComputerName $instance).CounterSamples).CookedValue
+$restart_count=((Get-Counter "ASP.NET\Application Restarts" -ComputerName $instance).CounterSamples).CookedValue
+$request_wait_time=((Get-Counter "ASP.NET\Request Wait Time" -ComputerName $instance).CounterSamples).CookedValue
+$requests_queued=((Get-Counter "ASP.NET\Requests Queued" -ComputerName $instance).CounterSamples).CookedValue
+$exceptions_per_sec=((Get-Counter ".NET CLR Exceptions(w3wp*)\# of Exceps Thrown / sec" -ComputerName $instance)).CounterSamples.CookedValue
+$commited_bytes=((Get-Counter ".NET CLR Memory(w3wp*)\# Total Committed Bytes" -ComputerName $instance)).CounterSamples.CookedValue
+
+$performance_counters="RequestCount=$request_count RequestsTotal=$requests_total TotalErrorsPerSec=$errors_total_per_sec RequestsExecuting=$requests_executing RestartCount=$restart_count RequestWaitTime=$request_wait_time RequestsQueued=$requests_queued ExceptionsPerSecond=$exceptions_per_sec TotalCommittedBytes=$commited_bytes"
+
+write-host "$performance_counters|$performance_counters"

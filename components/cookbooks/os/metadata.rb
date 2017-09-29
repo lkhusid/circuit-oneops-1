@@ -5,6 +5,7 @@ maintainer_email "support@oneops.com"
 license "Apache License, Version 2.0"
 depends "shared"
 depends "simple_iptables"
+depends 'security'
 
 grouping 'default',
          :access   => "global",
@@ -52,17 +53,19 @@ attribute 'ostype',
     :category => '3.Operating System',
     :order => 1,
     :form => { 'field' => 'select', 'options_for_select' => [
-      ['Ubuntu 16.04','ubuntu-16.04'],      
+      ['Ubuntu 16.04','ubuntu-16.04'],
       ['Ubuntu 14.04','ubuntu-14.04'],
       ['CentOS 7.0','centos-7.0'],
       ['CentOS 7.2','centos-7.2'],
-      ['CentOS 7.3','centos-7.3'],	    
+      ['CentOS 7.3','centos-7.3'],
+      ['CentOS-LXD 7.2','centos-lxd-7.2'],
+      ['CentOS-LXD 7.3','centos-lxd-7.3'],
       ['Redhat 7.0','redhat-7.0'],
       ['Redhat 7.2','redhat-7.2'],
-      ['Redhat 7.3','redhat-7.3'],        	    
+      ['Redhat 7.3','redhat-7.3'],
       ['Windows 2012 R2','windows_2012_r2'],
-	  ['Windows 2016','windows_2016']
-	] }
+      ['Windows 2016','windows_2016']
+    ] }
   }
 
 
@@ -84,6 +87,17 @@ attribute 'osname',
             :order     => 3
           }
 
+attribute 'features',
+          :description => 'Windows Features',
+          :data_type   => 'array',
+          :default     => '[]',
+          :format      => {
+            :help     => 'Install additional windows features',
+            :category => '3.Operating System',
+            :filter   => {'all' => {'visible' => 'ostype:eq:windows_2012_r2 || ostype:eq:windows_2016'}},
+            :order    => 4
+          }
+
 attribute 'repo_list',
           :description => "OS Package Repositories",
           :data_type   => "array",
@@ -103,7 +117,7 @@ attribute 'hosts',
           :format      => {
             :help     => 'First field is hostname, second is IP address',
             :category => '4.Networking',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -115,7 +129,7 @@ attribute 'additional_search_domains',
           :format      => {
             :help     => 'Additional search domains added to dhclient.conf for resolv.conf',
             :category => '4.Networking',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 7
           }
 
@@ -126,7 +140,7 @@ attribute 'proxy_map',
           :format      => {
             :help     => 'Map of proxies - ex) http => http://yourproxy, https => https://yourhttpsproxy, etc',
             :category => '4.Networking',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 8
           }
 
@@ -137,7 +151,7 @@ attribute 'dhclient',
             :help     => 'When selected enables long running dhclient which will manage periodic IP Address renewals. When not selected, dhclient will be stopped and IP Address will behave as if static.',
             :category => '4.Networking',
             :form     => {'field' => 'checkbox'},
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 9
           }
 
@@ -149,7 +163,7 @@ attribute 'iptables_enabled',
             :help     => 'Disable / Enable Firewall',
             :category => '5.Firewall',
             :form     => {'field' => 'checkbox'},
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -226,7 +240,7 @@ attribute 'limits',
           :format      => {
             :help     => 'Key value pairs for limits.conf system settings. Ex: "nofile = 512".Domain is "*" and types are "hard and soft"',
             :category => '7.Security',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -237,7 +251,7 @@ attribute 'sshd_config',
           :format      => {
             :help     => 'Custom entries for /etc/ssh/sshd_config',
             :category => '7.Security',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 2
           }
 
@@ -248,7 +262,7 @@ attribute 'applied_compliance',
           :format      => {
             :help     => 'A map of last applied versions of compliances.',
             :category => '7.Security',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 3
           }
 
@@ -261,7 +275,7 @@ attribute 'sysctl',
           :format      => {
             :help     => 'Key Value pairs for sysctl.conf kernel system settings. Ex: "fs.file-max = 65535"',
             :category => '8.Kernel',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -273,7 +287,7 @@ attribute 'env_vars',
           :format      => {
             :help     => 'Key Value pairs for system env variables (Ex: "LANG = en_US.UTF-8"). Here you can also refer CLOUD, GLOBAL and LOCAL variables as env value.',
             :category => '9.Environment Variables',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -283,7 +297,7 @@ attribute 'pam_groupdn',
           :format      => {
             :help     => 'List of groups need access to SSH. Format (memberOf=group_dn1)(memberOf=group_dn2)...',
             :category => '9.LDAP Configuration',
-            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},			
+            :filter   => {'all' => {'visible' => 'ostype:neq:windows_2012_r2 && ostype:neq:windows_2016'}},
             :order    => 1
           }
 
@@ -321,5 +335,5 @@ recipe 'apply-security-compliance',
            :dataType => 'string'
          }
        }
-       
+
 recipe 'reconfig-network', "Reconfig Network"

@@ -192,18 +192,20 @@ build "#{install_dir}" do
 end
 
 if ci[:ciAttributes][:ci] == 'true'
+  `sudo cp /opt/oneops/workorder/build.#{ci[:ciName]}.json /opt/oneops/`
   cron "continuous_integration_#{manifest}" do
     minute "0,5,10,15,20,25,30,35,40,45,50,55"
     path '${PATH}:/usr/local/bin:/usr/bin'
-    command "chef-solo -l debug -c /home/oneops/cookbooks/chef.rb -j /opt/oneops/workorder/build.#{ci[:ciName]}.json >> /tmp/build.#{ci[:ciName]}.log 2>&1"
+    command "/usr/local/bin/chef-solo -l info -F doc -c /home/oneops/circuit-oneops-1/components/cookbooks/chef-build.#{ci[:ciName]}.rb -j /opt/oneops/build.#{ci[:ciName]}.json >> /tmp/build.#{ci[:ciName]}.log 2>&1"
     mailto '/dev/null'
     action :create
   end
 elsif ci[:ciAttributes][:ci] == 'false' && ci.has_key?(:ciBaseAttributes) && ci[:ciBaseAttributes][:ci] && ci[:ciBaseAttributes][:ci] == 'true'
+  `sudo rm /opt/oneops/build.#{ci[:ciName]}.json`
   cron "continuous_integration_#{manifest}" do
     minute "0,5,10,15,20,25,30,35,40,45,50,55"
     path '${PATH}:/usr/local/bin:/usr/bin'
-    command "chef-solo -l debug -c /home/oneops/cookbooks/chef.rb -j /opt/oneops/workorder/build.#{ci[:ciName]}.json >> /tmp/build.#{ci[:ciName]}.log 2>&1"
+    command "/usr/local/bin/chef-solo -l info -F doc -c /home/oneops/circuit-oneops-1/components/cookbooks/chef-build.#{ci[:ciName]}.rb -j /opt/oneops/build.#{ci[:ciName]}.json >> /tmp/build.#{ci[:ciName]}.log 2>&1"
     mailto '/dev/null'
     action :delete
   end

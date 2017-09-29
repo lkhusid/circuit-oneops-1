@@ -1,0 +1,57 @@
+#!/bin/bash
+
+COORD_IP="$1"
+
+if [ "$COORD_IP" == "" ]; then
+  echo "ERROR: No coordinator IP specified" 1>&2
+  exit 1
+fi
+
+THIS_IP=`hostname -I | awk '{ print $1 }'`
+
+# Update the configuration with the new coordinator IP
+CFG_FILE=/etc/presto/config.properties
+TMP_CFG_FILE=/tmp/new_presto_config.properties
+BAK_CFG_FILE=/etc/presto/config.properties_bak
+
+COORD_LINE="coordinator=false"
+
+if [ "$THIS_IP" == "$COORD_IP" ]; then
+  COORD_LINE="coordinator=true"
+fi
+
+DISCOVERY_URI_LINE="discovery.uri=http://$COORD_IP:<%= @http_port %>"
+
+cat $CFG_FILE | sed  "s|^coordinator=.*|$COORD_LINE|; s|^discovery.uri=.*|$DISCOVERY_URI_LINE|" > $TMP_CFG_FILE
+chown presto:presto $TMP_CFG_FILE
+
+mv $CFG_FILE $BAK_CFG_FILE
+mv $TMP_CFG_FILE $CFG_FILE
+
+# Update the CLI script
+CLI_FILE=/usr/local/bin/presto-cli
+TMP_CLI_FILE=/tmp/new-presto-cli
+BAK_CLI_FILE=/usr/local/bin/presto-cli-bak
+
+<% if @enable_ssl %>
+PRESTO_URL_LINE="presto_url=\"https://<%= @coordinator_fqdn %>:<%= @https_port %>\""
+<% else %>
+PRESTO_URL_LINE="presto_url=\"http://<%= @coordinator_fqdn %>:<%= @http_port %>\""
+<% end %>
+
+if [ "$THIS_IP" == "$COORD_IP" ]; then
+  # Use the coordinator IP on the actual coordinator node
+<% if @enable_ssl %>
+  PRESTO_URL_LINE="presto_url=\"https://$COORD_IP:<%= @https_port %>\""
+<% else %>
+  PRESTO_URL_LINE="presto_url=\"http://$COORD_IP:<%= @http_port %>\""
+<% end %>
+fi
+
+cat $CLI_FILE | sed  "s|^presto_url=.*|$PRESTO_URL_LINE|" > $TMP_CLI_FILE
+
+mv $CLI_FILE $BAK_CLI_FILE
+mv $TMP_CLI_FILE $CLI_FILE
+chmod 755 $CLI_FILE
+
+service presto restart

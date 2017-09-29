@@ -311,16 +311,35 @@ end
 
 # DHCLIENT
 
+# Baremetal compute should have the interface name detected dynamically.
+compute_baremetal = node.workorder.payLoad.ManagedVia[0]["ciAttributes"]["is_baremetal"]
+
 case node.platform
-when "fedora","redhat","centos"
-  file = "/etc/sysconfig/network-scripts/ifcfg-eth0"
-  `grep PERSISTENT_DHCLIENT #{file}`
-  if $?.to_i != 0
-    Chef::Log.info("DHCLIENT setting ifcfg-eth0 - network restart")
-    `echo "PERSISTENT_DHCLIENT=1" >> #{file} ; /sbin/service network restart`
-  else
-    Chef::Log.info("DHCLIENT already configured")
-  end
+
+  when "fedora","redhat","centos"
+    if !compute_baremetal.nil? && compute_baremetal =~/true/
+      Chef::Log.info("This is a baremetal compute. Interface will be detected dynamically.")
+      active_interface = `ip route list|grep default |awk '{print $5}'`
+      Chef::Log.info("Active interface is #{active_interface}")
+      file = "/etc/sysconfig/network-scripts/ifcfg-#{active_interface}"
+      `grep PERSISTENT_DHCLIENT #{file}`
+      if $?.to_i != 0
+        Chef::Log.info("PERSISTENT DHCLIENT setting - network restart")
+        `echo -e "\nPERSISTENT_DHCLIENT=1" >> #{file} ; /sbin/service network restart`
+      else
+        Chef::Log.info("DHCLIENT already configured")
+      end
+    else
+      Chef::Log.info("This is a regular compute. Interface will be eth0")
+      file = "/etc/sysconfig/network-scripts/ifcfg-eth0"
+      `grep PERSISTENT_DHCLIENT #{file}`
+      if $?.to_i != 0
+        Chef::Log.info("DHCLIENT setting ifcfg-eth0 - network restart")
+        `echo "PERSISTENT_DHCLIENT=1" >> #{file} ; /sbin/service network restart`
+      else
+        Chef::Log.info("DHCLIENT already configured")
+      end
+    end
 end
 
 

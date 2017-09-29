@@ -20,6 +20,7 @@ windows_platform = node['platform_family'] == 'windows'
 p = node.workorder.rfcCi.ciAttributes[:path]
 c = node.workorder.rfcCi.ciAttributes[:content]
 e = node.workorder.rfcCi.ciAttributes[:exec_cmd]
+file_mode = node.workorder.rfcCi.ciAttributes[:file_mode]
 
 d = File.dirname(p)
 
@@ -35,7 +36,7 @@ end
 file "#{p}" do
   owner "root" unless windows_platform
   group "root" unless windows_platform
-  mode "0755"
+  mode "#{file_mode}"
   content "#{c}".gsub(/\r\n?/,"\n")
   action :create
 end

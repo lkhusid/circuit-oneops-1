@@ -27,13 +27,13 @@ attribute 'tomcat_install_dir',
 attribute 'version',
           :description => "Version",
           :required => "required",
-          :default => "7.0.75",
+          :default => "7.0.82",
           :format => {
               :important => true,
               :help => 'Version of Tomcat',
               :category => '1.Global',
               :order => 4,
-              :form => {'field' => 'select', 'options_for_select' => [['7.0 - Deprecated', '7.0'], ['7.0.75', '7.0.75'], ['7.0.78', '7.0.78'], ['8.5.12', '8.5.12'], ['8.5.14', '8.5.14']]},
+              :form => {'field' => 'select', 'options_for_select' => [['7.0 - Deprecated', '7.0'], ['7.0.75', '7.0.75'], ['7.0.78', '7.0.78'],['7.0.82', '7.0.82'], ['8.5.12', '8.5.12'], ['8.5.14', '8.5.14'], ['8.5.23', '8.5.23']]},
               :pattern => "[0-9\.]+"
           }
 

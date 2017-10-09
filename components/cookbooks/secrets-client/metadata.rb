@@ -9,27 +9,15 @@ grouping 'default',
          :access => 'global',
          :packages => ['base', 'mgmt.catalog', 'mgmt.manifest', 'catalog', 'manifest', 'bom']
 
-attribute 'secretsmount',
-          :description => 'Secrets Mount',
-          :required => 'required',
-          :default => '/secrets',
-          :format => {
-              :important => true,
-              :help => 'Directory path where the secrets can be accessed',
-              :category => '1.General',
-              :editable => false,
-              :order => 1
-          }
-
 attribute 'user',
           :description => 'User',
           :required => 'required',
           :default => 'root',
           :format => {
               :important => true,
-              :help => 'User that can access the secrets',
+              :help => 'User that can access the secrets under /secrets mount',
               :category => '1.General',
-              :order => 2
+              :order => 1
           }
 
 attribute 'group',
@@ -38,9 +26,9 @@ attribute 'group',
           :default => 'root',
           :format => {
               :important => true,
-              :help => 'User group that can access the secrets',
+              :help => 'User group that can access the secrets under /secrets mount',
               :category => '1.General',
-              :order => 3
+              :order => 2
           }
 
 recipe 'stop', 'Stop'

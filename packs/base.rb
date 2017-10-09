@@ -674,7 +674,51 @@ resource "volume",
                     'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',90,5,1),reset('<',90,5,1)),
                   },
                 },
-    }
+    },
+  :payloads => {
+    'volume_storage' => {
+     'description' => 'Storage Service',
+     'definition' => '{
+       "returnObject": false,
+       "returnRelation": false,
+       "relationName": "base.RealizedAs",
+       "direction": "to",
+       "targetClassName": "manifest.oneops.1.Volume",
+       "relations": [
+         { "returnObject": false,
+           "returnRelation": false,
+           "relationName": "manifest.DependsOn",
+           "direction": "from",
+           "targetClassName": "manifest.oneops.1.Storage",
+           "relations": [
+             { "returnObject": false,
+               "returnRelation": false,
+               "relationName": "manifest.Requires",
+               "direction": "to",
+               "targetClassName": "manifest.Platform",
+               "relations": [
+                 { "returnObject": false,
+                   "returnRelation": false,
+                   "relationName": "base.Consumes",
+                   "direction": "from",
+                   "targetClassName": "account.Cloud",
+                   "relations": [
+                     { "returnObject": true,
+                       "returnRelation": false,
+                       "relationName": "base.Provides",
+                       "relationAttrs":[{"attributeName":"service", "condition":"eq", "avalue":"storage"}],
+                       "direction": "from"
+                     }
+                   ]
+                 }
+               ]
+             }
+           ]
+         }
+       ]
+     }'
+   }
+  }
 
 resource "share",
   :cookbook => "oneops.1.glusterfs",

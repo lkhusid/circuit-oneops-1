@@ -15,15 +15,25 @@ end
 
 exit_with_error "no cloud service defined or empty" if cloud_service.nil?
 
-case cloud_service[:ciClassName].split(".").last.downcase
-  
-  when /octavia/
-    include_recipe "lb::build_load_balancers"
-    include_recipe "octavia::update"
+# checking if lb_service_type attribute has changed and initiating migration
+config_items_changed= node[:workorder][:rfcCi][:ciBaseAttributes]
+if !config_items_changed.empty? && config_items_changed.has_key?("lb_service_type")
 
-  when /netscaler/
-    include_recipe "lb::add"
+  #migrate loadbalancer
+  include_recipe "lb::migrate"
 
-  when /azure_lb/
-    include_recipe "lb::add"
+else
+  # Normal loadbalncer update
+  case cloud_service[:ciClassName].split(".").last.downcase
+
+    when /octavia/
+      include_recipe "lb::build_load_balancers"
+      include_recipe "octavia::update"
+
+    when /netscaler/
+      include_recipe "lb::add"
+
+    when /azure_lb/
+      include_recipe "lb::add"
+  end
 end

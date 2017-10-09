@@ -19,7 +19,7 @@ node.set[:keywhiz_service_host] = keywhiz_service_host
 node.set[:keywhiz_service_port] = keywhiz_service_port
 
 node.set[:sync_cert_passphrase] = "oO" + SecureRandom.base64(7).to_s + "@" + SecureRandom.random_number(1000).to_s 
-#keywhiz_cloud_service[:sync_cert_passphrase]
+# keywhiz_cloud_service[:sync_cert_passphrase]
 
 client_cert = keywhiz_cloud_service[:client_cert]
 
@@ -40,7 +40,7 @@ https.verify_depth = 3
 
 node.set[:kw_https] = https 
 
-#now set the org, assembly
+# now set the org, assembly
 ns_parts = node.workorder.rfcCi.nsPath.split("/")
 org = ns_parts[1]
 assembly = ns_parts[2]
@@ -50,9 +50,12 @@ node.set[:org] = org
 node.set[:assembly] = assembly
 node.set[:env] = env
 
-#set common name of the keysync cert
+# set common name of the keysync cert
 ci_id = node.workorder.rfcCi.ciId
 node.set[:common_name] = "keysync-" + ci_id.to_s + "." + node[:workorder][:cloud][:ciName] + "." + mgmt_domain
 node.set[:print_cert_bom_attributes] = false # this is so that the cert bom RESULT* attributes are not printed
 node.set[:secrets_client_service_name] = 'keysync'
+
+# Set default secrets mount.
+node.set[:secrets][:mount] = '/secrets'
 

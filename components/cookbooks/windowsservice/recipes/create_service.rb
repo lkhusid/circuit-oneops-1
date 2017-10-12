@@ -6,6 +6,8 @@ if windows_service.user_account == 'SpecificUser'
   else
     user_name = windows_service.username
   end
+  node.set['workorder']['rfcCi']['ciAttributes']['user_right'] = "SeServiceLogonRight"
+  include_recipe 'windows-utils::assign_user_rights'
 else
   user_name = windows_service.user_account
 end

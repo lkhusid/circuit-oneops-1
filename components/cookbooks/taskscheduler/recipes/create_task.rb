@@ -9,6 +9,10 @@ else
   user_name = task_scheduler.username
 end
 
+node.set['workorder']['rfcCi']['ciAttributes']['user_right'] = "SeBatchLogOnRight"
+include_recipe 'windows-utils::assign_user_rights'
+
+
 version = node['workorder']['rfcCi']['ciAttributes']['package_version']
 package_name = task_scheduler["package_name"]
 task_scheduler_path = "#{task_scheduler.physical_path}\\#{package_name}\\#{version}\\#{task_scheduler.path}"

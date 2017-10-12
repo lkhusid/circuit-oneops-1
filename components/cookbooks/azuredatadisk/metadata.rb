@@ -95,7 +95,9 @@ attribute 'region',
                   ['South Central US','southcentralus'],
                   ['West US','westus'],
                   ['Japan East','japaneast'],
-                  ['East Asia','eastasia']
+                  ['East Asia','eastasia'],
+                  ['UK West','ukwest'],
+                  ['UK South','uksouth']
               ]
               }
           }

@@ -87,7 +87,9 @@ local_bricks.each do |b|
   end
 end
 
-include_recipe "glusterfs::remote_probe"
+if(ci[:rfcAction] == "replace")
+  include_recipe "glusterfs::remote_probe"
+end
 
 ruby_block "glusterfs block" do
   block do
@@ -103,10 +105,9 @@ ruby_block "glusterfs block" do
               break
             else
               Chef::Log.info("#{command} got failed. #{output}")
-              Chef::Log.info("Maximum retry count is 9. Current retry count is #{retry_count}. Sleeping 20 seconds. ")
-              sleep 20
+              Chef::Log.info("Maximum retry count is 9. Current retry count is #{retry_count}. Sleeping 5 seconds. ")
+              sleep 5
             end
-            exit_with_error "#{command} got failed. #{output}" if retry_count == 9
             retry_count += 1
           end
       end
@@ -125,7 +126,21 @@ ruby_block "glusterfs block" do
       bricks_arg = bricks.sort.map{|b| b[1]}.join(' ')
 
       `gluster volume info #{parent[:ciName]}`
-      execute_command("yes y | gluster volume create #{parent[:ciName]} #{replicas_arg} #{bricks_arg} force")  if !$?.success?
+      retry_count = 1
+      while retry_count < 4
+        command = "yes y | gluster volume create #{parent[:ciName]} #{replicas_arg} #{bricks_arg} force"
+        output = `#{command} 2>&1`
+        if $?.success?
+          Chef::Log.info("#{command} got successful. #{output}")
+          break
+        else
+          Chef::Log.info("#{command} got failed. #{output}")
+          Chef::Log.info("Maximum retry count is 3. Current retry count is #{retry_count}. Sleeping 20 seconds. ")
+          sleep 20
+        end
+        exit_with_error "#{command} got failed. #{output}" if retry_count == 3
+        retry_count += 1
+      end
 
       existing_bricks = `gluster volume info #{parent[:ciName]}`.scan(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}.*/)
       new_bricks = bricks_arg.split(' ')

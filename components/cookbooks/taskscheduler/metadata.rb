@@ -7,6 +7,7 @@ version          '0.1.0'
 
 supports 'windows'
 depends 'artifact'
+depends 'windows-utils'
 
 grouping 'default',
   :access   => 'global',

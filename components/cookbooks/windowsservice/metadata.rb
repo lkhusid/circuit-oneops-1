@@ -6,6 +6,8 @@ description      'Installs/Configures Windowsservice'
 version          '0.1.0'
 
 supports 'windows'
+depends 'artifact'
+depends 'windows-utils'
 
 grouping 'default',
   :access   => 'global',
@@ -157,7 +159,7 @@ attribute 'password',
     :filter    => {'all' => {'visible' => 'user_account:eq:SpecificUser'}}
   }
 
-depends 'artifact'
+
 recipe 'start_service', 'Start windows service'
 recipe 'stop_service', 'Stop windows service'
 recipe 'restart_service', 'Restart windows service'

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration debug="true"
+  xmlns:log4j='http://jakarta.apache.org/log4j/'>
+
+  <appender name="console" class="org.apache.log4j.ConsoleAppender">
+    <layout class="org.apache.log4j.PatternLayout">
+      <param name="ConversionPattern" value="%5p [%t] (%c) - %m%n" />
+    </layout>
+  </appender>
+
+  <appender name="file" class="org.apache.log4j.RollingFileAppender">
+    <param name="append" value="false" />
+    <param name="maxFileSize" value="<%= node.jetty_log_max_filesize %>MB" />
+    <param name="maxBackupIndex" value="<%= node.jetty_log_backup_index %>" />
+    <param name="file" value="<%=node.jolokia_proxy[:jetty_logs_dir]%>/jetty.log" />
+    <layout class="org.apache.log4j.PatternLayout">
+      <param name="ConversionPattern" value="%5p [%t] (%c) - %m%n" />
+    </layout>
+  </appender>
+
+  <root>
+    <level value="<%= node.jolokia_proxy.log_level %>" />
+    <appender-ref ref="console" />
+    <appender-ref ref="file" />
+  </root>
+</log4j:configuration>

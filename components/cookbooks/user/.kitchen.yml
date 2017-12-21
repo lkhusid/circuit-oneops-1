@@ -1,10 +1,11 @@
+#<% load "#{File.dirname(__FILE__)}/../../../monkey_patch.rb" %>
 ---
 driver:
   name: vagrant
 provisioner:
   name: chef_solo
 platforms:
-  - name: centos-7.2
+  - name: centos-7.1
 suites:
   - name: add
     run_list:
@@ -19,10 +20,11 @@ suites:
   - name: delete
     run_list:
       - recipe[kitchen-test-helper]
-      - recipe[User::add]
-      - recipe[User::delete]
+      - recipe[user::add]
+      - recipe[user::delete]
     attributes:
       user:
         username: 'app'
         login_shell: '/bin/bash'
         group: '["app"]'
+        authorized_keys: '["changeme"]'

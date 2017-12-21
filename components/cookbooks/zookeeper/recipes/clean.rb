@@ -1,3 +1,11 @@
+#
+# Cookbook Name:: zookeeper
+# Recipe:: clean
+#
+#
+#
+
+
 script "clean_up_data_dir" do
   interpreter "bash"
   user node[:zookeeper][:user]

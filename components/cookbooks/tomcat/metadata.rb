@@ -1,7 +1,7 @@
 name                "Tomcat"
-description         "Installs/Configures tomcat"
+description         "Installs/Configures tomcat servlet container"
 maintainer          "OneOps"
-maintainer_email    "support@oneops.com"
+maintainer_email    "brett.bourqin@walmartlabs.com"
 license             "Apache License, Version 2.0"
 depends             "shared"
 depends             "javaservicewrapper"
@@ -33,19 +33,19 @@ attribute 'version',
               :help => 'Version of Tomcat',
               :category => '1.Global',
               :order => 4,
-              :form => {'field' => 'select', 'options_for_select' => [['7.0 - Deprecated', '7.0'], ['7.0.75', '7.0.75'], ['7.0.78', '7.0.78'],['7.0.82', '7.0.82'], ['8.5.12', '8.5.12'], ['8.5.14', '8.5.14'], ['8.5.23', '8.5.23']]},
+              :form => {'field' => 'select', 'options_for_select' => [['7.0.82', '7.0.82'], ['8.5.23', '8.5.23']]},
               :pattern => "[0-9\.]+"
           }
 
 attribute 'build_version',
           :description => "Deprecated - Build Version",
-          #:default => "70",
+          :default => "",
           :format => {
             :important => true,
             :category => '1.Global',
             :help => 'Deprecated - Tomcat minor version number.  Example: Version=7, Build Version=75 will install Tomcat 7.0.75',
             :order => 5,
-            :form => {'field' => 'select', 'options_for_select' => [['42', '42'], ['62', '62'], ['67', '67'], ['68', '68'], ['70', '70'], ['72', '72'], ['73', '73'], ['75', '75'], ['NA', '']]}
+            :form => {'field' => 'select', 'options_for_select' => [['NA', '']]}
           }
 
 
@@ -76,9 +76,9 @@ attribute 'tomcat_group',
               :order => 2
           }
 attribute 'protocol',
-          :description => 'Sets the protocol to handle incoming traffic for Connector',
+          :description => 'Sets the protocol to handle incoming traffic for the Connector',
           :required => 'required',
-          :default => 'Non blocking Java connector',
+          :default => 'org.apache.coyote.http11.Http11NioProtocol',
           :format => {
               :help => 'Sets "protocol" attribute in server.xml connector.[Blocking Java connector=org.apache.coyote.http11.Http11Protocol,Non blocking Java connector=org.apache.coyote.http11.Http11NioProtocol]. Refer. /tomcat-7.0-doc/config/http.html ',
               :category => '2.Server',
@@ -141,16 +141,6 @@ attribute 'server_port',
               :pattern => "[0-9]+"
           }
 
-attribute 'ajp_port',
-          :description => "AJP port - Deprecated",
-          :required => "required",
-          :default => "8009",
-          :format => {
-              :help => 'Deprecated - Tomcat AJP port',
-              :category => '2.Server',
-              :order => 9,
-              :pattern => "[0-9]+"
-          }
 
 attribute 'environment',
           :description => 'Environment Variables',
@@ -330,7 +320,7 @@ attribute 'enable_method_trace',
           :description => 'Enable TRACE HTTP method',
           :default => 'false',
               :format => {
-              :help => 'Disable / Enable the trace http method. Note: this applies to HTTP, HTTPS, and AJP Connectors',
+              :help => 'Disable / Enable the trace http method. Note: this applies to HTTP, HTTPS',
               :category => '2.Server',
               :filter => {'all' => {'visible' => 'advanced_security_options:eq:true'}},
               :form => { 'field' => 'checkbox' },

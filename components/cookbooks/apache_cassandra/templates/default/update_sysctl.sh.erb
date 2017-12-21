@@ -1,0 +1,8 @@
+#!/bin/bash
+if grep -q "vm.max_map_count" "/etc/sysctl.conf"; then
+echo exist
+sudo sed -i "/vm.max_map_count/c\\vm.max_map_count = 131072" /etc/sysctl.conf
+else
+   echo doesNOTexist
+   echo "vm.max_map_count = 131072"  >> /etc/sysctl.conf
+fi

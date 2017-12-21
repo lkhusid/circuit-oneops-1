@@ -1,0 +1,13 @@
+
+if ::File.exist?('/etc/oneops')
+	config = {}
+	::File.read('/etc/oneops').split(/[, \n]+/).each do |line|
+		key,value = line.split('=')
+		config[key] = value
+	end
+	source "#{config['rubygems']}"
+else
+	source "https://rubygems.org"
+end
+
+gem 'json'

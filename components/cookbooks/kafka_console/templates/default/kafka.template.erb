@@ -1,0 +1,7 @@
+upstream kafka {   
+}
+
+server {
+    listen <%= @fqdn %>:9092;
+    proxy_pass kafka;
+}

@@ -1,0 +1,8 @@
+export JAVA_HOME=<%= node.jolokia_proxy.java_home %>
+export JETTY_HOME=<%= node.jolokia_proxy.jetty_home_dir %>
+export JETTY_BASE=<%= node.jolokia_proxy.jetty_base_dir %>
+export JETTY_USER=<%= node.jolokia_proxy.user %>
+export JETTY_ARGS="<%= node.jolokia_proxy.args.kind_of?(Array) ?  node.jolokia_proxy.args.join(' ') : node.jolokia_proxy.args %>"
+export JETTY_LOGS=<%= node.jolokia_proxy.jetty_logs_dir %>
+export JETTY_RUN=<%= node.jolokia_proxy.pid_dir %>
+export JAVA_OPTIONS="<%= node.jolokia_proxy.java_options.kind_of?(Array) ?  node.jolokia_proxy.java_options.join(' ') : node.jolokia_proxy.java_options %>"

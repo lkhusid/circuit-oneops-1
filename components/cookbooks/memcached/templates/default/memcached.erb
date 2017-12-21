@@ -1,0 +1,19 @@
+# memcached    Startup script for memcached processes
+#
+# chkconfig: - 90 10
+# description: Memcache provides fast memory based storage.
+# processname: memcached
+
+[Unit]
+Description=Memcached
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/memcached <%= @cli_opts.join(' ') %>
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+

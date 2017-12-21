@@ -1,0 +1,8 @@
+#!/bin/bash
+if grep -q "* - nproc" "/etc/security/limits.d/90-nproc.conf"; then
+echo exist
+sudo sed -i "/* - nproc/c\\* - nproc 32768" /etc/security/limits.d/90-nproc.conf
+else
+   echo doesNOTexist
+   echo "* - nproc 32768"  >> /etc/security/limits.d/90-nproc.conf
+fi

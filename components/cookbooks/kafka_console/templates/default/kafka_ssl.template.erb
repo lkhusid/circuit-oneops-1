@@ -1,0 +1,7 @@
+upstream kafka_ssl {   
+}
+
+server {
+     listen <%= @fqdn %>:9093;
+    proxy_pass kafka_ssl;
+}

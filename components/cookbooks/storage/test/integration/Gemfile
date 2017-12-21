@@ -1,0 +1,19 @@
+if ::File.exist?('/etc/oneops')
+    config = {}
+    ::File.read('/etc/oneops').split(/[, \n]+/).each do |line|
+        key,value = line.split('=')
+        config[key] = value
+    end
+    source "#{config['rubygems']}"
+else
+    `gem source`.split("\n").select{|l| (l =~ /^http/)}.each{|s| (source "#{s}")}
+end
+
+gem 'chefspec', '<=4.7.0'
+gem 'fauxhai', '~>3.6.0'
+gem 'chef', '11.18.12'
+gem 'fog', '1.29.0'
+gem 'aws-s3', '0.6.3'
+gem 'fog-core', '<=1.43.0'
+gem 'fog-azure-rm', '0.3.5'
+gem 'rack', '~>1.6'

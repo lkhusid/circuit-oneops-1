@@ -14,14 +14,14 @@
 
 require 'fog'
 
-include_recipe "shared::set_provider"
+include_recipe "shared::set_provider_new"
 
 cloud_name = node[:workorder][:cloud][:ciName]
 provider = node[:workorder][:services][:compute][cloud_name][:ciClassName].gsub("cloud.service.","").downcase
 
 if provider =~ /azure/
   include_recipe "azure::powercycle_node"
-  if node.hard_reboot_result == "Error"
+  if node[:hard_reboot_result] == "Error"
     e = Exception.new("no backtrace")
     e.set_backtrace("no backtrace")
     raise e
@@ -33,8 +33,8 @@ else
   ruby_block 'compute powercycle' do
     block do
 
-      instance_id = node.workorder.ci[:ciAttributes][:instance_id]
-      server = node.iaas_provider.servers.get instance_id
+      instance_id = node[:workorder][:ci][:ciAttributes][:instance_id]
+      server = node[:iaas_provider].servers.get instance_id
 
       if server == nil
         Chef::Log.error("cannot find server: #{instance_id}")

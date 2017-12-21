@@ -31,3 +31,9 @@ service 'azure-gateway',
         :cookbook => 'azuregateway',
         :source => [Chef::Config[:register], Chef::Config[:version].split(".").first].join('.'),
         :provides => {:service => 'lb'}
+
+service 'azure-objectstore',
+        :description => 'Azure Storage Service',
+        :cookbook => 'azureobjectstore',
+        :source => [Chef::Config[:register], Chef::Config[:version].split(".").first].join('.'),
+        :provides => { :service => 'filestore' }

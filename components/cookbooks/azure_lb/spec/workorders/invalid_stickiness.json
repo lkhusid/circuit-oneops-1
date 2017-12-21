@@ -1,0 +1,17 @@
+{
+  "app_name": "lb",
+  "ip_attribute": "private_ip",
+  "name": "lb-96920452-1",
+  "workorder": {
+    "rfcCi": {
+      "ciAttributes": {
+        "listeners": "[\"http 80 http 8080\"]",
+        "ecv_map": "{\"8080\":\"GET health_check\"}",
+        "lbmethod": "roundrobin",
+        "stickiness": "true",
+        "persistence_type": "cookieinsert"
+      }
+    }
+  },
+  "mgmt_domain": "stg.oneops.walmart.com"
+}

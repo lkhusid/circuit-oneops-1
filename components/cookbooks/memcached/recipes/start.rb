@@ -1,0 +1,1 @@
+execute "systemctl start memcached.service"

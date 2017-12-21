@@ -3,7 +3,6 @@
 # I am server # <%= @myid %>
 
 
-
 <% if @zookeeper_hosts.size > 1 -%>
 <%- @zookeeper_hosts.each_pair do |key, value| %>
 server.<%= value %>=<%= key %>:<%= @zookeeper[:leader_port] %>:<%= @zookeeper[:election_port] %>
@@ -11,6 +10,7 @@ server.<%= value %>=<%= key %>:<%= @zookeeper[:leader_port] %>:<%= @zookeeper[:e
 <% else -%>
 server=<%= @zookeeper_hosts.keys[0] %>:<%= @zookeeper[:leader_port] %>:<%= @zookeeper[:election_port] %>
 <% end -%>
+
 
 # The number of milliseconds of each tick (default 2000)
 tickTime=<%=       @zookeeper[:tick_time] %>

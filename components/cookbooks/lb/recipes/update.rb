@@ -17,7 +17,12 @@ exit_with_error "no cloud service defined or empty" if cloud_service.nil?
 
 # checking if lb_service_type attribute has changed and initiating migration
 config_items_changed= node[:workorder][:rfcCi][:ciBaseAttributes]
-if !config_items_changed.empty? && config_items_changed.has_key?("lb_service_type")
+old_lb_service_type= config_items_changed[:lb_service_type]
+
+Chef::Log.info("new lb service type value: " +lb_service_type.to_s)
+Chef::Log.info("old lb service type value: " +old_lb_service_type.to_s)
+
+if !config_items_changed.empty? && config_items_changed.has_key?("lb_service_type") && config_items_changed[:lb_service_type] != lb_service_type
 
   #migrate loadbalancer
   include_recipe "lb::migrate"

@@ -1,4 +1,3 @@
-CREATE KEYSPACE <%= node.keyspace.keyspace_name %>
-WITH placement_strategy = '<%= node.keyspace.placement_strategy %>' <%= node.and_clause %>;
-
+<%=node.cql_action%> KEYSPACE "<%= node.keyspace.keyspace_name %>" 
+<%= node.and_clause %>;
 <%= node.keyspace.extra %>

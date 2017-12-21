@@ -2,6 +2,40 @@
 #
 # Install ruby and bundle for chef or puppet, oneops user, sshd config
 #
+set_env()
+{
+    for ARG in "$@"
+    do
+      # if arg starts with http then use it to set http_proxy env variable
+      if [[ $ARG == http:* ]] ; then
+        http_proxy=${ARG/http:/}
+        echo "exporting http_proxy=$http_proxy"
+        export http_proxy=$http_proxy
+      elif [[ $ARG == https:* ]] ; then
+        https_proxy=${ARG/https:/}
+        echo "exporting https_proxy=$https_proxy"
+        export https_proxy=$https_proxy
+      elif [[ $ARG == no:* ]] ; then
+        no_proxy=${ARG/no:/}
+        echo "exporting no_proxy=$no_proxy"
+        export no_proxy=$no_proxy
+      elif [[ $ARG == rubygems:* ]] ; then
+        rubygems_proxy=${ARG/rubygems:/}
+        echo "exporting rubygems_proxy=$rubygems_proxy"
+        export rubygems_proxy=$rubygems_proxy
+      elif [[ $ARG == misc:* ]] ; then
+        misc_proxy=${ARG/misc:/}
+        echo "exporting misc_proxy=$misc_proxy"
+        export misc_proxy=$misc_proxy
+      fi
+    done
+}
+
+set_env $@
+
+
+
+
 set -e
 
 if ! [ -e /etc/ssh/ssh_host_dsa_key ] ; then
@@ -9,31 +43,8 @@ if ! [ -e /etc/ssh/ssh_host_dsa_key ] ; then
   /usr/bin/ssh-keygen -A
 fi
 
-for ARG in "$@"
-do
-  # if arg starts with http then use it to set http_proxy env variable
-  if [[ $ARG == http:* ]] ; then
-	http_proxy=${ARG/http:/}
-    echo "exporting http_proxy=$http_proxy"
-    export http_proxy=$http_proxy
-  elif [[ $ARG == https:* ]] ; then
-	https_proxy=${ARG/https:/}
-    echo "exporting https_proxy=$https_proxy"
-    export https_proxy=$https_proxy
-  elif [[ $ARG == no:* ]] ; then
-	no_proxy=${ARG/no:/}
-    echo "exporting no_proxy=$no_proxy"
-    export no_proxy=$no_proxy
-  elif [[ $ARG == rubygems:* ]] ; then
-    rubygems_proxy=${ARG/rubygems:/}
-    echo "exporting rubygems_proxy=$rubygems_proxy"
-    export rubygems_proxy=$rubygems_proxy
-  elif [[ $ARG == misc:* ]] ; then
-    misc_proxy=${ARG/misc:/}
-    echo "exporting misc_proxy=$misc_proxy"
-    export misc_proxy=$misc_proxy
-  fi
-done
+# function call
+# get_proxy
 
 # setup os release variables
 echo "Install ruby and bundle."
@@ -176,6 +187,22 @@ if [ $? != 0 ] ; then
 else
 	echo "oneops user already there..."
 fi
+
+echo "Gem settings for oneops user. ruby gem source is $rubygems_proxy"
+su - oneops <<EOF
+for ARG in "$@"
+do
+    $(set_env $@)
+done
+if [ -n "$rubygems_proxy" ]; then
+    gem source --add $rubygems_proxy
+    gem source --remove 'http://rubygems.org/'
+    gem source --remove 'https://rubygems.org/'
+    gem source
+fi
+set -e
+gem install bundler --no-ri --no-rdoc
+EOF
 set -e
 
 # ssh and components move

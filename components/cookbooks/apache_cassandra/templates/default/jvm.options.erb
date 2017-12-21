@@ -1,0 +1,5 @@
+<% if node[:jvm_opts] != nil && node[:jvm_opts].size > 0 %>	
+<% JSON.parse(node[:jvm_opts]).each do |opt| %>
+<%=opt%>
+<% end %>
+<% end %>

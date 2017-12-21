@@ -1,0 +1,10 @@
+upstream kafka_ssl {
+    <% @brokers.sort.each do |ip| %>
+    server <%= ip %>:9093;
+    <% end -%>
+}
+
+server {
+    listen <%= @fqdn %>:9093;
+    proxy_pass kafka_ssl;
+}

@@ -43,7 +43,7 @@ begin
     existing_lb = lb_manager.get_loadbalancer(lb_name)
 
     #handle changes in listeners only
-    
+
     if config_items_changed.has_key?("listeners")
       #ciBaseAtrribute had old config setting, while ciAttriutes new config changes
       old = JSON.parse(node[:workorder][:rfcCi][:ciBaseAttributes][:listeners])
@@ -78,6 +78,14 @@ begin
         iprotocol = listener_properties[2].upcase
         iport = listener_properties[3]
 
+        if vprotocol == "SSL"
+          vprotocol = "HTTPS"
+        end
+
+        if iprotocol == "SSL"
+          iprotocol = "HTTPS"
+        end
+
         if (vprotocol == 'HTTP' and iprotocol == 'HTTPS')
           Chef::Log.error(listener)
           Chef::Log.error('Protocol Mismatch in listener config')
@@ -100,6 +108,10 @@ begin
             secret_manager = SecretManager.new(service_lb_attributes[:endpoint], service_lb_attributes[:username],service_lb_attributes[:password], service_lb_attributes[:tenant] )
             container_ref = secret_manager.get_container(barbican_container_name)
             Chef::Log.info("Container_ref : #{container_ref}")
+            if !container_ref
+              Chef::Log.error("Unable to fetch Barbican container href for container name : #{barbican_container_name}")
+              raise Exception, "Unable to fetch Barbican container href for container name : #{barbican_container_name}"
+            end
             if iprotocol == 'HTTP'
               new_listener = initialize_listener('TERMINATED_HTTPS', vport, lb_name, pool, connection_limit, container_ref)
             elsif iprotocol == 'HTTPS'

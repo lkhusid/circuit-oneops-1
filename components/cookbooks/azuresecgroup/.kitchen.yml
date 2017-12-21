@@ -1,0 +1,31 @@
+<% load "/opt/oneops/inductor/circuit-oneops-1/monkey_patch.rb" %>
+driver:
+  name: proxy
+  host: 127.0.0.1
+  reset_command: "exit 0"
+  port: 22
+  transport: local
+provisioner:
+  require_chef_omnibus: false
+verifier:
+  name: serverspec
+  remote_exec: false
+  sudo: false
+  transport: local
+  test_serverspec_installed: false
+  additional_install_command: 'mkdir -p /opt/oneops/inductor/circuit-oneops-1/gems'
+  bundler_path: 'GEM_HOME=/opt/oneops/inductor/circuit-oneops-1/gems /usr/local/bin'
+  gemfile: test/integration/Gemfile
+  env_vars:
+    GEM_PATH: /usr/local/share/gems:/opt/oneops/inductor/circuit-oneops-1/gems
+platforms:
+  - name: centos-7.2
+suites:
+  - name: add
+    verifier:
+      patterns:
+      - test/integration/add/serverspec/add_spec.rb
+  - name: delete
+    verifier:
+      patterns:
+      - test/integration/delete/serverspec/delete_spec.rb

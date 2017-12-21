@@ -1,0 +1,97 @@
+
+{
+    "clusters": {
+       "<%= node.workorder.payLoad["Environment"][0]["ciName"] %>":{
+       "zkconnect": "<%= @zookeeper_fqdn %>:9091",
+       "brokers": "<%= @fqdn %>:9092",
+#    	 "ganglia": {
+#	    "url": "http://<%= node[:ipaddress] %>/gweb",
+#	    "regex": "<%= @hostname_common_prefix %>*"
+#            "regex": ".*"
+#         },
+    	 "show": true,
+    	},
+      },
+    "metrics":{
+        "cluster":[
+             {"metric":"BrokerTopicMetrics.AllTopicsMessagesInPerSec.OneMinuteRate",
+             "title": "Messages In Per sec",
+             "yaxis": "MessagesInPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+             },
+             {"metric":"BrokerTopicMetrics.AllTopicsBytesOutPerSec.OneMinuteRate",
+             "title": "Bytes Out Per sec",
+             "yaxis": "BytesOutPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+             },
+             {"metric":"BrokerTopicMetrics.AllTopicsBytesInPerSec.OneMinuteRate",
+             "title": "Bytes In Per sec",
+             "yaxis": "BytesInPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+              }
+        ],
+        "topic": [
+            {"metric":"BrokerTopicMetrics.BytesInPerSec.%topic.name%.OneMinuteRate",
+             "title": "Bytes In Per sec",
+             "yaxis": "BytesInPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+             },
+             {"metric":"BrokerTopicMetrics.BytesOutPerSec.%topic.name%.OneMinuteRate",
+             "title": "Bytes Out Per sec",
+             "yaxis": "BytesOutPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+             },
+             {"metric":"BrokerTopicMetrics.MessagesInPerSec.%topic.name%.OneMinuteRate",
+             "title": "Messages In Per sec",
+             "yaxis": "MessagesInPerSec",
+             "span": "day",
+             "graphType":"stack",
+             "glegend":"show"
+             }
+	      ],
+	   "consumer":[
+            {"metric":"%Metric.Name%$",
+            "hreg": ".*",
+            "title": "Message Lag",
+            "yaxis": "MessageLag",
+            "span": "day",
+            "graphType":"stack",
+            "glegend":"show"
+            }
+        ]
+      },
+ #   "initInfo": {
+ #	"defaultCluster": "<%= node.workorder.payLoad["Environment"][0]["ciName"] %>"
+  #    }
+  #   "gmetricInfo": [
+ #        {"group":  "<%= @metric_sink_host %>",
+  #        "port": "<%= @metric_sink_port %>",
+   #       "ttl": "5",
+ #	}],
+ #    "gwebInfo":{
+ #        "url": "http://<%= node[:ipaddress] %>/gweb/graph.php?",
+ #     },
+ #     "jobInfo": {
+ #        "clusters":{
+ #	    "<%= node['hostname'] %>": ["<%= node.workorder.payLoad["Environment"][0]["ciName"] %>"],
+ #        },
+ # #        "consumerLagJob": {
+    #         "delay":"0",
+  #           "frequency":"4",
+  #       },
+  #       "alertJob":{
+  # #           "delay":"0",
+  # #           "frequency":"10",
+   #      },
+  #    }
+}

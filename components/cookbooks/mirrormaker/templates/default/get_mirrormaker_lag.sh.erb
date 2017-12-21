@@ -1,0 +1,5 @@
+#!/bin/bash
+
+lag="$(/usr/local/kafka/bin/kafka-consumer-offset-checker.sh  --zookeeper <%= node['mirrormaker']['zookeeper_connect_for_consumer'] %> --group <%= node['mirrormaker']['consumer_group_id'] %>  |  tail -n +2 |awk '{sum+=$6} END {print sum}')"
+
+echo {\"mirrormaker_lag\":$lag}

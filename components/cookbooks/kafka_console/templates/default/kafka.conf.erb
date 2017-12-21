@@ -1,0 +1,10 @@
+upstream kafka {
+    <% @brokers.sort.each do |ip| %>
+    server <%= ip %>:9092;
+    <% end -%>
+}
+
+server {
+    listen <%= @fqdn %>:9092;
+    proxy_pass kafka;
+}

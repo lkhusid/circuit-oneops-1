@@ -1,0 +1,95 @@
+#!/usr/bin/python
+
+import sys,json, time
+import urllib
+from subprocess import call
+
+# Remember the start time of this script so that the run time can
+# be reported as a metric.
+startTime = time.time()
+
+# Pull the metrics from the REST api and send them to stdout for
+# reporting through Telegraf
+try:
+  metricsLink = "http://localhost:<%= @metrics_port %>/metrics/<%= @metrics_path %>"
+  metricsData = urllib.urlopen(metricsLink)
+  dataString = metricsData.read()
+except:
+  pass
+
+metricsOutput = {}
+groupKey = ""
+
+numArgs = len(sys.argv)
+
+if numArgs > 1:
+  searchKey = sys.argv[1]
+  groupKey = searchKey
+  
+  if (searchKey == "master") or (searchKey == "worker"):
+    groupKey = "spark"
+  
+  metricsOutput["group"] = groupKey
+  
+  # Loop through the data and print any values
+  # returned under the "gauges" element
+  try:
+    searchKey = searchKey + "."
+    jsonData = json.loads(dataString)
+    for key in jsonData["gauges"]:
+      if key.startswith(searchKey):
+        metricsOutput[key] = jsonData["gauges"][key]["value"]
+
+  except:
+    pass
+
+# Pull the metrics from the JSON Web UI and send them to stdout for
+# reporting through Telegraf
+dataString = ""
+try:
+  metricsLink = "http://localhost:<%= @metrics_port %>/json"
+  metricsData = urllib.urlopen(metricsLink)
+  dataString = metricsData.read()
+except:
+  pass
+
+# Capture the end time for gathering the metrics.
+endTime = time.time()
+
+# Only report the metrics for the "spark" group.
+if (groupKey == "spark"):
+  metricsOutput["metric_retrieval_time_ms"] = int((endTime - startTime) * 1000)
+
+<% if @is_spark_master %>
+  try:
+    jsonData = json.loads(dataString)
+
+    # Convert the status into a number:
+    #
+    # 0: ALIVE
+    # 1: STANDBY
+    # 2: RECOVERING
+    # 3: COMPLETING_RECOVERY
+    #
+    statusVal = -1
+
+    masterStatus = jsonData["status"]
+    if masterStatus == "ALIVE":
+      statusVal = 0
+    elif masterStatus == "STANDBY":
+      statusVal = 1
+    elif masterStatus == "RECOVERING":
+      statusVal = 2
+    elif masterStatus == "COMPLETING_RECOVERY":
+      statusVal = 3
+
+    if statusVal != -1:
+      metricsOutput["status"] = statusVal
+  except:
+    pass
+<% end %>
+
+try:
+  print json.dumps(metricsOutput)
+except:
+  pass

@@ -1,0 +1,1 @@
+include_recipe "kafka_rest::add"

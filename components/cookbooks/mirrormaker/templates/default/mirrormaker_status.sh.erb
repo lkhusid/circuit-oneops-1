@@ -1,0 +1,8 @@
+#!/bin/bash
+
+/sbin/service mirrormaker status >/dev/null
+if [ "$?" = "1" ]; then
+  echo {\"mirrormaker_status\":0}
+else
+  echo {\"mirrormaker_status\":1}
+fi

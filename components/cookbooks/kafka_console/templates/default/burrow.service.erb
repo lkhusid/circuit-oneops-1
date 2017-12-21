@@ -1,0 +1,86 @@
+#!/bin/bash
+# /etc/init.d/burrow
+# Subsystem file for "burrow" server
+#
+# chkconfig: 2345 95 05
+# description: Burrow service daemon
+#
+# processname: burrow
+# pidfile: /tmp/burrow.pid
+#source function library
+. /etc/init.d/functions
+RETVAL=0
+SERVICE_NAME=burrow
+PID_FILE_NAME=/app/godir/burrow/log/$SERVICE_NAME.pid
+
+export GOPATH=/app/godir/burrow
+
+start() {
+  { echo "$(date) Starting $SERVICE_NAME ..."; } | tee -a /app/godir/burrow/log/burrow.log
+  if [ ! -f $PID_FILE_NAME ]; then
+    nohup $GOPATH/bin/Burrow --config $GOPATH/burrow.cfg >> /app/godir/burrow/log/burrow.log 2>&1 &
+    sleep 5
+    PID=$(cat $PID_FILE_NAME);
+    { echo "$(date) $SERVICE_NAME started with PID=$PID ..."; } | tee -a /app/godir/burrow/log/burrow.log
+  else
+    PID=$(cat $PID_FILE_NAME);
+    { echo "$(date) $SERVICE_NAME is already running with PID=$PID ..."; } | tee -a /app/godir/burrow/log/burrow.log
+  fi
+}
+
+stop() {
+  if [ -f $PID_FILE_NAME ]; then
+      PID=$(cat $PID_FILE_NAME);
+      { echo "$(date) $SERVICE_NAME with PID=$PID is stopping ..."; } | tee -a /app/godir/burrow/log/burrow.log
+      kill "$PID";
+      { echo "$(date) $SERVICE_NAME with PID=$PID stopped ..."; } | tee -a /app/godir/burrow/log/burrow.log
+      sleep 2
+      if [ -f $PID_FILE_NAME ]; then
+        rm -rf $PID_FILE_NAME
+      fi
+
+  else
+      { echo "$(date) $SERVICE_NAME is not running ..."; } | tee -a /app/godir/burrow/log/burrow.log
+  fi
+}
+
+status() {
+        { echo -n "$(date) Checking $SERVICE_NAME status: "; } | tee -a /app/godir/burrow/log/burrow.log
+        pgrep Burrow
+        RETVAL=$?
+        PID=
+        if [ -f $PID_FILE_NAME ]; then
+          PID=$(cat $PID_FILE_NAME);
+        fi
+
+        if [ "$RETVAL" -eq 0 ] && [ ! -z "$PID" ]; then
+          { echo "$(date) $SERVICE_NAME with PID=$PID is running ..."; } | tee -a /app/godir/burrow/log/burrow.log
+        else
+          { echo "$(date) $SERVICE_NAME is not running ..."; } | tee -a /app/godir/burrow/log/burrow.log
+        fi
+        return $RETVAL
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    reload)
+        stop
+        start
+        ;;
+    *)
+        echo "$(date) Usage: $SERVICE_NAME {start|stop|status|restart|reload}"
+        exit 1
+        ;;
+esac

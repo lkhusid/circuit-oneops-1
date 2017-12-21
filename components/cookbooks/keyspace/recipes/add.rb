@@ -19,43 +19,34 @@ ip = node.workorder.payLoad.ManagedVia[0][:ciAttributes][:dns_record].split(',')
 
 create_keyspace_file = "/tmp/"+node.workorder.rfcCi.ciId.to_s
 
-dc_map = {}
-node.workorder.payLoad.RequiresComputes.each do |member|
-  if !member[:ciAttributes].has_key?("private_ip")
-    Chef::Log.info("skipping keyspace generation until all computes are provisioned")
-    return
-  end
-
-  # todo: temporary until cloud name is missing
-  dc = member[:ciName].split('-').reverse[1].to_i
-  dc_map[dc] = 1
-end
-
+dc_map = Keyspace::Util.find_dc_replication_factor(node)
 and_clause = ""
 
 case node.keyspace.placement_strategy
 when "SimpleStrategy"
-  and_clause = "AND strategy_options = [{replication_factor: #{node.keyspace.replication_factor} }]"
+  and_clause = "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': #{node.keyspace.replication_factor} }"
 when "NetworkTopologyStrategy"
-  and_clause = "AND strategy_options = [{"
+  and_clause = "WITH replication = {'class': 'NetworkTopologyStrategy', "
   dc_count = 0
   dc_map.keys.each do |dc|
-    if dc_count >0
-      and_clause +=","
+    if dc_count > 0
+      and_clause += ", "
     end
-    and_clause += "#{dc}:#{node.keyspace.replication_factor}"
+    and_clause += "'#{dc}': '#{node.keyspace.replication_factor}'"
     dc_count += 1
   end
-  and_clause += "}]"
+  and_clause += "}"
 end
 
 node.set["and_clause"] = and_clause
+node.set["cql_action"] = Keyspace::Util.keyspace_exists?(node, node.keyspace.keyspace_name.downcase) ? "ALTER" : "CREATE"
 
 template create_keyspace_file do
   source "create_keyspace.erb"
 end
 
-execute "/opt/cassandra/bin/cassandra-cli -h #{ip} -f #{create_keyspace_file}" do
-  returns [0,4]
+execute "/opt/cassandra/bin/cqlsh #{ip} -u #{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].username} -p '#{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].password}' -f #{create_keyspace_file}" do
+  sensitive true
+  returns [0]
 end
 

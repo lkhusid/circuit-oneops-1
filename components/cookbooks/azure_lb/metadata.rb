@@ -1,14 +1,14 @@
-name             'Azure_lb'
-description      'Azure Load Balancer'
-version          '0.1.0'
-maintainer       'OneOps'
+name 'Azure_lb'
+description 'Azure Load Balancer'
+version '0.1.0'
+maintainer 'OneOps'
 maintainer_email 'support@oneops.com'
-license          'Apache License, Version 2.0'
-depends		       "azure"
+license 'Apache License, Version 2.0'
+depends "azure"
 
 grouping 'default',
          :access => "global",
-         :packages => [ 'base', 'mgmt.catalog', 'catalog', 'mgmt.manifest', 'manifest', 'bom', 'mgmt.cloud.service', 'cloud.service' ],
+         :packages => ['base', 'mgmt.catalog', 'catalog', 'mgmt.manifest', 'manifest', 'bom', 'mgmt.cloud.service', 'cloud.service'],
          :namespace => true
 
 
@@ -60,18 +60,19 @@ attribute 'location',
               :help => 'Use the location string',
               :category => '2.Config',
               :order => 5,
-              :form => { 'field' => 'select', 'options_for_select' => [
-                  ['Central US','centralus'],
-                  ['East US','eastus'],
-                  ['East US 2','eastus2'],
-                  ['North Central US','northcentralus'],
-                  ['South Central US','southcentralus'],
-                  ['West US','westus'],
-                  ['Japan East','japaneast'],
-                  ['East Asia','eastasia'],
-                  ['UK West','ukwest'],
-                  ['UK South','uksouth']
-                  ]
+              :form => {'field' => 'select', 'options_for_select' => [
+                  ['Central US', 'centralus'],
+                  ['East US', 'eastus'],
+                  ['East US 2', 'eastus2'],
+                  ['North Central US', 'northcentralus'],
+                  ['South Central US', 'southcentralus'],
+                  ['West US', 'westus'],
+                  ['Japan East', 'japaneast'],
+                  ['East Asia', 'eastasia'],
+                  ['UK West', 'ukwest'],
+                  ['UK South', 'uksouth'],
+                  ['Japan West', 'japanwest']
+              ]
               }
           }
 

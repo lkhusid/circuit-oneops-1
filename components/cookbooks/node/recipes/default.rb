@@ -21,7 +21,14 @@
   # when "debian"
   # # include_recipe "apt"
 # end
-
+require 'yaml'
 include_recipe "node::ci_attr_to_node_attr"
-include_recipe "node::install_from_#{node['nodejs']['install_method']}"
+
+if File.file?("/etc/oneops-tools-inventory.yml") && YAML.load_file("/etc/oneops-tools-inventory.yml").key?("nodejs_#{node['nodejs']['version']}")
+  Chef::Log.info("On fast image and installing from file")
+  include_recipe "node::install_from_file"
+else
+  include_recipe "node::install_from_#{node['nodejs']['install_method']}"
+end
+
 

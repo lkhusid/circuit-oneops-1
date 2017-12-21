@@ -4,16 +4,19 @@ def exit_with_error(msg)
   Chef::Application.fatal!(msg)
 end
 
-def execute_command(command)
-  output = `#{command} 2>&1`
-  if $?.success?
-    Chef::Log.info("#{command} got successful.. #{output.gsub(/\n+/, '.')}")
-  else
-    exit_with_error "#{command} got failed.. #{output.gsub(/\n+/, '.')}"
+def execute_command(command, force_failure = nil)
+  result = Mixlib::ShellOut.new(command).run_command
+  if !result.valid_exit_codes.include?(result.exitstatus)
+    if force_failure
+      exit_with_error("Error in #{command}: #{result.stderr.gsub(/\n+/, '.')}")
+    else
+      Chef::Log.warn("Error in #{command}: #{result.stderr.gsub(/\n+/, '.')}")
+    end
   end
+  result
 end
 
-def get_storage()
+def get_storage(node)
 
   storage = nil
   device_map = []
@@ -88,4 +91,26 @@ def get_storage()
   end #if node.platform !~ /windows/ else
 
   return storage, device_map
+end
+
+def get_device_id (orig_device_list, dev_prefix, max_retry_count, sleep_sec)
+  #device_list is an array of devices under /dev/#dev_prefix* folder, prior to executing attach command
+  #the function is called after attach command was issued on the storage provider
+  #the below code watches /dev folder on the local VM and compares it to the device_list array
+  #once a difference is found, it's assumed to be the new device id
+  device_list = execute_command("ls -1 /dev/#{dev_prefix}*").stdout.split("\n")
+  retry_count = 0
+  while (orig_device_list.size + 1) != device_list.size && retry_count < max_retry_count do
+    sleep sleep_sec
+    retry_count +=1
+    device_list = execute_command("ls -1 /dev/#{dev_prefix}*").stdout.split("\n")
+  end
+
+  if retry_count == max_retry_count && (orig_device_list.size + 1) != device_list.size
+    exit_with_error("max retry count of "+max_retry_count.to_s+" hit ... device list: "+orig_device_list.inspect.gsub("\n"," "))
+    exit 1
+  end
+
+  dev_id = (device_list - orig_device_list).first
+  return dev_id
 end

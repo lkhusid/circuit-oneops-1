@@ -1,0 +1,1 @@
+execute "systemctl status memcached.service"

@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+require '/opt/memcached/lib/memcache_stats'
+
+# The list of "raw" stats we want
+stats = ['bytes', 'curr_connections', 'curr_items', 'total_items', 'limit_maxbytes']
+# The list of stats for which we want delta values (note--these don't have to match the stats list)
+delta_stats = ['bytes', 'cmd_get', 'cmd_set', 'get_hits', 'get_misses', 'evictions']
+
+ms = MemcacheStats.new('localhost', <%= node['memcached']['port'] %>)
+stat_hash = ms.get_stats(stats, delta_stats)
+
+output = "Memcached stats |"
+stat_hash['stats'].each{|name, value|
+    output << name << "=" << value << " "
+}
+time_elapsed = stat_hash['delta']['time'].to_f
+stat_hash['delta'].keep_if{|name, value| value.to_f >= 0 && name != 'time'}.each{|name, value|
+    output << name << "_per_sec=" << (value.to_f / time_elapsed).to_s << " "
+}
+
+bytes_used_percent = 100.0 * stat_hash['stats']['bytes'].to_f / stat_hash['stats']['limit_maxbytes'].to_f
+output << "bytes_used_percent=#{'%.2f' % bytes_used_percent} "
+  
+puts output

@@ -1,0 +1,128 @@
+<% graphite_host = @host -%>
+
+{
+"servers" : [ {
+"port" : "11061",
+"host" : "<%= node['ipaddress'] %>",
+"numQueryThreads" : 2,
+"queries" : [
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.AllTopicsMessagesInPerSec",
+"outputWriters" : [
+{
+ "@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+ "settings" : {
+    "port" : <%= @port %>,
+    "host" : "<%= graphite_host %>",
+    "rootPrefix": "<%= @graphite_prefix %>"
+ }
+}
+]
+},
+
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec,topic=*",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.MessagesInPerSec",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>",
+"typeNames" : ["topic"]
+}
+}
+]
+},
+
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=BytesInPerSec",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.AllTopicsBytesInPerSec",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>"
+}
+}
+]
+},
+
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=BytesInPerSec,topic=*",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.BytesInPerSec",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>",
+"typeNames" : ["topic"]
+}
+}
+]
+},
+
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.AllTopicsBytesOutPerSec",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>"
+}
+}
+]
+},
+
+{
+"obj" : "kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec,topic=*",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "BrokerTopicMetrics.BytesOutPerSec",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>",
+"typeNames" : ["topic"]
+}
+}
+]
+},
+
+{
+"obj" : "\"kafka.server\":type=\"FetcherStats\",*",
+"attr": [ "Count", "OneMinuteRate" ],
+"resultAlias": "FetcherStats",
+"outputWriters" : [
+{
+"@class" : "com.googlecode.jmxtrans.model.output.GraphiteWriter",
+"settings" : {
+"port" : <%= @port %>,
+"host" : "<%= graphite_host %>",
+"rootPrefix": "<%= @graphite_prefix %>",
+"typeNames" : ["name"]
+}
+}
+]
+}
+
+]
+}
+]
+}

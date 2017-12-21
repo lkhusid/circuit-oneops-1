@@ -1,0 +1,40 @@
+#!/bin/sh
+
+exec 2>/app/get_concord_status.out
+set -xv
+
+if [ -z $playbook ]
+then
+  echo "Must have environment variable 'playbook', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $concordaddress ]
+then
+  echo "Must have environment variable 'concordaddress', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+          
+if [ -z $managedserviceuser ]
+then
+  echo "Must have environment variable 'managedserviceuser', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $managedservicepass ]
+then
+  echo "Must have environment variable 'managedservicepass', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+instanceId=`awk -F"\"" '{if($2 == "instanceId") print $4 }' /app/curl_${playbook}.out`
+if [ -z $instanceId ]
+then
+  echo "Must have environment variable 'instanceId', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+curl -v -u ${managedserviceuser}:${managedservicepass} -X GET http://${concordaddress}/api/v1/process/${instanceId}  >/app/status 2>&1
+status=`awk -F"\"" '{if($2 == "status") print $4 }' /app/status`
+echo -n "${status}" 
+exit 0

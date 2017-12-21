@@ -32,27 +32,40 @@ dest_file = "#{node.tomcat.tomcat_install_dir}/apache-tomcat-#{full_version}.tar
 cloud_name = node[:workorder][:cloud][:ciName]
 services = node[:workorder][:services]
 
-if services.nil? || !services.has_key?(:mirror)
-  Chef::Log.error("Please make sure  cloud '#{cloud_name}' has mirror service with 'apache' eg {apache=>http://archive.apache.org/dist}")
-  exit 1
-end
-mirrors = JSON.parse(services[:mirror][cloud_name][:ciAttributes][:mirrors])
-if mirrors.nil? || !mirrors.has_key?('apache')
-  Chef::Log.error("Please make sure  cloud '#{cloud_name}' has mirror service with 'apache' eg {apache=>http://archive.apache.org/dist}")
-  exit 1
-end
-mirrors = JSON.parse(node[:workorder][:services][:mirror][cloud_name][:ciAttributes][:mirrors])
-source_list = mirrors['apache'].split(",").map { |mirror| "#{mirror}/#{tarball}" }
+if File.file?("/etc/oneops-tools-inventory.yml") && YAML.load_file("/etc/oneops-tools-inventory.yml").key?("tomcat_#{full_version}")
 
-shared_download_http source_list.join(",") do
-  path dest_file
-  action :create
+  # if on fast deploy image copy tomcat instead of downloading
+  runtimes = YAML.load_file("/etc/oneops-tools-inventory.yml")
+  if File.file?("#{runtimes["tomcat_#{full_version}"]}")
+    dest_file = runtimes["tomcat_#{full_version}"]
+  else
+    Chef::Log.error("Failed on Fast image. File #{runtimes["tomcat_#{full_version}"]} specified in /etc/oneops-tools-inventory.yml does not exist")
+    exit 1
+  end
+else
+
+  if services.nil? || !services.has_key?(:mirror)
+    Chef::Log.error("Please make sure  cloud '#{cloud_name}' has mirror service with 'apache' eg {apache=>http://archive.apache.org/dist}")
+    exit 1
+  end
+  mirrors = JSON.parse(services[:mirror][cloud_name][:ciAttributes][:mirrors])
+  if mirrors.nil? || !mirrors.has_key?('apache')
+    Chef::Log.error("Please make sure  cloud '#{cloud_name}' has mirror service with 'apache' eg {apache=>http://archive.apache.org/dist}")
+    exit 1
+  end
+  mirrors = JSON.parse(node[:workorder][:services][:mirror][cloud_name][:ciAttributes][:mirrors])
+  source_list = mirrors['apache'].split(",").map { |mirror| "#{mirror}/#{tarball}" }
+  shared_download_http source_list.join(",") do
+    path dest_file
+    action :create
+  end
 end
 
-tar_flags = "--exclude webapps/ROOT"
-execute "tar #{tar_flags} -zxf #{dest_file}" do
-  cwd node.tomcat.tomcat_install_dir
-end
+  tar_flags = "--exclude webapps/ROOT"
+  execute "tar #{tar_flags} -zxf #{dest_file}" do
+    cwd node.tomcat.tomcat_install_dir
+  end
+
 
 execute "rm -fr tomcat#{major_version}" do
   cwd node.tomcat.tomcat_install_dir

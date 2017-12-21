@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+## check_sst_count.pl ##
+
+sub average {
+        my @array = @_; # save the array passed to this function
+        my $sum; # create a variable to hold the sum of the array's values
+        foreach (@array) { $sum += $_; } # add each element of the array
+        # to the sum
+        return $sum/@array; # divide sum by the number of elements in the
+        # array to find the mean
+}
+
+my $cfstats=`cat /tmp/nodetoolcfstats.log | grep 'SSTable count'`;
+chomp $cfstats;
+$cfstats =~ s/SSTable count//igm;
+##$cfstats =~ s/\://gm;
+$cfstats =~ s/\s//gm;
+
+my @results = split /\:/, $cfstats;
+
+foreach(@results){
+    if( ( defined $_) and !($_ =~ /^$/ )){
+        push(@clean_results, $_);
+    }
+}
+
+foreach (@clean_results) {print "$_\n";}
+
+$avgOfArray = average(@clean_results);
+$i_avgOfArray = sprintf "%.0f", $avgOfArray;
+##print $avgOfArray;
+print "sst_table_count \= $i_avgOfArray \| sst_table_count\=$i_avgOfArray\n";

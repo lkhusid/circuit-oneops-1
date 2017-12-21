@@ -1,0 +1,9 @@
+
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 create /kafka-manager/clusters/<%= node.workorder.payLoad["Environment"][0]["ciName"] %> <%= node[:ipaddress] %>
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 create /kafka-manager/clusters/<%= node.workorder.payLoad["Environment"][0]["ciName"] %>/topics <%= node[:ipaddress] %>
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 create /kafka-manager/configs/<%= node.workorder.payLoad["Environment"][0]["ciName"] %> '{"name":"<%= node.workorder.payLoad["Environment"][0]["ciName"] %>","curatorConfig":{"zkConnect":"<%= @zookeeper_fqdn %>:9091","zkMaxRetry":100,"baseSleepTimeMs":100,"maxSleepTimeMs":1000},"enabled":true,"kafkaVersion":"<%= @kafka_version %>","jmxEnabled":true, "logkafkaEnabled":false}'
+
+
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 set /kafka-manager/clusters/<%= node.workorder.payLoad["Environment"][0]["ciName"] %> <%= node[:ipaddress] %>
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 set /kafka-manager/clusters/<%= node.workorder.payLoad["Environment"][0]["ciName"] %>/topics <%= node[:ipaddress] %>
+/usr/local/kafka/bin/zookeeper-shell.sh <%= @zookeeper_fqdn %>:9091 set /kafka-manager/configs/<%= node.workorder.payLoad["Environment"][0]["ciName"] %> '{"name":"<%= node.workorder.payLoad["Environment"][0]["ciName"] %>","curatorConfig":{"zkConnect":"<%= @zookeeper_fqdn %>:9091","zkMaxRetry":100,"baseSleepTimeMs":100,"maxSleepTimeMs":1000},"enabled":true,"kafkaVersion":"<%= @kafka_version %>","jmxEnabled":true, "logkafkaEnabled":false}'

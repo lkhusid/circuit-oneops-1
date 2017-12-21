@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+## check_sst_sum.pl ##
+
+my $cfstats=`cat /tmp/nodetoolcfstats.log | grep 'SSTable count'`;
+chomp $cfstats;
+$cfstats =~ s/SSTable count//igm;
+##$cfstats =~ s/\://gm;
+$cfstats =~ s/\s//gm;
+
+my @results = split /\:/, $cfstats;
+
+foreach(@results){
+    if( ( defined $_) and !($_ =~ /^$/ )){
+        push(@clean_results, $_);
+    }
+}
+
+my $sum = 0;
+foreach my $num (@clean_results){
+    $sum = $sum + $num;
+}
+
+print "sst_table_count \= $sum \| sst_table_count\=$sum\n";

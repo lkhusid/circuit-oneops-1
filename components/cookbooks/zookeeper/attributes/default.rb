@@ -1,5 +1,5 @@
-default[:zookeeper][:version] = "3.4.5"
-default[:zookeeper][:mirror] = "http://archive.apache.org/dist/zookeeper/"
+default[:zookeeper][:version] = "3.4.6"
+default[:zookeeper][:mirror] = "http://central.maven.org/maven2/org/apache/zookeeper/zookeeper/#{default[:zookeeper][:version]}/zookeeper-#{default[:zookeeper][:version]}.tar.gz"
 default[:zookeeper][:checksum] = 'e92b634e99db0414c6642f6014506cc22eefbea42cc912b57d7d0527fb7db132'
 default[:zookeeper][:install_dir] = "/usr/lib/zookeeper"
 default[:zookeeper][:user] = "zookeeper"
@@ -19,7 +19,7 @@ default[:zookeeper][:cluster_name]           = node[:cluster_name]
 default[:zookeeper][:home_dir]               = '/usr/lib/zookeeper'
 default[:zookeeper][:conf_dir]               = '/etc/zookeeper'
 default[:zookeeper][:log_dir]                = '/var/log/zookeeper'
-default[:zookeeper][:pid_dir]                = '/var/run/zookeeper'
+default[:zookeeper][:pid_dir]                = '/usr/lib/tmpfiles.d/zookeeper'
 
 default[:zookeeper][:journal_dir]          = '/var/zookeeper/txlog'
 default[:zookeeper][:data_dir]             = '/var/zookeeper/data'
@@ -101,4 +101,3 @@ default[:zookeeper][:autopurge_purgeinterval]  = 0
 
 # How logging should be done
 default[:zookeeper][:log4j_logger]  = 'INFO,CONSOLE,ROLLINGFILE'
-

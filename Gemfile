@@ -1,5 +1,12 @@
-source 'http://rubygems.org'
+if ::File.exist?('/etc/oneops')
+    config = {}
+    ::File.read('/etc/oneops').split(/[, \n]+/).each do |line|
+        key,value = line.split('=')
+        config[key] = value
+    end
+    source "#{config['rubygems']}"
+else
+    `gem source`.split("\n").select{|l| (l =~ /^http/)}.each{|s| (source "#{s}")}
+end
 
-gem 'oneops-admin', '1.0.0'
-
-
+gem 'oneops-admin-adapter'

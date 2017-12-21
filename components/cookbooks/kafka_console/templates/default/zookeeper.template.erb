@@ -1,0 +1,7 @@
+upstream zookeeper {   
+}
+
+server {
+    listen <%= @fqdn %>:9091;
+    proxy_pass zookeeper;
+}

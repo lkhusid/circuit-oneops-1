@@ -1,0 +1,135 @@
+#!/bin/sh
+
+exec 2>/app/run_concord_ansible.out
+set -xv
+
+env >/app/run_concord_ansible.env.out 2>&1
+PROJECT_ID="cloudrdbms"
+current_host=$(hostname -i )
+
+if [ -f /app/listofIPfromworkorder.log ]
+then
+  all_hosts=$(awk '{printf "%s \"%s\"" , separator, $1, separator = ", "}' /app/listofIPfromworkorder.log )
+else
+  echo "Must have /app/listofIPfromworkorder.log, otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $playbook ]
+then
+  echo "Must have environment variable 'playbook', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $concordaddress ]
+then
+  echo "Must have environment variable 'concordaddress', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $nexusurl ]
+then
+  echo "Must have environment variable 'nexusurl', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $clustername ]
+then
+  echo "Must have environment variable 'clustername', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+    
+if [ -z $runOnEnv ]
+then
+  echo "Must have environment variable 'runOnEnv', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+    
+if [ -z $drclouds ]
+then
+  echo "The 'drclouds' environment variable can be empty, this will mean all the cluster is under 1 galara cluster without async DR."
+fi
+    
+if [ -z $cloudrdbmspackversion ]
+then
+  echo "Must have environment variable 'cloudrdbmspackversion', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+    
+if [ -z $artifactnexusurl ]
+then
+  echo "Must have environment variable 'artifactnexusurl', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+    
+if [ -z $artifactversion ]
+then
+  echo "Must have environment variable 'artifactversion', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+    
+if [ -z $zookeeperversion ]
+then
+  echo "Must have environment variable 'zookeeperversion', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+          
+if [ -z $managedserviceuser ]
+then
+  echo "Must have environment variable 'managedserviceuser', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+if [ -z $managedservicepass ]
+then
+  echo "Must have environment variable 'managedservicepass', otherwise this will fail. Exiting with Failure."
+  exit 1
+fi
+
+
+echo ""
+
+
+echo "{
+\"template\": \"ansible\",
+\"playbook\": \"ansible/${playbook}.yml\",
+\"debug\" : \"True\",
+\"config\": { 
+  \"defaults\": { 
+    \"forks\": 9,
+    \"remote_user\": \"opensysdba\"
+  },
+  \"privilege_escalation\": {
+    \"become\" : \"True\",
+    \"become_user\" : \"root\",
+    \"become_method\" : \"sudo\"
+  }
+},
+\"inventory\": {
+  \"action_nodes\": {
+    \"hosts\": [ \"${current_host}\" ],
+    \"vars\": {
+      \"default\": {
+        \"cloudrdbms\":  {
+          \"urlbase\": \"${nexusurl}\",
+          \"clustername\": \"${clustername}\",
+          \"runOnEnv\": \"${runOnEnv}\",
+          \"drclouds\": \"${drclouds}\",
+          \"cloudrdbmspackversion\": \"${cloudrdbmspackversion}\",
+          \"artifactnexusurl\": \"${artifactnexusurl}\",
+          \"artifactversion\": \"${artifactversion}\",
+          \"zookeeperversion\": \"${zookeeperversion}\"
+          }
+        }
+      }
+    }
+  },
+  \"all\": {
+    \"hosts\": [ ${all_hosts} ]
+  }
+}
+}" >request.json
+
+curl  -u "$managedserviceuser:$managedservicepass" -F request=@request.json http://$concordaddress/api/v1/process/$PROJECT_ID:$cloudrdbmspackversion >/app/curl_${playbook}.out
+echo "The return code from curl was: " $? 
+exit 0

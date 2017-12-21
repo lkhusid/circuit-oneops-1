@@ -1,0 +1,22 @@
+load_module "/usr/lib64/nginx/modules/ngx_stream_module.so";
+
+user  nginx;
+worker_processes  <%= node.cpu.total %>;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /var/run/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+stream {
+    include /etc/nginx/conf.d/kafka.conf;
+    include /etc/nginx/conf.d/kafka_ssl.conf;
+    <% payLoad = node.workorder.payLoad[:kafka].select { |cm| cm['ciClassName'].split('.').last == 'Kafka'}.first %>
+    <% use_external_zookeeper = payLoad["ciAttributes"]["use_external_zookeeper"] %>
+    <% if use_external_zookeeper.eql?("false") %>
+    include /etc/nginx/conf.d/zookeeper.conf;
+    <% end %>
+}

@@ -1,0 +1,47 @@
+#!/bin/bash
+# get my own broker id
+# checks to see if element is in array
+containsElement () {
+  local e
+  for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
+  return 1
+}
+
+pingZK () {
+  zk=$1
+  zkSplit=(${zk//:/ })
+  (nc -z ${zkSplit[0]} ${zkSplit[1]})
+  ret=$?
+  return $ret
+}
+
+myBrokerId=$(/bin/grep broker.id /etc/kafka/broker.properties | awk -F\= '{print $2}')
+
+# get list of zookeepers from server.properties
+zkList=($(/bin/grep zookeeper.connect= /etc/kafka/server.properties | awk -F\= '{print $2}' | sed 's;,; ;g'))
+
+# choose a random zookeeper from zkList
+# zk=${zkList[$RANDOM % ${#zkList[@]}]}
+
+hasLiveZK=0
+
+for zk in "${zkList[@]}"
+do
+  # if the current zk is reachable
+  if pingZK "${zk}"; then
+  # get list of broker ids currently known by zk
+  brokerList=($(/usr/local/kafka/bin/zookeeper-shell.sh ${zk} ls /brokers/ids | tail -1 | sed 's;\[\|\]\|\,;;g'))
+  hasLiveZK=1
+  fi
+done
+
+if [ ${hasLiveZK} -eq 1 ]; then
+  if containsElement "${myBrokerId}" "${brokerList[@]}"; then
+    echo "Broker connected to ZooKeeper |up=100"
+  else
+    echo "Broker NOT connected to ZooKeeper |up=0"
+  fi
+else
+  echo "NO live ZooKeeper |up=0"
+fi
+exit $?

@@ -37,10 +37,32 @@ end
 install_dir = node.java.install_dir
 sys_default = node.java.sysdefault
 
-# Trim the binpath whitespace
+# Trim the whitespace from user input
 node.java.binpath.strip!
+node.java.uversion.strip!
 
-if node.java.binpath.empty?
+# Set binpath and uversion to user input if provided
+binpath = node.java.binpath.empty? ? "" : node.java.binpath
+uversion = node.java.uversion.empty? ? "" : node.java.uversion
+
+# If on fast image then set binpath to pre-loaded file
+if binpath.empty? && File.file?("/etc/oneops-tools-inventory.yml")
+
+  # Load runtimes yaml on fast image and set uverstion if not already set and jdk version is available
+  runtimes = YAML.load_file("/etc/oneops-tools-inventory.yml")
+  if uversion.empty?
+    runtimes.each do |key, value|
+      if key.include?("#{pkg}_1.#{version}.0")
+        uversion = key.split("_").last
+      end
+    end
+  end
+  if runtimes.key?("#{pkg}_1.#{version}.0_#{uversion}")
+    binpath = runtimes["#{pkg}_1.#{version}.0_#{uversion}"]
+  end
+end
+
+if binpath.empty?
   # Automatically download the package from mirror location
   base_url, file_name, extract_dir = get_java_pkg_location
   binpath = "/usr/src/#{file_name}"
@@ -58,7 +80,6 @@ if node.java.binpath.empty?
 
 else
   # User provided binary package
-  binpath = node.java.binpath
   uversion, extract_dir = validate_pkg_file(binpath.split("/").last)
 end
 

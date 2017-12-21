@@ -8,10 +8,10 @@ ZK_SERVER_SH=<%= @zookeeper[:install_dir]%>/zookeeper-<%=@zookeeper[:version]%>/
 
 case $1 in
 status)
-    "$ZK_SERVER_SH" status
+  eval "$SU \"$ZK_SERVER_SH status\""
   ;;
 start)
- eval "$SU \"$ZK_SERVER_SH start\""   
+ eval "$SU \"$ZK_SERVER_SH start\""
  if [ $? -eq 0 ] ; then
         touch  /var/lock/subsys/zookeeper-server
     else
@@ -29,7 +29,7 @@ stop)
     fi
  ;;
 restart)
-  eval "$SU \"$ZK_SERVER_SH restart\"" 
+  eval "$SU \"$ZK_SERVER_SH restart\""
  if [ $? -eq 0 ] ; then
         touch  /var/lock/subsys/zookeeper-server
     else
@@ -42,4 +42,3 @@ restart)
 echo "Usage: $0 {start|stop|restart|status}" >&2
 
 esac
-

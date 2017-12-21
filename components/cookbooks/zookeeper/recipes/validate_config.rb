@@ -1,3 +1,6 @@
+payload = node.workorder.payLoad
+Chef::Log.info("Workorder: #{node[:workorder].to_json}")
+
 if node.workorder.has_key?("rfcCi")
   ci = node.workorder.rfcCi
 else
@@ -8,13 +11,26 @@ if ci.ciAttributes.has_key?("prod_level_checks_enabled")
   node.default[:prod_level_checks_enabled] = ci.ciAttributes.prod_level_checks_enabled
   prod_level_checks_enabled = node[:prod_level_checks_enabled]
 else
-  Chef::Log.warn("No prod_level_checks_enabled attribute found.")
+  Chef::Log.warn("No prod_level_checks_enabled attribute found. This might be old deployment, please pull latest design and re-deploy")
   return
 end
 
 Chef::Log.info("======= prod_level_checks_enabled enabled = #{prod_level_checks_enabled} =====")
 
-profile = node.workorder.payLoad.Environment[0][:ciAttributes]["profile"]
+if (node[:workorder].has_key?("payLoad"))
+    if (node[:workorder][:payLoad].has_key?("Environment"))
+      profile = node[:workorder][:payLoad][:Environment][0][:ciAttributes][:profile]
+      profile.downcase!
+      Chef::Log.info("CI attributes profile : #{profile}")
+    else
+        Chef::Log.error("Expecting field \"Environment\" in #{node[:workorder][:payLoad].to_json}");
+        msg = "Expecting \"Environment\" field in . #{node[:workorder][:payLoad].to_json}"
+        raise "#{msg}"
+        return
+    end
+else
+    Chef::Log.error("Expecting field \"payLoad\" in node[:workorder]");
+end
 
 if profile == 'prod'
   if !prod_level_checks_enabled.eql?("true")
@@ -37,19 +53,59 @@ else
   return
 end
 
-nodes = node.workorder.payLoad.RequiresComputes
+zkclouds = Array.new
+
+if (node[:workorder].has_key?("payLoad"))
+    if (node[:workorder][:payLoad].has_key?("Clouds_in_zk_cluster"))
+        node[:workorder][:payLoad][:Clouds_in_zk_cluster].each do |cloud|
+          Chef::Log.info("Adding cloud: #{cloud[:ciName]}")
+          zkclouds.push(cloud[:ciName])
+        end
+    else
+        Chef::Log.error("Expecting field \"Clouds_in_zk_cluster\" in #{node[:workorder][:payLoad].to_json}");
+    end
+else
+    Chef::Log.error("Expecting field \"payLoad\" in node[:workorder]");
+end
+
+zkclouds = zkclouds.sort()
+Chef::Log.info("Sorted array of Cloud Names: #{zkclouds}")
+
+zknodes = Array.new
+if (node[:workorder].has_key?("payLoad"))
+    if (node[:workorder][:payLoad].has_key?("Computes_in_zk_cluster"))
+        node[:workorder][:payLoad][:Computes_in_zk_cluster].each do |compute|
+          Chef::Log.info("Adding node: #{compute[:ciName]}")
+          zknodes.push(compute[:ciName])
+        end
+    else
+        Chef::Log.fatal("Expecting field \"Computes_in_zk_cluster\" in #{node[:workorder][:payLoad].to_json}");
+    end
+else
+    Chef::Log.fatal("Expecting field \"payLoad\" in node[:workorder]");
+end
+
+zknodes = zknodes.sort()
+Chef::Log.info("Sorted array of Compute Names: #{zknodes}")
 
 cloud_to_computes = Hash.new
 
-nodes.each do |compute|
-  cloud_index = compute[:ciName].split('-').reverse[1].to_s
-  if (cloud_to_computes[cloud_index] == nil)
-    cloud_to_computes[cloud_index] = Array.new
-  else
-    cloud_to_computes[cloud_index].push(compute[:ciName])
-  end
+if (node[:workorder].has_key?("payLoad"))
+    if (node[:workorder][:payLoad].has_key?("Computes_in_zk_cluster"))
+        Chef::Log.info("Computes_in_zk_cluster: #{node[:workorder][:payLoad][:Computes_in_zk_cluster].to_json}")
+        node[:workorder][:payLoad][:Computes_in_zk_cluster].each do |compute|
+            cloud_index = compute[:ciName].split('-').reverse[1].to_s
+            if (cloud_to_computes[cloud_index] == nil)
+                cloud_to_computes[cloud_index] = Array.new
+            end
+            cloud_to_computes[cloud_index].push(compute[:ciName])
+        end
+    else
+        Chef::Log.warn("Field \"Computes_in_zk_cluster\" not found in #{node[:workorder][:payLoad]}");
+    end
+else
+    Chef::Log.warn("Field \"payLoad\" not found in #{node[:workorder]}");
 end
-
 Chef::Log.info("**** cloud_to_computes: #{cloud_to_computes.to_s}")
 
 

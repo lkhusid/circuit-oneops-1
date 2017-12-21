@@ -1,8 +1,9 @@
-cloud_name = node[:workorder][:cloud][:ciName]
-cloud_type = node[:workorder][:services][:filestore][cloud_name][:ciClassName].split(".").last.downcase
+file '/etc/objectstore_creds.json' do
+  mode '0600'
+  action :delete
+end
 
-
-case cloud_type
-  when /swift/
-    include_recipe "swift::delete_objectstore"
-  end
+file '/usr/local/bin/objectstore' do
+  mode '0600'
+  action :delete
+end

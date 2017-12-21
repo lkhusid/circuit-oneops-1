@@ -1,0 +1,31 @@
+#<% load "#{File.dirname(__FILE__)}/../../../monkey_patch.rb" %>
+---
+driver:
+  name: proxy
+  host: 127.0.0.1
+  reset_command: "exit 0"
+  username: vagrant
+  password: vagrant
+provisioner:
+  name: chef_solo
+  cookbook_files_glob: "**/*"
+  require_chef_omnibus: false
+  solo_rb:
+    verify_api_cert: true
+    ssl_verify_mode: :verify_peer
+    log_level: :info
+platforms:
+  - name: centos-7.1
+suites:
+  - name: install
+    run_list:
+      - recipe[kitchen-test-helper]
+      - recipe[supervisord::add]
+    attributes:
+      workorder:
+        rfcCi:
+          ciAttributes:
+            http_port: "9001"
+            http_username: "admin"
+            http_password: "admin"
+            program_config: ""

@@ -1,0 +1,3 @@
+#!/bin/bash
+sudo sed -i "/- seeds:/c\ \ \ \ \ \ - seeds: $1" /opt/cassandra/conf/cassandra.yaml
+chown cassandra:cassandra /opt/cassandra/conf/cassandra.yaml

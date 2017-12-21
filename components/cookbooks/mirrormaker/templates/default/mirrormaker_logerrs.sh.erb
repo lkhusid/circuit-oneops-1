@@ -1,0 +1,10 @@
+#!/bin/bash
+
+ERRORPATTERN='ERROR|Exception'
+if [ $# -gt 0 ]; then
+   ERRORPATTERN=$1
+fi
+
+mmlogcriticals="$(/opt/nagios/libexec/check_logfiles --noprotocol --tag=mirrormaker_errlog --logfile=/mirrormaker/log/mirrormaker.log --warningpattern='WARN' --criticalpattern=${ERRORPATTERN} | cut -d\| -f2 | sed 's/ /\n/g' | grep criticals | cut -d= -f2)"
+
+echo {\"mirrormaker_log_criticals\": $mmlogcriticals}

@@ -24,7 +24,7 @@
       end
       dc_rack_map = JSON.parse(node.workorder.rfcCi.ciAttributes.cloud_dc_rack_map)
       compute = node.workorder.payLoad.DependsOn.select{ |d| d[:ciClassName] =~ /Compute/ }.first
-          
+      
       ci_name_parts = compute['ciName'].split("-")
       cloud_ci_id = ci_name_parts[-2] 
       cloud_name = cloud_map[cloud_ci_id]['ciName']

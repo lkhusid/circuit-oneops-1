@@ -2,232 +2,255 @@
 
 require 'rubygems'
 require 'optparse'
-require 'fog'
+require 'json'
 
-# Pretty format size.
-#
-# @param size size in bytes.
-def format_size(size)
-  conv = %w(B KB MB GB TB PB EB)
-  scale = 1024
-  ndx=1
-  if size < 2*(scale**ndx)
-    return "#{(size)}#{conv[ndx-1]}"
-  end
-  size=size.to_f
-  [2, 3, 4, 5, 6, 7].each { |i|
-    if size < 2*(scale**i)
-      return "#{'%.3f' % (size/(scale**(i-1)))}#{conv[i-1]}"
+def list_directories_or_files(conn, options, argv)
+  # check if need to list files or directories
+  if argv.size > 1
+    directory = conn.directories.get(argv[1])
+    if directory.nil?
+      puts "dir does not exist: #{argv[1]}"
+      exit 1
     end
-  }
-  ndx=7
-  "#{'%.3f' % (size/(scale**(ndx-1)))}#{conv[ndx-1]}"
+    if options[:verbose]
+      puts directory.files.inspect
+    else
+      directory.files.each { |file| puts file.key }
+    end
+  else
+    if options[:verbose]
+      puts conn.directories.inspect
+    else
+      conn.directories.each { |directory| puts directory.key }
+    end
+  end
 end
 
+def delete_directory_or_file(conn, argv)
+  # Gets the name of the file or directory which we intent to delete
+  remote_object = argv[1]
+  if remote_object.include?('/')
+    remote_dir = remote_object.split('/').first
+    directory = conn.directories.get(remote_dir)
+    if directory.nil?
+      puts "cannot get remote dir: #{remote_dir}"
+      exit 1
+    end
+    remote_parts = remote_object.split('/')
+    remote_parts.shift
+    remote_file = remote_parts.join('/')
+    file_to_delete = directory.files.get(remote_file)
+    if file_to_delete.nil?
+      puts "remote file does not exist: #{remote_file}"
+    else
+      puts "removing file: #{remote_file}"
+      file_to_delete.destroy
+    end
+  else
+    directory = conn.directories.get(remote_object)
+    directory.files.each do |file|
+      puts "removing file: #{file.key} from #{remote_object}"
+      file.destroy
+    end
+    puts "removing dir: #{remote_object}"
+    directory.destroy
+  end
+end
+
+def upload_directory_or_file(conn, argv)
+  file_name = argv[1]
+  bucket_name = argv[2]
+  file_filter = argv[3] || '*'
+
+  unless File.exist?(file_name)
+    puts "Given local file/dir not exists #{file_name}"
+    exit 1
+  end
+
+  directory = conn.directories.get(bucket_name)
+  if directory.nil?
+    puts "Creating the bucket: #{bucket_name}"
+    directory = conn.directories.create :key => bucket_name
+  end
+
+  puts "Uploading local file/dir: #{file_name}, filter: #{file_filter} to bucket: #{bucket_name}"
+  files = if File.directory?(file_name)
+            Dir.chdir(file_name)
+            Dir.glob("**/#{file_filter}").reject { |path| File.directory?(path) }
+          else
+            [file_name]
+          end
+
+  start_time = Time.now
+  size = 0
+  files.each_with_index do |file, idx|
+    puts "#{idx + 1}/#{files.size}) Upload: #{file} to bucket: #{bucket_name}"
+    directory.files.create(:key => file, :body => File.open(file))
+    size += File.size(file)
+  end
+  finish_time = Time.now
+  time_taken = finish_time - start_time
+  puts "\nUpload is completed, total size: #{format_size(size)} took #{time_taken} sec."
+end
+
+def download_directory_or_file(conn, options, argv)
+  parts = argv[1].split('/')
+  dir_name = parts.shift
+  file = ''
+  subdir = ''
+  unless parts.empty?
+    file = parts.join('/')
+    parts.pop
+    subdir = parts.join('/')
+  end
+  directory = conn.directories.get(dir_name)
+  local_dir = argv[2]
+
+  if local_dir[-1, 1] != '/'
+    local_dir += '/'
+  end
+
+  mkdir_out = `mkdir -p #{local_dir}`
+  unless $?.success?
+    puts "error creating local dir: #{local_dir} - #{mkdir_out}"
+    exit 1
+  end
+
+  directory.files.each do |remote_file|
+    if options[:verbose]
+      puts "remote_file: #{remote_file.inspect}"
+    else
+      puts "remote_file: #{remote_file.key}"
+    end
+
+    if remote_file.content_type == 'application/directory'
+      new_dir = local_dir + remote_file.key
+      puts "creating dir: #{new_dir}"
+      mkdir_out = `mkdir -p #{new_dir}`
+
+      unless $?.success?
+        puts "error creating local dir: #{new_dir} - #{mkdir_out}"
+        exit 1
+      end
+
+    else
+      # Handling in case of sub directory
+      if remote_file.key.include?('/') &&
+          subdir.empty? ||
+          remote_file.key.include?(subdir)
+        dirs_list = remote_file.key.split('/')
+        dirs_list.pop
+        dirs = dirs_list.join('/')
+        puts "making dir: #{local_dir + dirs}"
+        `mkdir -p #{local_dir + dirs}`
+        unless $?.success?
+          puts "error creating local dir: #{local_dir + dirs}"
+          exit 1
+        end
+      end
+
+      # if bucket is supplied file will be empty
+      puts "match on file: #{file} #{remote_file.key}"
+      if file.empty? || file == remote_file.key
+        File.open(local_dir + remote_file.key, 'wb') do |local_file|
+          start_time = Time.now
+          # Download files in chunks
+          directory.files.get(remote_file.key) do |chunk, remaining_bytes, total_bytes|
+            puts "\rDownloaded: #{total_bytes - remaining_bytes} of #{total_bytes}"
+            local_file.write(chunk)
+          end
+          finish_time = Time.now
+          time_taken = finish_time - start_time
+          puts "\nDownload is completed, total size: #{remote_file.content_length} took #{time_taken} sec."
+        end
+      end
+    end
+  end
+end
+
+# Pretty format size.
+# @param size size in bytes.
+def format_size(size)
+  conv = %w[B KB MB GB TB PB EB]
+  scale = 1024
+  ndx = 1
+  if size < 2 * (scale**ndx)
+    return "#{size}#{conv[ndx - 1]}"
+  end
+  size = size.to_f
+  [2, 3, 4, 5, 6, 7].each do |i|
+    if size < 2 * (scale**i)
+      return "#{'%.3f' % (size / (scale**(i - 1)))}#{conv[i - 1]}"
+    end
+  end
+  ndx = 7
+  "#{'%.3f' % (size / (scale**(ndx - 1)))}#{conv[ndx - 1]}"
+end
+
+# Execution starting point
 options = {}
+options[:verbose] = false
 OptionParser.new do |opts|
   opts.banner = 'Usage: objectstore action [options]'
-  opts.on('-v', '--[no-]verbose', 'Run verbosely') do |v|
+  opts.on('-v', '--verbose', 'Run verbosely') do |v|
     options[:verbose] = v
   end
 end.parse!
 
-
 action = ARGV[0]
 if action.nil?
-  puts 'Usage: '
-  puts 'objectstore list [bucket]'
-  puts 'objectstore upload local_dir|file bucket'
-  puts 'objectstore download bucket|file local_dir'
-  puts 'objectstore delete file|bucket'
+  usage
+  puts 'usage: '
+  puts 'objectstore list <container>'
+  puts 'objectstore upload <local upload dir|file> <container>'
+  puts 'objectstore download <container/blob> <local download path>'
+  puts 'objectstore delete <container>|<blob>'
   exit 1
 end
 
-
 # Get creds from openrc s3, cloudfiles, etc will use
-creds = {}
+creds = JSON.parse(File.read('/etc/objectstore_creds.json'))
 conn = nil
-provider = 'openstack'
-config_file = '/etc/openrc'
-if File.exists?(config_file)
-  File.open(config_file, 'r') do |f|
-    f.each_line do |line|
-      if line =~ /^export (.*)=(.*)$/
-        creds[$1] = $2
-      end
-    end
-  end
+
+case creds['provider']
+when /OpenStack/
+  require 'fog'
+  puts "Connecting to #{creds['endpoint']} as #{creds['username']}..."
+  conn = Fog::Storage.new(creds)
+when /Azure/
+  require 'fog/azurerm'
+  puts "Connecting to #{creds['azure_storage_account_name']}..."
+  conn = Fog::Storage::AzureRM.new(creds)
+else
+  puts "Provider #{creds['provider']} not supported!"
+  exit 1
 end
-
-
-case provider
-  when 'openstack'
-    puts "Connecting to #{creds['OS_AUTH_URL']} as #{creds['OS_USERNAME']}..."
-    conn = Fog::Storage.new({
-                                :provider => 'OpenStack',
-                                :openstack_username => creds['OS_USERNAME'],
-                                :openstack_api_key => creds['OS_PASSWORD'],
-                                :openstack_auth_url => creds['OS_AUTH_URL']+'/tokens',
-                                :openstack_region => creds['OS_REGION_NAME']
-                            })
-  else
-    puts "Provider #{provider} not supported!"
-    exit 1
-end
-
 
 case action
-  when 'list'
-    if ARGV.size > 1
-      dir = conn.directories.get(ARGV[1])
-      if dir.nil?
-        puts "dir does not exist: #{ARGV[1]}"
-        exit 1
-      end
-      puts dir.files.inspect
-    else
-      puts conn.directories.inspect
-    end
+when 'list'
+  list_directories_or_files(conn, options, ARGV)
 
-  when 'delete'
-    if ARGV.size < 2
-      puts 'Usage: objectstore delete file|bucket'
-      exit 1
-    end
-    remote_object = ARGV[1]
-    if remote_object.include?('/')
-      remote_dir = remote_object.split('/').first
-      dir = conn.directories.get remote_dir
-      if dir.nil?
-        puts "cannot get remote dir: #{remote_dir}"
-        exit 1
-      end
-      remote_parts = remote_object.split('/')
-      remote_parts.shift
-      remote_file = remote_parts.join('/')
-      file = dir.files.get remote_file
-      if file.nil?
-        puts "remote file does not exist: #{remote_file}"
-      else
-        puts "removing file: #{remote_file}"
-        file.destroy
-      end
-    else
-      dir = conn.directories.get remote_object
-      dir.files.each do |file|
-        puts "removing file: #{file.key} from #{remote_object}"
-        file.destroy
-      end
-      puts "removing dir: #{remote_object}"
-      dir.destroy
-
-    end
-
-  when 'upload'
-    if ARGV.size < 3
-      puts 'Usage: objectstore upload (local_dir|file) bucket [file_filter]'
-      exit 1
-    end
-
-    file_name = ARGV[1]
-    bucket_name = ARGV[2]
-    file_filter = ARGV[3] || '*'
-
-    unless File.exists? file_name
-      puts "Given local file/dir not exists #{file_name}"
-      exit 1
-    end
-
-    dir = conn.directories.get bucket_name
-    if dir.nil?
-      puts "Creating the bucket: #{bucket_name}"
-      dir = conn.directories.create :key => bucket_name
-    end
-
-    puts "Uploading local file/dir: #{file_name}, filter: #{file_filter} to bucket: #{bucket_name}"
-    files = if File.directory?(file_name)
-              Dir.chdir(file_name)
-              Dir.glob("**/#{file_filter}").reject { |path| File.directory?(path) }
-            else
-              [file_name]
-            end
-
-    start = Time.now
-    size = 0
-    files.each_with_index { |file, idx|
-      puts "#{idx+1}/#{files.size}) Upload: #{file} to bucket: #{bucket_name}"
-      dir.files.create :key => file, :body => File.open(file)
-      size += File.size(file)
-    }
-    finish = Time.now
-    puts "\nUpload is completed, total size: #{format_size(size)} took #{finish-start} sec."
-
-  when 'download'
-    if ARGV.size < 3
-      puts 'Usage: objectstore download bucket local_dir'
-      exit 1
-    end
-
-    parts = ARGV[1].split('/')
-    dir_name = parts.shift
-    file = ''
-    subdir = ''
-    if parts.size > 0
-      file = parts.join('/')
-      parts.pop
-      subdir = parts.join('/')
-    end
-    dir = conn.directories.get(dir_name)
-    local_dir = ARGV[2]
-
-    if local_dir[-1, 1] != '/'
-      local_dir += '/'
-    end
-
-    mkdir_out = `mkdir -p #{local_dir}`
-    if $?.to_i != 0
-      puts "error creating local dir: #{local_dir} - #{mkdir_out}"
-      exit 1
-    end
-
-    dir.files.each do |remote_file|
-      puts "remote_file: #{remote_file.inspect}"
-      if remote_file.content_type == 'application/directory'
-        new_dir = local_dir + remote_file.key
-        puts "creating dir: #{new_dir}"
-        mkdir_out = `mkdir -p #{new_dir}`
-
-        if $?.to_i != 0
-          puts "error creating local dir: #{new_dir} - #{mkdir_out}"
-          exit 1
-        end
-
-      else
-        if remote_file.key.include?('/') &&
-            subdir.empty? || remote_file.key.include?(subdir)
-          dirs_list = remote_file.key.split('/')
-          dirs_list.pop
-          dirs = dirs_list.join('/')
-          puts "making dir: #{local_dir + dirs}"
-          `mkdir -p #{local_dir + dirs}`
-          if $?.to_i != 0
-            puts "error creating local dir: #{local_dir + dirs}"
-            exit 1
-          end
-        end
-
-        # if bucket is supplied file will be empty
-        puts "match on file: #{file} #{remote_file.key}"
-        if file.empty? || file == remote_file.key
-          File.open(local_dir + remote_file.key, 'w') do |local_file|
-            puts "writing: #{local_dir + remote_file.key}"
-            local_file.write(remote_file.body)
-          end
-        end
-
-      end
-    end
-  else
-    puts "Action #{action} not supported!"
+when 'delete'
+  if ARGV.size < 2
+    puts 'Usage: objectstore delete <container>|<blob>'
     exit 1
+  end
+  delete_directory_or_file(conn, ARGV)
+
+when 'upload'
+  if ARGV.size < 3
+    puts 'Usage: objectstore upload (local_dir|file) <container> [file_filter]'
+    exit 1
+  end
+  upload_directory_or_file(conn, ARGV)
+
+when 'download'
+  if ARGV.size < 3
+    puts 'Usage: objectstore download <container> local_dir'
+    exit 1
+  end
+  download_directory_or_file(conn, options, ARGV)
+else
+  puts "Action #{action} not supported!"
+  exit 1
 end

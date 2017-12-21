@@ -1,0 +1,7 @@
+#!/bin/bash
+# THIS FILE IS MANAGED BY CHEF
+
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+@hourly root find <%= node['mirrormaker'][:log_dir] %> -mtime +1 -name "*.log.*" -exec rm -rf {} \; && ls <%= node['mirrormaker'][:log_dir] %>/mirrormaker.log.* | grep -v gz | grep -q mirrormaker.log && ls <%= node['mirrormaker'][:log_dir] %>/mirrormaker.log.* | grep -v gz | xargs gzip

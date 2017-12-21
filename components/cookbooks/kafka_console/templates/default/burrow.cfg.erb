@@ -1,0 +1,38 @@
+[general]
+logdir=/app/godir/burrow/log
+logconfig=/app/godir/burrow/src/github.com/linkedin/Burrow/config/logging.cfg
+pidfile=burrow.pid
+client-id=burrow-lagchecker
+group-blacklist=^(console-consumer-|python-kafka-consumer-).*$
+#group-whitelist=^(my-important-consumer).*$
+
+[zookeeper]
+hostname=<%= @zk_host %>
+port=<%= @zk_port %>
+timeout=6
+lock-path=/burrow/notifier
+
+[kafka "<%= @kafka_cluster_name %>"]
+broker=<%= @kafka_host %>
+broker-port=<%= @kafka_port %>
+zookeeper=<%= @zk_host %>
+zookeeper-port=<%= @zk_port %>
+zookeeper-path=/kafka-cluster
+offsets-topic=__consumer_offsets
+
+[tickers]
+broker-offsets=20
+
+[lagcheck]
+intervals=3
+expire-group=604800
+
+[httpserver]
+server=on
+port=8000
+; Alternatively, use listen (cannot be specified when port is)
+; listen=host:port
+; listen=host2:port2
+
+[notify]
+interval=3

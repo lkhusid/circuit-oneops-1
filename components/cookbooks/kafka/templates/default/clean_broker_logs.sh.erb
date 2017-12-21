@@ -1,0 +1,19 @@
+#!/bin/bash
+# first, check if there is any past log file to compress under /var/log/kafka/
+out=`ls /var/log/kafka/server.log.* | grep -v gz`
+ec=$?
+if [ $ec != 0 ]; then
+   # if no past log, do nothing and set exit code to 0
+   ec=0
+else
+   # otherwise, zip and delete the log
+   out=`find /var/log/kafka -mtime +<%= node['kafka']['kafka_server_log_retention_days'] %> -name "*.log.*" -exec rm -rf {} \; && ls /var/log/kafka/server.log.* | grep -v gz | grep -q server.log && ls /var/log/kafka/server.log.* | grep -v gz | xargs gzip`
+   ec=$?
+fi
+
+if [ $ec != 0 ]; then
+   echo "Broker Log NOT Cleanup |up=0"
+else
+   echo "Broker Log Cleanup |up=100"
+fi
+exit $?

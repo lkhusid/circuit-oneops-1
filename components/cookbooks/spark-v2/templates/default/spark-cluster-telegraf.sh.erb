@@ -1,0 +1,72 @@
+#!/usr/bin/python
+
+import sys,json
+import urllib
+from subprocess import call
+
+# Pull the metrics from the REST api and send them to stdout for
+# reporting through Telegraf
+try:
+  metricsLink = "http://localhost:<%= @metrics_port %>/metrics/<%= @metrics_path %>"
+  metricsData = urllib.urlopen(metricsLink)
+  dataString = metricsData.read()
+except:
+  pass
+
+metricsOutput = {}
+
+# Loop through the data and print any values
+# to report as cluster metrics
+try:
+  jsonData = json.loads(dataString)
+
+<% if @is_spark_master %>
+  # Read the value of master.apps and report it as cluster.jobs_running
+  metricsOutput["jobs_running"] = jsonData["gauges"]["master.apps"]["value"]
+<% end %>
+except:
+  pass
+
+<% if @is_spark_master %>
+dataString = ""
+
+# Pull the metrics from the JSON Web UI and send them to stdout for
+# reporting through Telegraf
+try:
+  metricsLink = "http://localhost:<%= @metrics_port %>/json"
+  metricsData = urllib.urlopen(metricsLink)
+  dataString = metricsData.read()
+except:
+  pass
+
+# Loop through the data and print any values
+# to report as cluster metrics
+try:
+  jsonData = json.loads(dataString)
+
+  metricsOutput["activeapps_count"] = len(jsonData["activeapps"])
+  metricsOutput["completedapps_count"] = len(jsonData["completedapps"])
+  metricsOutput["activedrivers_count"] = len(jsonData["activedrivers"])
+
+  metricsOutput["totalcores_count"] = jsonData["cores"]
+  metricsOutput["coresused_count"] = jsonData["coresused"]
+  metricsOutput["totalmemory_mb"] = jsonData["memory"]
+  metricsOutput["memoryused_mb"] = jsonData["memoryused"]
+
+  # Build the set of unique users on the cluster by
+  # seeing how many different users are in the active
+  # applications list.
+  uniqueUsers = set( )
+  for activeApp in jsonData["activeapps"]:
+    uniqueUsers.add(activeApp["user"])
+
+  metricsOutput["unique_users"] = len(uniqueUsers)
+
+except:
+  pass
+<% end %>
+
+try:
+  print json.dumps(metricsOutput)
+except:
+  pass

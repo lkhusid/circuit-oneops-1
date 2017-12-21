@@ -167,7 +167,7 @@ ruby_block 'set flavor/image/availability_zone' do
       #Set max server create value based on compute_type
       if compute_type == "baremetal"
         max_server_create_value = 360
-        node.set["max_retry_count_add"] = 2
+        node.set["max_retry_count_add"] = 48
       else
         max_server_create_value = 30
         node.set["max_retry_count_add"] = 30

@@ -1,0 +1,10 @@
+upstream zookeeper {   
+    <% @brokers.sort.each do |ip| %>
+    server <%= ip %>:9091;
+    <% end -%>
+}
+
+server {
+    listen <%= @fqdn %>:9091;
+    proxy_pass zookeeper;
+}

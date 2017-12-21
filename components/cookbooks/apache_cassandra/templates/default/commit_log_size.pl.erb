@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+## commit_log_size.pl##
+
+## APACHE ##
+my $curr_commit_size=`du -s /app/cassandra/commitlog | cut -f1`;
+my $curr_commit_size_mb = $curr_commit_size;
+
+my $remain_cass_vol_size = `df | grep cassandra`;
+my @remain_vol = split(" ",$remain_cass_vol_size);
+my $remain = $remain_vol[2];
+my $percentage = $curr_commit_size_mb/$remain;
+##print "$percentage\n";
+$i_percentage = sprintf "%.2f", $percentage;
+$result_percentage = $i_percentage * 100;
+##print "$result_percentage\n";
+
+print "commitlogsize \= $result_percentage \| commitlogsize\=$result_percentage\n";

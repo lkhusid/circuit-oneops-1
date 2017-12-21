@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# pubsub-zookeeper: this shell script starts and stops the pubsub-zookeeper service
+#
+# chkconfig: 2345 80 20
+#
+### INIT DETAILS
+# Provides: pubsub-zookeeper
+# Required-Start: $network
+# Required-Stop: $network
+# Description: service setups the pubsub zookeeper service
+# Short-Description: start and stop pubsub zookeeper service
+###
+
+# Source init functions
+. /etc/rc.d/init.d/functions
+
+ZOOKEEPER_DIR="/usr/local/kafka"
+CONF_DIR="/etc/kafka"
+ZOOKEEPER_START_SCRIPT="$ZOOKEEPER_DIR/bin/zookeeper-server-start.sh"
+ZOOKEEPER_CONFIG="${CONF_DIR}/zookeeper.properties"
+ZOOKEEPER_LOG="/var/log/zk/pubsub-zookeeper.log"
+
+export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:${CONF_DIR}/log4j-zk.properties"
+export KAFKA_HEAP_OPTS="-Xmx<%= @heap_size %>M -Xms<%= @heap_size %>M"
+export JMX_PORT="<%= node['kafka']['zookeeper_jmx_port'] %>"
+
+# Lock and PID
+LOCK_FILE="/var/lock/subsys/pubsub-zookeeper"
+PID_FILE="/var/run/pubsub-zookeeper.pid"
+
+function start() {
+    RETVAL="0"
+    echo "INFO: Starting pubsub-zookeeper"
+    if ( isRunning ); then
+        echo "INFO: Pubsub zookeeper already running"
+    else
+        rm -rf $PID_FILE $LOCK_FILE
+        $ZOOKEEPER_START_SCRIPT $ZOOKEEPER_CONFIG > $ZOOKEEPER_LOG 2>&1 &
+        if [ "$RETVAL" -eq "0" ]; then
+            psubpid=$!
+            echo "INFO: Service pubsub-zookeeper with process id $psubpid"
+            echo $psubpid > $PID_FILE
+            touch $LOCK_FILE 2>&1 || RETVAL="4"
+            echo "Started pubsub zookeeper; check logs at ${ZOOKEEPER_LOG}"
+        fi
+    fi
+}
+
+function stop() {
+    RETVAL="0"
+    echo "INFO: Stoping pubsub-zookeeper"
+    if ( isRunning ); then
+        echo "INFO: Stopping pubsub zookeeper"
+        read psubpid < $PID_FILE
+        ps ax | grep -i 'zookeeper.properties' | grep -i $ZOOKEEPER_DIR | awk '{print $1}' | xargs kill -9
+        if [ "$(ps --pid $psubpid | grep -c $psubpid )" -gt "0" ]; then
+            kill -9 $psubpid
+        fi
+        rm -rf $PID_FILE $LOCK_FILE
+    else
+        echo "INFO: No process for pubsub zookeeper running currently"
+    fi
+}
+
+function status(){
+    if ( isRunning ); then
+        echo "INFO: Service pubsub-zookeeper is running"
+        exit 0
+    else
+        echo "INFO: Service pubsub-zookeeper not running"
+        exit 1
+    fi
+}
+
+function isRunning(){
+    if [ -f "${LOCK_FILE}" ]; then
+        if [ -f "${PID_FILE}" ]; then
+            read psubpid < $PID_FILE
+            if [ -d "/proc/${psubpid}" ]; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+function usage(){
+    echo "Usage: $0 {start|stop|status|restart}"
+}
+
+RETVAL="0"
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        stop
+        sleep 5
+            start
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+exit $RETVAL

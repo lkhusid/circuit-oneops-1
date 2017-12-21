@@ -1,1 +1,1 @@
-include_recipe "objectstore::add"
+include_recipe 'objectstore::add'

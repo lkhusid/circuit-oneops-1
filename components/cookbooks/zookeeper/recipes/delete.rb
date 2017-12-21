@@ -1,1 +1,6 @@
-include_recipe "zookeeper::stop"
+#
+# Cookbook Name:: zookeeper
+# Recipe:: delete
+#
+#
+#

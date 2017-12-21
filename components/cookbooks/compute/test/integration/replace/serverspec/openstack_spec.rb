@@ -1,0 +1,1 @@
+require "/opt/oneops/inductor/circuit-oneops-1/components/cookbooks/compute/test/integration/add/serverspec/openstack_spec.rb"

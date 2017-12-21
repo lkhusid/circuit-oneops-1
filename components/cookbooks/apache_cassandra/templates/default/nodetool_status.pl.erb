@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+##nodetool_status.pl##
+
+my $get_nodes=`cat /tmp/nodetoolstatus.log`;
+my @results = split /^/, $get_nodes;
+
+my $tot_nodes = 0;
+my $up_nodes = 0;
+my $down_nodes = 0;
+
+foreach (@results) {
+        if ($_ =~ m/^U/) {
+                $up_nodes ++;
+                $tot_nodes ++;
+        }
+        if ($_ =~ m/^D/) {
+                $down_nodes ++;
+                $tot_nodes ++;
+        }
+}
+
+print "totalnodes \= $tot_nodes \| totalnodes\=$tot_nodes\n";
+print "upnodes \= $up_nodes \| upnodes\=$up_nodes\n";
+print "downnodes \= $down_nodes \| downnodes\=$down_nodes\n";

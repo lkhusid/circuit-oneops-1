@@ -1,0 +1,7 @@
+#!/bin/bash
+## nodetools.sh##
+
+## GET TOTAL NODE STATE ##
+/opt/cassandra/bin/nodetool status | egrep -i "UN|UL|UJ|UM|DN|DL|DJ|DM";
+
+/opt/cassandra/bin/nodetool cfstats > /tmp/nodetoolcfstats.log;

@@ -46,9 +46,7 @@ action :default do
           
       if resp_obj["errorcode"] == 293
         wait_time = 10 * (attempt + 1)
-        Chef::Log.error( "save inprogress waiting #{wait_time}sec ...")    
-        sleep(wait_time)
-        raise "Operation already in progress"
+        Chef::Log.warn("save inprogress")
         
       elsif resp_obj["errorcode"] != 0
         raise "runtime error"    

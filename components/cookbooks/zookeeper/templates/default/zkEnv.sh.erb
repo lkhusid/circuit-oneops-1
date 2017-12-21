@@ -37,6 +37,15 @@ JMX_RMI_PORT=$(($JMX_PORT+1))
 ZOOBINDIR=${ZOOBINDIR:-/usr/bin}
 ZOOKEEPER_PREFIX=${ZOOBINDIR}/..
 
+# GC Logging
+<% if node["zookeeper"]["gc_log_params"] != nil %>
+<% GC_LOG_OPTS = JSON.parse(node["zookeeper"]["gc_log_params"]).map{ |v| " #{v}" } %>
+<% if !"#{GC_LOG_OPTS}".empty? %>
+JVMFLAGS="${JVMFLAGS} -Xloggc:${ZOO_LOG_DIR}/zookeeper.gc.log <%= GC_LOG_OPTS %>"
+<% end %>
+<% end %>
+
+
 if [ "x$ZOOCFGDIR" = "x" ]
 then
   if [ -e "${ZOOKEEPER_PREFIX}/conf" ]; then

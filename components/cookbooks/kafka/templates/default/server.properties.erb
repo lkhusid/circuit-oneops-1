@@ -1,0 +1,43 @@
+<% JSON.parse(node.workorder.rfcCi.ciAttributes[:kafka_properties]).each do |param,value| %>
+<% if param == 'log.dirs' || param == 'log.dir' || param == 'reserved.broker.max.id' || param == 'zookeeper.connect' %>
+##############################################
+#  customer specification below is ignored
+#  <%= param %>=<%= value %>
+##############################################
+<% else %>
+<%= param %>=<%= value %>
+<%  end %>
+<% end %>
+
+<% if !(node.workorder.rfcCi.ciAttributes.version.start_with? '0.8.') %>
+reserved.broker.max.id=2147483647
+<% end %>
+
+log.dirs=<%= node['kafka']['data_dir'] %>
+
+# Zookeeper connection string (see zookeeper docs for details).
+# This is a comma separated host:port pairs, each corresponding to a zk
+# server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002".
+# You can also append an optional chroot string to the urls to specify the
+# root directory for all kafka znodes.
+<% zk_peers = Array.new %>
+<% @zookeeper_cluster_peers.sort.each do |zk_peer| %>
+<% zk_peers.push(zk_peer) %>
+<% end %>
+zookeeper.connect=<%= (zk_peers.to_a).join(":9091,") %>:9091
+
+<% @ssl_properties.each do |param,value| %>
+<%= param %>=<%= value %>
+<% end %>
+
+<% if node['kafka']['enable_sasl_plain'].eql?('true') %>
+    security.inter.broker.protocol=SASL_PLAINTEXT
+    sasl.mechanism.inter.broker.protocol=PLAIN
+    sasl.enabled.mechanisms=PLAIN
+<% end %>
+
+
+<% if !node['kafka']['version'].eql?('0.8.2.1') && node['kafka']['enable_rack_awareness'].eql?('true') %>
+broker.rack=<%= node.workorder.cloud.ciName %>
+<% end %>
+

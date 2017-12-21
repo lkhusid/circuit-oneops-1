@@ -1,6 +1,6 @@
 #
 # Cookbook Name:: zookeeper
-# Recipe:: repair
+# Recipe:: start
 #
 #
 

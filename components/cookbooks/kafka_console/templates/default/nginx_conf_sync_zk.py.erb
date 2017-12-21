@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+
+import os
+import json
+import subprocess
+import re
+import sys
+import ast
+import collections
+
+def _do_local_cmd_with_output(cmd):
+    """runs command locally and returns stdout"""
+    #with open(os.devnull, 'w') as bitbucket:
+    #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=bitbucket, shell=True)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    out, err = p.communicate()
+    return out
+
+def _get_all_broker_ids(zk):
+    """get all broker ids by querying the zookeeper directory /brokers/ids """
+    cmd = '/usr/local/kafka/bin/zookeeper-shell.sh %s ls /brokers/ids | tail -1' % (zk)
+    out = _do_local_cmd_with_output(cmd)
+    # print out
+    brokerIds = []
+    for id in ast.literal_eval(out):
+        brokerIds.append(str(id))
+    return sorted(brokerIds, key=int)
+
+def _get_broker_ip_by_id(zk, brokerId):
+    """get broker ip by querying the zookeeper directory /brokers/brokerId. The return is a json obj """
+    cmd = '/usr/local/kafka/bin/zookeeper-shell.sh %s get /brokers/ids/%s | tail -1' % (zk, brokerId)
+    out = _do_local_cmd_with_output(cmd).splitlines()
+    #print len(out)
+    js = json.loads(out[len(out)-1])
+    return js['host']
+
+def _get_server_ip_from_nginx_conf():
+    cmd = ['cat /etc/nginx/conf.d/kafka.conf']
+    properties = _do_local_cmd_with_output(cmd).splitlines()
+    ip_from_nginx_conf = []
+    for line in properties:
+        if 'server' in line and 'server {' not in line:
+            prefix = line.split(":")[0]
+            txt = prefix.split()
+            #print txt
+            ip_from_nginx_conf.append(txt[len(txt)-1])
+    return ip_from_nginx_conf
+
+def update_nginx_conf(service, ip_from_zookeeper):
+    conf_temp_file = "/etc/nginx/conf.d/"+ service + ".template"
+    f = open(conf_temp_file, "r")
+    contents = f.readlines()
+    f.close()
+
+    index = 1
+    for x in range(0, len(ip_from_zookeeper)):
+        value = "    server " + ip_from_zookeeper[x]
+        value1 = "    server " + ip_from_zookeeper[x]
+        if service == "kafka":
+            value += ":9092;\n"
+            value1 += ":9093;\n"
+        else:
+            value += ":9091;\n"
+        contents.insert(index, value)
+        index += 1
+        if service == "kafka":
+        	contents.insert(index, value1)
+        	index += 1
+    contents = "".join(contents)
+ 
+    conf_file = "/etc/nginx/conf.d/"+ service + ".conf"
+    os.remove(conf_file)
+    f = open(conf_file, "w")
+    f.write(contents)
+    f.close()
+
+def main():
+    zk = "<%= @zookeeper_fqdn %>:9091"
+    brokerIds = _get_all_broker_ids(zk)
+    ip_from_zookeeper = []
+    ip_from_nginx_conf = _get_server_ip_from_nginx_conf()
+    for id in brokerIds:
+        ip_from_zookeeper.append(_get_broker_ip_by_id(zk, id))
+
+    if sorted(ip_from_zookeeper) != sorted(ip_from_nginx_conf):
+       update_nginx_conf("kafka", ip_from_zookeeper)
+
+      <% payLoad = node.workorder.payLoad[:kafka].select { |cm| cm['ciClassName'].split('.').last == 'Kafka'}.first %>
+      <% use_external_zookeeper = payLoad["ciAttributes"]["use_external_zookeeper"] %>
+      <% if use_external_zookeeper.eql?("false") %>
+      update_nginx_conf("zookeeper", ip_from_zookeeper)
+      <% end %>
+
+       _do_local_cmd_with_output("/etc/init.d/nginx restart")
+ 
+if __name__ == '__main__':
+    main()

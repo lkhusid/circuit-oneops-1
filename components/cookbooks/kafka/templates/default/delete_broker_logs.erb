@@ -1,0 +1,8 @@
+#!/bin/bash
+# THIS FILE IS MANAGED BY CHEF
+
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=
+
+@weekly root find /var/log/kafka -mtime +7 -name "*.log*.gz" -exec rm -rf {} \;

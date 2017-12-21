@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [ "$1" == "" ]; then
+  echo "No log file specified."
+  exit 1
+fi
+
+LOGFILE="$1"
+GROUP="spark"
+
+if [ -f "$1" ]; then
+  BASENAME="`basename $LOGFILE`"
+  TEMPFILE=/tmp/${BASENAME}
+  OFFSETFILE=/tmp/${BASENAME}.offset
+
+  # Get the new portion of the log file
+  # Screen out lines that start with * to
+  # filter out warnings from logtail related
+  # to the log being truncated (when it rolls)
+  logtail -f$LOGFILE -o$OFFSETFILE |grep -v "^\*" > $TEMPFILE
+
+  # Analyze the new log entries and report
+  # values based on it
+  total_lines=`cat $TEMPFILE |wc -l`
+  total_warn_lines=`cat $TEMPFILE |awk '{print $3}' |grep WARN |wc -l`
+  total_error_lines=`cat $TEMPFILE |awk '{print $3}' |grep ERROR |wc -l`
+
+else
+  echo "Log file [$LOGFILE] does not exist."
+  exit 2
+fi
+
+echo "{ \"total_lines\": $total_lines, \"total_warn_lines\": $total_warn_lines, \"total_error_lines\": $total_error_lines, \"group\": \"${GROUP}\" }"
+
+if [ -f "$TEMPFILE" ];  then
+  rm -f $TEMPFILE
+fi

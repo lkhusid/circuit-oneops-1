@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+
+rs="Running... | "
+
+["mcrouter", "memcached"].each { |process|
+  `ps auxwww| grep -v grep | grep -v check_process | egrep #{process} 2>&1`
+  exit_status = $?.to_i
+  rs.concat(exit_status == 0 ? "#{process}-status=1.00 " : "#{process}-status=0.00 ")
+}
+
+puts rs

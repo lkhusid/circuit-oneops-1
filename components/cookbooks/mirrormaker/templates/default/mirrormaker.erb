@@ -1,0 +1,112 @@
+#!/bin/bash
+# description: Mirrormaker Start Stop Restart
+# processname: mirrormaker 
+# chkconfig: 234 80 20
+
+# Source function library.
+
+. /etc/rc.d/init.d/functions
+
+export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:<%= node['mirrormaker'][:config_dir] %>/log4j.properties"
+export KAFKA_HEAP_OPTS="-Xmx<%= @max_heap %>M -Xms512M"
+#"-Xmx<%= @heap_size %> -Xms<%= @heap_size %>"
+
+USER="<%= node['mirrormaker']['user'] %>"
+MIRRORMAKER_START_SCRIPT="/usr/local/kafka/bin/kafka-mirror-maker.sh"
+export JMX_PORT="<%= node['mirrormaker']['jmx_port'] %>"
+
+MIRRORMAKER_CONFIG="<%= node['mirrormaker'][:config_dir] %>/mirrormaker.properties"
+PID_FILE="/var/run/mirrormaker.pid"
+
+function status(){
+    if ( isRunning ); then
+        echo "INFO: Service mirrormaker is running"
+        read pid < $PID_FILE
+        echo "mirrormaker running as :$(ps  --no-headers -o cmd $pid|tail ) "
+        echo "mirrormaker pid: $pid"
+        exit 0
+    else
+        echo "INFO: Service mirrormaker not running"
+        exit 1
+    fi
+}
+
+function isRunning(){
+    if [ -f "$PID_FILE" ]; then
+        read pid < $PID_FILE
+        if [ -d "/proc/$pid" ]; then
+           return 0
+        fi
+    fi
+    return 1
+}
+
+function start() {
+  if ( isRunning ); then
+      echo "INFO: mirrormaker already running"
+  else
+      echo "INFO: Starting mirrormaker."
+      rm -rf $PID_FILE
+      whitelist_conf="--$(cat $MIRRORMAKER_CONFIG | grep whitelist)"
+      topicMapList_conf="--$(cat $MIRRORMAKER_CONFIG | grep topicMapList)"
+
+      consumer_conf="--consumer.config <%= node['mirrormaker'][:consumer_config_dir] %>/consumer.properties"
+      producer_conf="--producer.config <%= node['mirrormaker'][:producer_config_dir] %>/producer.properties"
+
+      <% mirrormaker_conf = Array.new %>
+      <% JSON.parse(node.workorder.rfcCi.ciAttributes[:mirrormaker_properties]).each do |param,value| %>
+      <% mirrormaker_conf.push("--" + param + "=" + value) %>
+      <% end %>
+      if [ "$topicMapList_conf" == "--topicMapList=" ]; then
+        $MIRRORMAKER_START_SCRIPT $consumer_conf $producer_conf $whitelist_conf <%= (mirrormaker_conf.to_a).join(" ") %> &
+      else
+        $MIRRORMAKER_START_SCRIPT $consumer_conf $producer_conf $whitelist_conf $topicMapList_conf <%= (mirrormaker_conf.to_a).join(" ") %> &
+      fi
+
+      pid=$!
+      echo "INFO: Started mirrormaker with process id $pid"
+      echo $pid > $PID_FILE
+      RETVAL=$?
+  fi
+}
+
+function stop() {
+  if ( isRunning ); then
+     echo "INFO: Stopping mirrormaker."
+     cat $PID_FILE | xargs kill -9
+     RETVAL=$?
+     echo
+     [ $RETVAL = 0 ] && rm -f $PID_FILE
+  else 
+     echo "INFO: No process for mirrormaker running currently"
+  fi     
+}
+
+function usage(){
+    echo "Usage: $0 {start|stop|status|restart}"
+}
+
+RETVAL="0"
+case $1 in
+status)
+   status
+   ;;
+start)
+   start
+   ;;
+stop)
+   stop
+   ;;
+restart)
+   stop
+   sleep 5
+   start
+   ;;
+*)
+   usage
+   ;;
+
+esac
+
+exit $RETVAL
+

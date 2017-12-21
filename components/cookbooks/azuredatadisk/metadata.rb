@@ -97,7 +97,8 @@ attribute 'region',
                   ['Japan East','japaneast'],
                   ['East Asia','eastasia'],
                   ['UK West','ukwest'],
-                  ['UK South','uksouth']
+                  ['UK South','uksouth'],
+                  ['Japan West','japanwest']
               ]
               }
           }

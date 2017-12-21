@@ -1,0 +1,22 @@
+# .bash_profile
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+	. ~/.bashrc
+fi
+
+# User specific environment and startup programs
+export CASSANDRA_HOME=/app/cassandra/current
+export CASSANDRA_CONF=$CASSANDRA_HOME/conf
+export CASSANDRA_LOG_DIR=/var/log/cassandra
+export CASSANDRA_LOG=/var/log/cassandra
+export CASSANDRA_HEAPDUMP_DIR=/tmp
+export LOCAL_JMX=both
+PATH=$CASSANDRA_HOME/bin:$HOME/bin:$PATH
+
+# Alias
+alias system.log='tail -100f $CASSANDRA_LOG_DIR/system.log'
+alias cassandra.yaml='vi $CASSANDRA_HOME/conf/cassandra.yaml'
+
+# Set badge when using iTerm
+printf "\e]1337;SetBadgeFormat=%s\a" $(echo -n $ONEOPS_ASSEMBLY | base64)

@@ -36,6 +36,14 @@ node.loadbalancers.each do |loadbalancer|
   iport = loadbalancer[:iport]
   sg_name = loadbalancer[:sg_name]
 
+  if vprotocol == "SSL"
+    vprotocol = "HTTPS"
+  end
+
+  if iprotocol == "SSL"
+    iprotocol = "HTTPS"
+  end
+
   if (vprotocol == 'HTTP' and iprotocol == 'HTTPS')
     Chef::Log.error(loadbalancer)
     Chef::Log.error('Protocol Mismatch in listener config')
@@ -57,6 +65,10 @@ node.loadbalancers.each do |loadbalancer|
       secret_manager = SecretManager.new(service_lb_attributes[:endpoint], service_lb_attributes[:username],service_lb_attributes[:password], service_lb_attributes[:tenant] )
       container_ref = secret_manager.get_container(barbican_container_name)
       Chef::Log.info("Container_ref : #{container_ref}")
+      if !container_ref
+        Chef::Log.error("Unable to fetch Barbican container href for container name : #{barbican_container_name}")
+        raise Exception, "Unable to fetch Barbican container href for container name : #{barbican_container_name}"
+      end
       if iprotocol == 'HTTP'
         listeners.push(initialize_listener("TERMINATED_HTTPS", vport, lb_name, pool, connection_limit, container_ref))
       elsif iprotocol == 'HTTPS'

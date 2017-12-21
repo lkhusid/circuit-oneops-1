@@ -27,12 +27,11 @@ end
 node.set['workorder']['rfcCi']['ciAttributes']['package_version'] = version
 Chef::Log.info "The package_version is #{node['workorder']['rfcCi']['ciAttributes']['package_version']}"
 package_path = ::File.join(output_directory,"#{package_name}.#{version}")
+package_physical_path = ::File.join(application.physical_path, package_name)
 
-[output_directory, ::File.join(application.physical_path, package_name)].each do |path|
-  directory path do path
-     action :delete
-     recursive true
-  end
+directory package_physical_path do
+   action :delete
+   recursive true
 end
 
 directory output_directory do
@@ -54,4 +53,9 @@ end
 powershell_script "copy nuget package" do
   code "Copy-Item #{package_path}/* -Destination #{application.physical_path}/#{package_name}/#{version} -Recurse -Force -Exclude *.nupkg"
   only_if { (Dir.entries("#{application.physical_path}/#{package_name}/#{version}") - %w{ . .. }).empty? }
+end
+
+directory package_path do
+   action :delete
+   recursive true
 end

@@ -1,11 +1,11 @@
-name             "Azure Keypair"
-description      "General purpose key pairs"
-version          "0.1"
-maintainer       "OneOps, Inc."
-maintainer_email "support@oneops.com"
-license          "Apache License, Version 2.0"
+name 'Azure Keypair'
+description 'General purpose key pairs'
+version '0.1'
+maintainer 'OneOps, Inc.'
+maintainer_email 'support@oneops.com'
+license 'Apache License, Version 2.0'
 
-depends          "azure_base"
+depends 'azure_base'
 
 grouping 'default',
          :access => "global",
@@ -25,5 +25,3 @@ attribute 'key_name',
               :category => '1.Global',
               :order => 6
           }
-
-

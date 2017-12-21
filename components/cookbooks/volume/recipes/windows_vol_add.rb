@@ -12,7 +12,7 @@ if (mount_point.nil? || mount_point.length > 1 || !reg_ex.match(mount_point))
 end
 
 #Determine which particular storage this volume depends on
-storage,device_maps = get_storage()
+storage,device_maps = get_storage(node)
 
 Chef::Log.info("Device map: #{device_maps}")
 

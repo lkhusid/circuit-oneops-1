@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+
+require '/opt/memcached/lib/memcache_stats'
+require '/opt/meghacache/lib/graphite_writer'
+require '/opt/meghacache/lib/telegraf_writer'
+require 'json'
+
+# OneOps variables
+oo_org = '<%= @oo_org %>'.gsub(/\./, '-')
+oo_assembly = '<%= @oo_assembly %>'.gsub(/\./, '-')
+oo_env = '<%= @oo_env %>'.gsub(/\./, '-')
+oo_platform = '<%= @oo_platform %>'.gsub(/\./, '-')
+oo_cloud = '<%= @oo_cloud %>'.gsub(/\./, '-')
+
+graphite_prefix = "<%= @graphite_prefix %>.#{oo_org}-#{oo_assembly}-#{oo_platform}"
+logfiles_path = '<%= @graphite_logfiles_path %>'
+graphite_servers = JSON.parse('<%= @graphite_servers %>')
+current_cloud_id = '<%= @current_cloud_id %>'
+
+# The list of "raw" stats we want
+memcached_stats = ['bytes', 'bytes_read', 'bytes_written', 'curr_connections', 'curr_items', 'limit_maxbytes']
+# The list of stats for which we want delta values (note--these don't have to match the stats list)
+memcached_delta_stats = ['cmd_get', 'cmd_set', 'evictions', 'get_hits', 'get_misses', 'bytes_read']
+
+
+ms = MemcacheStats.new('localhost', '<%= @memcached_port %>')
+ms.pstore_file = "graphite_memcached.pstore"
+
+begin
+    stat_hash = ms.get_stats(memcached_stats, memcached_delta_stats)
+    stat_hash['stats']['proc_status'] = '1'
+rescue MemcacheConnectionError
+    stat_hash = {
+        "stats" => Hash.new,
+        "delta" => Hash.new
+    }
+    stat_hash['stats']['proc_status'] = '0'
+end
+
+begin
+    tw = TelegrafWriter.new('memcached', logfiles_path)
+    tw.write_influx(stat_hash)
+rescue => e
+    puts e.message
+end
+
+begin
+    gw = GraphiteWriter.new(graphite_prefix, graphite_servers, oo_env, oo_cloud, logfiles_path, 'memcached_')
+    gw.open_tcp_sockets
+    gw.write_to_graphite(stat_hash)
+    gw.close_tcp_sockets
+rescue => e
+    puts e.message
+end
+
+# The list of "raw" stats we want
+mcrouter_stats = ['num_servers', 'num_servers_up', 'num_servers_down',
+            'num_suspect_servers', 'cmd_cas', 'cmd_delete',
+            'cmd_get', 'cmd_gets', 'cmd_set',
+            'duration_us', 'asynclog_requests', 'num_clients']
+# The list of stats for which we want delta values (note--these don't have to match the stats list)
+mcrouter_delta_stats = []
+
+ms = MemcacheStats.new('localhost', '<%= @mcrouter_port %>')
+ms.pstore_file = "graphite_mcrouter.pstore"
+
+begin
+    stat_hash = ms.get_stats(mcrouter_stats, mcrouter_delta_stats)
+    stat_hash['stats']['proc_status'] = '1'
+rescue MemcacheConnectionError
+    stat_hash = {
+        "stats" => Hash.new,
+        "delta" => Hash.new
+    }
+    stat_hash['stats']['proc_status'] = '0'
+end
+
+file = File.read('/etc/mcrouter/mcrouter.json')
+data_hash = JSON.parse(file)
+data_hash['pools'].select{ |k,v| k.start_with?('cloud-' + current_cloud_id)}.each_pair { |cloud_key, servers_hash|
+  servers_hash.each {|key, value| stat_hash['stats']['configured_pool_size'] = value.length }
+}
+
+begin
+    tw = TelegrafWriter.new('mcrouter', logfiles_path)
+    tw.write_influx(stat_hash)
+rescue => e
+    puts e.message
+end
+
+begin
+    gw = GraphiteWriter.new(graphite_prefix, graphite_servers, oo_env, oo_cloud, logfiles_path, 'mcrouter_')
+    gw.open_tcp_sockets
+    gw.write_to_graphite(stat_hash)
+    gw.close_tcp_sockets
+rescue => e
+    puts e.message
+end

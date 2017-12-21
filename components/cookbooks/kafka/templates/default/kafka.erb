@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# kafka: this shell script starts and stops the kafka service
+#
+# chkconfig: 2345 80 20
+#
+### INIT DETAILS
+# Provides: kafka
+# Required-Start: $network
+# Required-Stop: $network
+# Description: service setups the kafka service
+# Short-Description: start and stop kafka service
+###
+
+# Source init functions
+. /etc/rc.d/init.d/functions
+
+PUBSUB_DIR="/usr/local/kafka"
+CONFIG_DIR="/etc/kafka"
+PUBSUB_START_SCRIPT="$PUBSUB_DIR/bin/kafka-server-start.sh"
+PUBSUB_CONFIG="$CONFIG_DIR/server.properties"
+BROKER_CONFIG="$CONFIG_DIR/broker.properties"
+PUBSUB_LOG="/var/log/kafka/kafka.log"
+TEMP_PUBSUB_CONFIG="$CONFIG_DIR/pubsub.properties"
+KAFKA_USER="<%= node['kafka']['user'] %>"
+SASL_FLAG="<%= node['kafka']['enable_sasl_plain'] %>"
+
+export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:${CONFIG_DIR}/log4j.properties"
+export JMX_PORT="<%= node['kafka']['kafka_jmx_port'] %>"
+export KAFKA_HEAP_OPTS="-Xmx<%= @heap_size %>M -Xms<%= @heap_size %>M"
+export KAFKA_JVM_PERFORMANCE_OPTS="<%= @kafka_jvm_performance_opts %>"
+
+function setup() {
+    cp $PUBSUB_CONFIG $TEMP_PUBSUB_CONFIG
+    if [ -f "$BROKER_CONFIG" ]; then
+        cat $BROKER_CONFIG >> $TEMP_PUBSUB_CONFIG
+    fi
+    if [ "true" == "$SASL_FLAG" ]; then
+       export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
+    fi
+}
+
+# Lock and PID
+LOCK_FILE="/var/lock/subsys/kafka"
+PID_FILE="/var/run/kafka.pid"
+
+function start() {
+    setup
+    RETVAL="0"
+    echo "INFO: Starting kafka"
+    if ( isRunning ); then
+        echo "INFO: kafka already running"
+    else
+        rm -rf $PID_FILE $LOCK_FILE
+        su $KAFKA_USER $PUBSUB_START_SCRIPT $TEMP_PUBSUB_CONFIG > $PUBSUB_LOG 2>&1 &
+        if [ "$RETVAL" -eq "0" ]; then
+            psubpid=$!
+
+            sleep 10
+            ps -ef | grep -v grep |grep -q $psubpid
+            if [ $? -eq 0 ]; then
+               echo "INFO: Service kafka with process id $psubpid"
+               echo $psubpid > $PID_FILE
+               touch $LOCK_FILE 2>&1 || RETVAL="4"
+               echo "Started kafka; check logs at ${PUBSUB_LOG}"
+            else
+               echo "Kafka started.. then quit; please see <%= node['kafka']['syslog_dir'] %>/server.log for details."
+            fi
+        else
+           echo "Kafka start failed."
+        fi
+    fi
+}
+
+function stop() {
+    RETVAL="0"
+    echo "INFO: Stoping kafka"
+    if ( isRunning ); then
+        read psubpid < $PID_FILE
+        ps ax | grep -i 'kafka.Kafka' | grep -i $PUBSUB_DIR | awk '{print $1}' | xargs kill -15
+        if [ "$(ps --pid $psubpid | grep -c $psubpid )" -gt "0" ]; then
+            kill -15 $psubpid
+        fi
+        counter=0
+        ps -ef | grep -v grep | grep -q $psubpid
+
+        while [[ $? -eq 0 && ($counter -lt 120) ]]; do
+           sleep 1
+           counter=$((counter+1))
+           ps -ef | grep -v grep | grep -q $psubpid
+        done
+
+        if [ $counter -lt 300 ]; then
+           rm -rf $PID_FILE $LOCK_FILE
+           echo "INFO: Stopped kafka service"
+        else
+           echo "INFO: Kafka stop service invoked, but process was still running after 2 min"
+           echo "INFO: please manually check on the host for kafka server process status"
+        fi
+    else
+        echo "INFO: No process for kafka running currently"
+    fi
+}
+
+function status(){
+    if ( isRunning ); then
+        echo "INFO: Service kafka is running"
+        exit 0
+    else
+        echo "INFO: Service kafka not running"
+        exit 1
+    fi
+}
+
+function isRunning(){
+    if [ -f "${LOCK_FILE}" ]; then
+        if [ -f "${PID_FILE}" ]; then
+            read psubpid < $PID_FILE
+            if [ -d "/proc/${psubpid}" ]; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+function usage(){
+    echo "Usage: $0 {start|stop|status|restart}"
+}
+
+RETVAL="0"
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        stop
+        sleep 10
+        start
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+exit $RETVAL

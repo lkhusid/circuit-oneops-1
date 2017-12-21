@@ -1,0 +1,8 @@
+<%= @async_dir -%>/*.log{
+copytruncate
+daily
+size 50M
+rotate 8
+missingok
+maxage 7
+}

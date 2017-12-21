@@ -1,8 +1,7 @@
 include_pack "genericlb"
-
 name "tomcat"
 owner "brett.bourquin@walmartlabs.com"
-description "Provides a Tomcat Servlet Container to deploy java web workloads"
+description "Provides a Tomcat Servlet Container to deploy java web application workloads"
 version "1.1"
 type "Platform"
 category "Web Application"
@@ -10,14 +9,42 @@ category "Web Application"
 environment "single", {}
 environment "redundant", {}
 
+variable "groupId",
+         :description => 'Group Identifier',
+         :value => 'org.apache.brooklynn.example'
+
+variable "artifactId",
+         :description => 'Artifact Identifier',
+         :value => 'hello-world'
+
+variable "appVersion",
+         :description => 'Artifact version',
+         :value => '1.0.0'
+
+variable "extension",
+         :description => 'Artifact extension',
+         :value => 'war'
+
+variable "repository",
+         :description => 'Repository name',
+         :value => ''
+
+##SHA version of the artifact
+variable "shaVersion",
+         :description => 'Checksum for artifact download',
+         :value => ''
+
+#The deployment context which application teams can set
+variable "deployContext",
+         :description => 'The context in which the app needs to be deployed',
+         :value => 'ROOT'
+
 resource "tomcat",
   :cookbook => "oneops.1.tomcat",
   :design => true,
   :requires => {
       :constraint => "1..1",
-      :services=> "mirror"},
-   :attributes => {
-       'install_type' => 'binary'
+      :services=> "mirror",
    },
   :monitors => {
       'HttpValue' => {:description => 'HttpValue',
@@ -154,8 +181,15 @@ resource "artifact",
   :design => true,
   :requires => { "constraint" => "0..*", "services" => "*maven" },
   :attributes => {
+     :repository => '$OO_LOCAL{repository}',
+     :location => '$OO_LOCAL{groupId}:$OO_LOCAL{artifactId}:$OO_LOCAL{extension}',
+     :version => '$OO_LOCAL{appVersion}',
+     :install_dir => '/opt/tomcat7/$OO_LOCAL{artifactId}',
+     :as_user => 'tomcat',
+     :as_group => 'tomcat',
+     :restart => "execute \"rm -fr /opt/tomcat7/webapps/$OO_LOCAL{deployContext}\" \n\nlink \"/opt/tomcat7/webapps/$OO_LOCAL{deployContext}\" do \n  to \"/opt/tomcat7/$OO_LOCAL{artifactId}/current\" \nend \n\n"
+   },
 
-  },
   :monitors => {
          'URL' => {:description => 'URL',
                    :source => '',

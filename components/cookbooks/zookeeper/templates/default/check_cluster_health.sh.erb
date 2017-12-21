@@ -29,8 +29,12 @@ do
 		active_nodes="$active_nodes $ip(leader)"
 	elif [ "$srvrOut" == "observer" ]; then
 		not_used="true"
-    elif [ "$srvrOut" == "standalone" ]; then
-        num_active_nodes=$(($num_active_nodes+1))
+<% env=node.workorder.payLoad.has_key?('Environment') ? node.workorder.payLoad.Environment.first : nil %>
+<% if (env !=nil && env.has_key?('ciAttributes') && env["ciAttributes"].has_key?("profile") && env["ciAttributes"]["profile"].downcase != "prod") %>
+        ## for non-prod env, "standalone" for 1-node zookeeper could be considered as "OK" status
+        elif [ "$srvrOut" == "standalone" ]; then
+                num_active_nodes=$(($num_active_nodes+1))
+<% end %>
 	else
 		#"ERROR: $ip is not a leader, follower or an observer, but returned 'imok' response"
 		returnCode=0

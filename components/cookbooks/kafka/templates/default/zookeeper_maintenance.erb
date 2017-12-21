@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# placed here by chef.
+#
+
+SHELL=/bin/bash
+MAILTO=
+
+@daily root cd /usr/local/kafka/libs && /usr/bin/java -Dlog4j.configuration=file://<%= node['kafka']['zk_config_dir']  %>/log4j-zk.properties -cp zookeeper-3.4.6.jar:log4j-1.2.16.jar:conf:slf4j-log4j12-1.6.1.jar:slf4j-api-1.7.6.jar org.apache.zookeeper.server.PurgeTxnLog <%= node['kafka']['zk_install_dir'] %>/log/ <%= node['kafka']['zk_install_dir'] %>/data/ -n 5 1>/dev/null
+

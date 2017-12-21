@@ -1,0 +1,12 @@
+#!/bin/bash
+# compare broker IP from nginx config and broker IP from Zookeeper
+out=`python /etc/nginx/nginx_conf_sync_zk.py`
+ec=$?
+
+if [ $ec != 0 ]; then
+   echo "Nginx Config NOT Sync |up=0"
+else
+   echo "Nginx Config Sync |up=100"
+fi
+exit $?
+

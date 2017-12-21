@@ -17,7 +17,7 @@ bash "execute_RAID" do
 end
 
 storage = nil
-storage,device_maps = get_storage()
+storage,device_maps = get_storage(node)
 
 if !storage.nil?
   exit_with_error("Block storage is not supported with baremetal")

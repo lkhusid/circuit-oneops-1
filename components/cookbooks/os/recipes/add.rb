@@ -18,6 +18,7 @@
 
 cloud_name = node[:workorder][:cloud][:ciName]
 compute_service = node[:workorder][:services][:compute][cloud_name]
+cloud = node[:workorder][:services][:compute][cloud_name][:ciAttributes]
 provider = compute_service[:ciClassName].gsub("cloud.service.","").downcase
 Chef::Log.info("provider: #{provider} ..")
 node.set['cloud_provider'] = provider
@@ -32,6 +33,14 @@ if (ostype =~ /ubuntu-16.04/)
   `sudo gem uninstall json -v 1.8.6`
 end
 
+# detect fast image
+if ostype !~ /windows/ && File.exist?("/etc/oneops-tools-inventory.yml")
+  Chef::Log.info('Fast image detected')
+  node.set['fast_image'] = true
+else
+  Chef::Log.debug('No fast image detected')
+  node.set['fast_image'] = false
+end
 
 #Symlinks for windows
 if ostype =~ /windows/
@@ -105,10 +114,20 @@ if ostype =~ /windows/
 end
 
 #Perform non-windows recipes
-# common plugins dir that components put their check scripts
-execute "mkdir -p /opt/nagios/libexec"
 
-include_recipe "os::packages"
+if !node['fast_image']
+  # common plugins dir that components put their check scripts
+  directory '/opt/nagios/libexec' do
+    owner 'root'
+    group 'root'
+    mode '0755'
+    recursive true
+    action :create
+  end
+
+  include_recipe "os::packages"
+end
+
 include_recipe "os::network"
 include_recipe "os::proxy"
 include_recipe "os::kernel" unless provider == "docker"
@@ -158,7 +177,12 @@ else
 end
 
 # sshd
-execute "cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup"
+file '/etc/ssh/sshd_config.backup' do
+  mode 0644
+  owner 'root'
+  group 'root'
+  content ::File.open('/etc/ssh/sshd_config').read
+end
 
 template "/etc/ssh/sshd_config" do
   cookbook "os"
@@ -185,18 +209,19 @@ ruby_block 'ssh config' do
   end
 end
 
-Chef::Log.info("Updating security and bash.")
 
-package "bash" do
-  action :upgrade
-end
+if !node['fast_image']
+  Chef::Log.info("Updating security and bash.")
+  package "bash" do
+    action :upgrade
+  end
 
-case node.platform
-when "redhat","centos","fedora"
-  if node.platform_version.to_i < 7
-    package "yum-security"
-    execute "yum -y update --security"
+  case node.platform
+  when "redhat","centos","fedora"
+    if node.platform_version.to_i < 7
+      package "yum-security"
+      execute "yum -y update --security"
+    end
   end
 end
-
 include_recipe "os::postfix" unless provider == "docker"

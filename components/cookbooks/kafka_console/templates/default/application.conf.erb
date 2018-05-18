@@ -9,7 +9,7 @@
 # The secret key is used to secure cryptographics functions.
 # If you deploy your application to several instances be sure to use the same key!
 play.crypto.secret="^<csmm5Fx4d=r2HEX8pelM3iBkFVv?k[mc;IZE<_Qoq8EkX_/7@Zt6dP05Pzea3U"
-play.crypto.secret=${?APPLICATION_SECRET}
+#play.crypto.secret=${?APPLICATION_SECRET}
 
 # The application languages
 # ~~~~~
@@ -27,7 +27,7 @@ application.features=<%= node["kafka_console"]["app_features"] %>
 
 akka {
 loggers = ["akka.event.slf4j.Slf4jLogger"]
-loglevel = "WARN"
+loglevel = "WARNING"
 }
 
 

@@ -1,8 +1,5 @@
 #!/bin/sh
 
-exec 2>/app/get_concord_status.out
-set -xv
-
 if [ -z $playbook ]
 then
   echo "Must have environment variable 'playbook', otherwise this will fail. Exiting with Failure."

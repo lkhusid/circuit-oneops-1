@@ -57,4 +57,9 @@ attribute 'inbound',
     :order => 1
   }
 
+attribute 'net_sec_group_id',
+  :description => "Net Sec Group ID",
+  :data_type => "text",
+  :default => ""
+
 recipe "repair", "Repair Secgroup"

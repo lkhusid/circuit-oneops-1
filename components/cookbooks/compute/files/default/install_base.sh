@@ -27,24 +27,115 @@ set_env()
         misc_proxy=${ARG/misc:/}
         echo "exporting misc_proxy=$misc_proxy"
         export misc_proxy=$misc_proxy
+      elif [[ $ARG == ruby_binary_path:* ]] ; then
+        echo "setting ruby_binary_path to $ARG"
+        ruby_binary_path=${ARG/ruby_binary_path:/}
+      elif [[ $ARG == ruby_binary_version:* ]] ; then
+        echo "setting ruby_binary_version to $ARG"
+        ruby_binary_version=${ARG/ruby_binary_version:/}
       fi
     done
 }
 
+install_base_centos()
+{
+  yum -d0 -e0 -y install sudo file make gcc gcc-c++ glibc-devel libgcc libxml2-devel libxslt-devel perl libyaml perl-Digest-MD5 nagios nagios-devel nagios-plugins
+  if [ "$major" -lt 7 ] ; then
+    yum -d0 -e0 -y install parted
+  fi
+}
+
+install_ruby_centos()
+{
+  if [ "$cloud_provider" == "azure" ] && [ "$major" -lt 7 ] && [ ! -n "$ruby_binary_path" ]; then
+    echo "Centos 6.x VMs on Azure clouds require Ruby 2.0.0"
+    echo "Please add ruby_binary_path env variable in compute cloud service"
+    exit 1
+  fi
+
+  # installing ruby 2.0.0 from a binary for CentOs 6.x if env variable is there
+  if [ "$major" -lt 7 ] && [ -n "$ruby_binary_path" ] ; then
+    install_ruby_binary_if_not_installed
+  else
+    yum -d0 -e0 -y install ruby ruby-libs ruby-devel ruby-rdoc rubygems
+  fi
+}
+
+install_ruby_binary_if_not_installed()
+{
+  if ! is_ruby_exists; then
+    install_ruby_binary
+  else
+    ver=`get_ruby_version`
+    if [ "$ver" != "$ruby_binary_version" ] ; then
+      yum remove -y ruby
+      install_ruby_binary
+    fi
+  fi
+}
+
+is_ruby_exists()
+{
+  ruby -v > /dev/null 2>&1
+  if [ "$?" == "0" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+get_ruby_version()
+{
+  #this assumes ruby is already installed and returns the currently installed ruby version
+  echo `ruby -e 'print "#{RUBY_VERSION}"'`
+}
+
+install_ruby_binary()
+{
+    wget -q -O ruby-binary.tar.gz $ruby_binary_path
+    tar zxf ruby-binary.tar.gz --strip-components 1 -C /usr
+    rm -f ruby-binary.tar.gz
+}
+
+set_gem_source()
+{
+  proxy_exists=`gem source | grep $rubygems_proxy | wc -l`
+  if [ $proxy_exists == 0 ] ; then
+    echo "adding $rubygems_proxy to gem sources"
+    gem source --add $rubygems_proxy
+    remove_source http://rubygems.org/
+    remove_source https://rubygems.org/
+  fi
+}
+
+remove_source()
+{
+  gem_source="$1"
+  default_exists=`gem source | grep $gem_source | wc -l`
+  if [ $rubygems_proxy != $gem_source ] && [ $default_exists != 0 ] ; then
+    echo "removing $gem_source from source list"
+    gem source --remove $gem_source
+  fi
+}
+
+downgrade_rubygems()
+{
+  #downgrading rubygems to 1.8.25 because of compatibility issues with rubygems 2.0 and chef 11.4.0
+  #https://discourse.chef.io/t/rubygems-format-loaderror/3677/2
+  rubygems_ver=$((echo "1.8.26" && gem -v) | sort -V | head -n 1)
+  if [ $rubygems_ver == "1.8.26" ]; then
+    echo "Downgrading rubygems..."
+    gem update --system 1.8.25 --no-ri --no-rdoc --quiet
+  fi
+}
+
 set_env $@
 
-
-
-
 set -e
-
 if ! [ -e /etc/ssh/ssh_host_dsa_key ] ; then
   echo "generating host ssh keys"
   /usr/bin/ssh-keygen -A
 fi
-
-# function call
-# get_proxy
 
 # setup os release variables
 echo "Install ruby and bundle."
@@ -64,14 +155,16 @@ if [ -e /etc/SuSE-release ] ; then
 
 # redhat / centos
 elif [ -e /etc/redhat-release ] ; then
-  echo "installing ruby, libs, headers and gcc"
-  yum -d0 -e0 -y install sudo file make gcc gcc-c++ glibc-devel libgcc ruby ruby-libs ruby-devel libxml2-devel libxslt-devel ruby-rdoc rubygems perl perl-Digest-MD5 nagios nagios-devel nagios-plugins
+  release=$(cat /etc/redhat-release | grep -o '[0-9]\.[0-9]')
+  major=${release%.*}
+  install_base_centos
+  install_ruby_centos
 
   # disable selinux
   if [ -e /selinux/enforce ]; then
     echo 0 >/selinux/enforce
     echo "SELINUX=disabled" >/etc/selinux/config
-	echo "SELINUXTYPE=targeted" >>/etc/selinux/config
+    echo "SELINUXTYPE=targeted" >>/etc/selinux/config
   fi
 
   # allow ssh sudo's w/out tty
@@ -81,128 +174,84 @@ elif [ -e /etc/redhat-release ] ; then
 
 else
 # debian
-	export DEBIAN_FRONTEND=noninteractive
-	echo "apt-get update ..."
-	apt-get update >/dev/null 2>&1
-	if [ $? != 0 ]; then
-	   echo "apt-get update returned non-zero result code. Usually means some repo is returning a 403 Forbidden. Try deleting the compute from providers console and retrying."
-	   exit 1
-	fi
-	apt-get install -q -y build-essential make libxml2-dev libxslt-dev libz-dev ruby ruby-dev nagios3
-	
-	# seperate rubygems - rackspace 14.04 needs it, aws doesn't
-	set +e
-	apt-get -y -q install rubygems-integration
-	rm -fr /etc/apache2/conf.d/nagios3.conf
-	set -e
+  export DEBIAN_FRONTEND=noninteractive
+  echo "apt-get update ..."
+  apt-get update >/dev/null 2>&1
+  if [ $? != 0 ]; then
+    echo "apt-get update returned non-zero result code. Usually means some repo is returning a 403 Forbidden. Try deleting the compute from providers console and retrying."
+    exit 1
+  fi
+  apt-get install -q -y build-essential make libxml2-dev libxslt-dev libz-dev ruby ruby-dev nagios3
+
+  # seperate rubygems - rackspace 14.04 needs it, aws doesn't
+  set +e
+  apt-get -y -q install rubygems-integration
+  rm -fr /etc/apache2/conf.d/nagios3.conf
+  set -e
 fi
 
 me=`logname`
-base_path="/home/$me"
-
-if [ "$me" == "root" ] ; then
-  base_path="/root"
-fi
-local_gems="$base_path/shared/cookbooks/vendor/cache/"
 
 set +e
-gem source | grep $local_gems
-if [ $? != 0 ]; then
-  gem source --add file://$local_gems
-  gem source --remove 'http://rubygems.org/'
-  gem source
-fi
 
+#set gem source from compute env variable
 if [ -n "$rubygems_proxy" ]; then
-  proxy_exists=`gem source | grep $rubygems_proxy | wc -l`
-  if [ $proxy_exists == 0 ] ; then
-    gem source --remove $rubygems_proxy
-    gem source --remove 'http://rubygems.org/'
-    gem source --remove 'https://rubygems.org/'
-    gem source
-  fi
+  set_gem_source
 else
   rubygems_proxy="https://rubygems.org"
 fi
-
-cd $local_gems
+mkdir -p -m 755 /opt/oneops
+echo "$rubygems_proxy" > /opt/oneops/rubygems_proxy
 
 if [ -e /etc/redhat-release ] ; then
-	# needed for rhel >= 7
-	gem update --system 1.8.25
-   if [ $? -ne 0 ]; then
-     gem source --remove file://$local_gems
-     gem source --add $rubygems_proxy
-     set -e
-     gem update --system 1.8.25
-     set +e
-   fi	
+  downgrade_rubygems
 fi
 
 gem_version="1.7.7"
 grep 16.04 /etc/issue
-if [ $? -eq 0 ]
-then
+if [ $? -eq 0 ]; then
   gem_version="2.0.2"
 fi
 
-gem install json --version $gem_version --no-ri --no-rdoc
+gem install json --version $gem_version --no-ri --no-rdoc --quiet
 if [ $? -ne 0 ]; then
-    echo "gem install using local repo failed. reverting to rubygems proxy."
-    gem source --add $rubygems_proxy
-    gem source --remove file://$local_gems
-    gem source --remove 'http://rubygems.org/'
-    gem source
-    gem install json --version $gem_version --no-ri --no-rdoc
-    if [ $? -ne 0 ]; then
-      echo "could not install json gem"
-      exit 1
-    fi
+  echo "could not install json gem, version $gem_version"
 fi
 
-set -e
-gem install bundler --bindir /usr/bin --no-ri --no-rdoc
+#set -e
+bundler_installed=$(gem list ^bundler$ -i)
+if [ $bundler_installed != "true" ]; then
+  echo "Installing bundler..."
+  ver=$((echo "1.8.25" && gem -v) | sort -V | head -n 1)
+  if [ $ver != '1.8.25' ]; then
+    gem install bundler -v 1.15.4 --bindir /usr/bin --no-ri --no-rdoc --quiet
+  else
+    gem install bundler --bindir /usr/bin --no-ri --no-rdoc --quiet
+  fi
+fi
 
-mkdir -p /opt/oneops
-echo "$rubygems_proxy" > /opt/oneops/rubygems_proxy
-
-set +e
+#set +e
 perl -p -i -e 's/ 00:00:00.000000000Z//' /var/lib/gems/*/specifications/*.gemspec 2>/dev/null
 
 # oneops user
 grep "^oneops:" /etc/passwd 2>/dev/null
 if [ $? != 0 ] ; then
-    set -e
-	echo "*** ADD oneops USER ***"
+  set -e
+  echo "*** ADD oneops USER ***"
 
-	# create oneops user & group - deb systems use addgroup
-	if [ -e /etc/lsb-release] ] ; then
-		addgroup oneops
-	else
-		groupadd oneops
-	fi
+  # create oneops user & group - deb systems use addgroup
+  if [ -e /etc/lsb-release] ] ; then
+    addgroup oneops
+  else
+    groupadd oneops
+  fi
 
-	useradd oneops -g oneops -m -s /bin/bash
-	echo "oneops   ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers
+  useradd oneops -g oneops -m -s /bin/bash
+  echo "oneops   ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers
 else
-	echo "oneops user already there..."
+  echo "oneops user already there..."
 fi
 
-echo "Gem settings for oneops user. ruby gem source is $rubygems_proxy"
-su - oneops <<EOF
-for ARG in "$@"
-do
-    $(set_env $@)
-done
-if [ -n "$rubygems_proxy" ]; then
-    gem source --add $rubygems_proxy
-    gem source --remove 'http://rubygems.org/'
-    gem source --remove 'https://rubygems.org/'
-    gem source
-fi
-set -e
-gem install bundler --no-ri --no-rdoc
-EOF
 set -e
 
 # ssh and components move
@@ -225,7 +274,9 @@ if [ -e /etc/SuSE-release ] ; then
   me_group="users"
 fi
 
-pwd
+# Configure gem sources for oneops user
+\cp ~/.gemrc /home/oneops/
+
 # gets rid of the 'only use ec2-user' ssh response
 sed -e 's/.* ssh-rsa/ssh-rsa/' .ssh/authorized_keys > .ssh/authorized_keys_
 mv .ssh/authorized_keys_ .ssh/authorized_keys
@@ -246,7 +297,16 @@ if [ "$me" == "idcuser" ] ; then
   openssl rand -base64 12 | passwd oneops --stdin
 fi
 
-mkdir -p /opt/oneops/workorder /etc/nagios/conf.d /var/log/nagios
-rsync -a $home_dir/circuit-oneops-1 /home/oneops/
-rsync -a $home_dir/shared /home/oneops/
-chown -R oneops:oneops /home/oneops /opt/oneops
+mkdir -p -m 750 /etc/nagios/conf.d
+mkdir -p -m 755 /opt/oneops/workorder
+mkdir -p -m 750 /var/log/nagios
+
+# On touch update; chown will break nagios if monitor cookbook does not run.
+# Still need to chown a few directories
+owner=$( ls -ld /opt/oneops/rubygems_proxy | awk '{print $3}' )
+if [ "$owner" == "root" ] ; then
+  chown -R oneops:oneops /home/oneops /opt/oneops
+  chown -R nagios:nagios /etc/nagios /var/log/nagios /etc/nagios/conf.d
+else
+  chown -R oneops:oneops /home/oneops/.ssh /opt/oneops/workorder /opt/oneops/rubygems_proxy
+fi

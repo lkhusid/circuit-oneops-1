@@ -14,7 +14,16 @@ else
   $node_wo ||= ::JSON.parse(File.read('/tmp/serverspec/node.json'))
 end
 
-set :path, '/sbin:/usr/local/sbin:/usr/sbin:$PATH' unless os[:family] == 'windows'
+#Renaming ci attribute (AO) to rfcCi (WO), so when testing Action Orders we can re-use tests cases written for Work Orders
+$node_wo['workorder']['rfcCi'] = $node_wo['workorder'].delete('ci') if $node_wo['workorder'].has_key?('ci')
+
+
+custom_ruby_bindir = '/home/oneops/ruby/2.0.0-p648/bin'
+if os[:family] != 'windows' && File.exist?("#{custom_ruby_bindir}/chef-solo")
+  set :path, "#{custom_ruby_bindir}:/sbin:/usr/local/sbin:/usr/sbin:$PATH"
+else
+  set :path, '/sbin:/usr/local/sbin:/usr/sbin:$PATH' unless os[:family] == 'windows'
+end
 
 require 'chef'
 

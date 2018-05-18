@@ -47,7 +47,7 @@ template "mcrouter_service" do
   source "mcrouter.erb"
   owner "root"
   group "root"
-  mode "0755"
+  mode "0644"
   variables(
       :cli_opts => cli_opts,
       :mcrouter_user => ci['user'],

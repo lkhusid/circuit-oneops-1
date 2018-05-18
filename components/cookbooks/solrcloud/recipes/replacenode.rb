@@ -2,20 +2,34 @@
 # Cookbook Name :: solrcloud
 # Recipe :: replacenode.rb
 #
-# The recipe adds the replaced node to few shards based on the max no of shards per node and joins the node to the cluster.
+# The recipe adds the replaced node to the shard with the fewest replicas, tie-breaking on the lowest shard number.
 #
 
-require 'open-uri'
-require 'json'
-require 'uri'
+extend SolrCloud::Util
 
-include_recipe 'solrcloud::default'
+# Wire solrcloud util to chef resources.
+Chef::Resource::RubyBlock.send(:include, SolrCloud::Util)
+
+# Add the new replaced node to the solr cluster without affecting the cluster status
+ruby_block "replace_node" do
+  block do
+    if node.has_key?("old_node_ip") && !node["old_node_ip"].empty?
+      Chef::Log.info("The compute IP address changed from Old IP #{node["old_node_ip"]} to #{node['ipaddress']}, will start with retain_replicas_on_node option.")
+      retain_replicas_on_node(node["old_node_ip"])
+    end
+  end
+end
+
+
+
+# ############################################################################################################
+
+# Un-used logic in replace
 
 ci = node.workorder.rfcCi.ciAttributes;
 
 join_replace_node = ci['join_replace_node']
 collection_list = ci['collection_list']
-
 
 if (join_replace_node == 'true')
 
@@ -47,6 +61,7 @@ if (join_replace_node == 'true')
           time = Time.now.getutc.to_i
           shardToReplicaCountMap = Hash.new()
 
+          # Create a map with shard name and replica count and sort by name and count.
           shardList.each do |shard|
             shardstate = jsonresponse["cluster"]["collections"]["#{collection_name}"]["shards"][shard]["state"]
             if shardstate == "active"
@@ -56,6 +71,8 @@ if (join_replace_node == 'true')
           end
           shardToReplicaCountMap = shardToReplicaCountMap.sort_by { |name, count| count }
 
+          # Repeat the below step based on the maxShardsPerNode value and add the node as a replica.
+          # Select the first shard from the map which has lowest no of replicas.
           for i in 1..Integer(maxShardsPerNode)
             shard = shardToReplicaCountMap[i - 1][0]
             begin
@@ -71,12 +88,12 @@ if (join_replace_node == 'true')
         end
       end
 
-      if (node['solr_version'].start_with? "5.") || (node['solr_version'].start_with? "6.")
+      if (node['solr_version'].start_with? "5.") || (node['solr_version'].start_with? "6.") || (node['solr_version'].start_with? "7.")
 
         request_url = "http://#{node['ipaddress']}:#{node['port_no']}/"+"#{node['aliases_uri_v6']}"
         Chef::Log.info("#{request_url}")
         response = open(request_url).read
-        jsonresponse = JSON.parse(response)        
+        jsonresponse = JSON.parse(response)
 
         aliasMap = JSON.parse(jsonresponse["znode"]["data"])
         if !"#{aliasMap}".empty?
@@ -101,6 +118,7 @@ if (join_replace_node == 'true')
           shardList = res["shards"].keys
           shardToReplicaCountMap = Hash.new()
 
+          # Create a map with shard name and replica count and sort by name and count.
           shardList.each do |shard|
             shardstate = res["shards"][shard]["state"]
             if shardstate == "active"
@@ -111,6 +129,8 @@ if (join_replace_node == 'true')
 
           shardToReplicaCountMap = shardToReplicaCountMap.sort_by { |name, count| count }
 
+          # Repeat the below step based on the maxShardsPerNode value and add the node as a replica.
+          # Select the first shard from the map which has lowest no of replicas.
           for i in 1..Integer(maxShardsPerNode)
             shard = shardToReplicaCountMap[i - 1][0]
             begin

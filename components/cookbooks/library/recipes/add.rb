@@ -31,7 +31,7 @@ end
 
 def is_valid_arch (a)
   valid = false
-  if a =~ /noarch|i386|x86_64/
+  if a =~ /noarch|i386|x86_64|i686/
     valid = true
   end
   return valid

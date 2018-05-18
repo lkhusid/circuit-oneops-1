@@ -1,4 +1,3 @@
-require 'azure_mgmt_resources'
 require File.expand_path('../../libraries/logger.rb', __FILE__)
 
 module Utils
@@ -47,24 +46,27 @@ module Utils
     end
   end
 
-  def get_component_name(type, ciId)
+  def get_component_name(type, ciId, platform_ci_id = nil)
     ciId = ciId.to_s
+    unless platform_ci_id.nil?
+      return "nic-#{platform_ci_id}-#{ciId}" if type == "nic"
+    end
     if type == "nic"
-      return "nic-"+ciId
+      return "nic-" + ciId
     elsif type == "publicip"
-      return "publicip-"+ciId
+      return "publicip-" + ciId
     elsif type == "privateip"
-      return "nicprivateip-"+ciId
+      return "nicprivateip-" + ciId
     elsif type == "lb_publicip"
-      return "lb-publicip-"+ciId
+      return "lb-publicip-" + ciId
     elsif type == "ag_publicip"
-      return "ag_publicip-"+ciId
+      return "ag_publicip-" + ciId
     end
   end
 
   def get_dns_domain_label(platform_name, cloud_id, instance_id, subdomain)
     subdomain = subdomain.gsub(".", "-")
-    return (platform_name+"-"+cloud_id+"-"+instance_id.to_s+"-"+subdomain).downcase
+    return (platform_name + "-" + cloud_id + "-" + instance_id.to_s + "-" + subdomain).downcase
   end
 
   # this is a static method to generate a name based on a ciId and location.
@@ -107,7 +109,7 @@ module Utils
       when 'westus'
         abbr = 'wus'
       when 'ukwest'
-        abbr ='wuk'
+        abbr = 'wuk'
       when 'uksouth'
         abbr = 'suk'
       else
@@ -120,7 +122,7 @@ module Utils
 
     OOLog.info("Getting Fault Domain: #{region}")
 # when new region added to oneops this fault domains needs to be updated
-    fault_domains = {:eastus2 => 3, :southcentralus => 3, :eastasia => 2, :japaneast => 2, :default => 2}
+    fault_domains = {:eastus2 => 3, :southcentralus => 3, :westus => 3, :japanwest => 2, :japaneast => 2, :ukwest => 2, :uksouth => 2, :eastasia => 2, :default => -1}
 
     OOLog.info("Finished Fault Domain: #{region}")
     return fault_domains[region.to_sym].nil? ? fault_domains['default'.to_sym] : fault_domains[region.to_sym]
@@ -132,19 +134,78 @@ module Utils
   end
 
   def get_resource_tags(node)
+
     tags = {}
 
-    org_tags = JSON.parse(node['workorder']['payLoad']['Organization'][0]['ciAttributes']['tags'])
-    assembly_tags = JSON.parse(node['workorder']['payLoad']['Assembly'][0]['ciAttributes']['tags'])
+    azuretagkeys = ["applicationname", "notificationdistlist", "costcenter", "platform", "deploymenttype", "environmentinfo", "sponsorinfo", "ownerinfo"]
+
+    org_tags = JSON.parse(node['workorder']['payLoad']['Organization'][0]['ciAttributes']['tags']).select {|k, v| azuretagkeys.include?(k)}
+    assembly_tags = JSON.parse(node['workorder']['payLoad']['Assembly'][0]['ciAttributes']['tags']).select {|k, v| azuretagkeys.include?(k)}
     assembly_owner_tag = node['workorder']['payLoad']['Assembly'][0]['ciAttributes']["owner"] || "Unknown"
 
     tags.merge!(org_tags)
     tags.merge!(assembly_tags)
     tags['owner'] = assembly_owner_tag
-    
+
     return tags
   end
 
+  def is_new_cloud(node)
+    cloud_name = node['workorder']['cloud']['ciName']
+    cloud_name =~ /^(dev|prod|stg)-az-(\S*)-\d*$/ ? true : false
+  end
+
+  def get_nsg_rg_name(location)
+    "#{location.upcase}_NSGs_RG"
+  end
+
+  def get_nsg_name(node)
+    "#{get_pack_name(node)}_nsg_v#{current_time}"
+  end
+
+  def get_pack_name(node)
+    node['workorder']['box']['ciAttributes']['pack']
+  end
+
+  def current_time
+    time = Time.now.to_f.to_s
+    time.split(/\W+/).join
+  end
+
+  # This method is to get the resource group for action work orders
+  def get_resource_group(node, org, assembly, platform_ciID, environment, location, environment_ciID)
+
+    new_cloud = is_new_cloud(node)
+    OOLog.info("Resource Group org: #{org}")
+    OOLog.info("Resource Group assembly: #{assembly}")
+    OOLog.info("Resource Group Environment: #{environment}")
+    OOLog.info("Resource Group location: #{location}")
+
+    if new_cloud
+
+      OOLog.info("Resource Group Environment ci ID: #{environment_ciID}")
+
+      resource_group_name = org[0..15] + '-' +
+          assembly[0..15] + '-' +
+          environment_ciID.to_s + '-' +
+          environment[0..15] + '-' +
+          Utils.abbreviate_location(location)
+
+    else
+
+      OOLog.info("Resource Group Platform ci ID: #{platform_ciID}")
+
+      resource_group_name = org[0..15] + '-' +
+          assembly[0..15] + '-' +
+          platform_ciID.to_s + '-' +
+          environment[0..15] + '-' +
+          Utils.abbreviate_location(location)
+    end
+    OOLog.info("Resource Group Name is: #{resource_group_name}")
+    OOLog.info("Resource Group Name Length: #{resource_group_name.length}")
+
+    resource_group_name
+  end
 
   module_function :get_credentials,
                   :set_proxy,
@@ -154,6 +215,11 @@ module Utils
                   :abbreviate_location,
                   :get_fault_domains,
                   :get_update_domains,
-                  :get_resource_tags
+                  :get_resource_tags,
+                  :is_new_cloud,
+                  :get_resource_group,
+                  :get_nsg_rg_name,
+                  :get_nsg_name,
+                  :get_pack_name
 
-end
+  end

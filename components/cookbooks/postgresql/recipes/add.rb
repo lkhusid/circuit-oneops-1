@@ -64,8 +64,14 @@ is_hot_standby = false
 master_payload = nil
 
 # install the gem pg
-execute "sudo /usr/bin/gem install pg -v 0.17.1 --no-rdoc --no-ri -- --with-pg-config=/usr/pgsql-#{node[:postgresql][:version]}/bin/pg_config"
-
+if File.exist?("/etc/oneops-tools-inventory.yml")
+  Chef::Log.info('Fast image detected')
+  execute "yum groupinstall -y 'development tools'"
+  execute "sudo /home/oneops/ruby/2.0.0-p648/bin/gem install pg -v 0.17.1 --no-rdoc --no-ri -- --with-pg-config=/usr/pgsql-#{node[:postgresql][:version]}/bin/pg_config"
+else
+  Chef::Log.debug('No fast image detected')
+  execute "sudo /usr/bin/gem install pg -v 0.17.1 --no-rdoc --no-ri -- --with-pg-config=/usr/pgsql-#{node[:postgresql][:version]}/bin/pg_config"
+end
 
 # standby instances will have a master payload 
 # redundant needs a different payload due to lb

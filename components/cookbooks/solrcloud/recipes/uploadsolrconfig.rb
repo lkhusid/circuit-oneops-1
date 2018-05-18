@@ -2,51 +2,60 @@
 # Cookbook Name :: solrcloud
 # Recipe :: uploadsolrconfig.rb
 #
-# The recipe downloads the custom config from nexus and uploads to Zookeeper.
+# The recipe downloads the custom config from given url and uploads to Zookeeper.
 #
 
 
 include_recipe 'solrcloud::default'
 
 extend SolrCloud::Util
-
-# Wire java util to chef resources.
+# Wire SolrCloud util to chef resources.
 Chef::Resource::RubyBlock.send(:include, SolrCloud::Util)
 
+
 args = ::JSON.parse(node.workorder.arglist)
-customConfigJar = args["CustomConfigJar"]
-customConfigName = args["CustomConfigName"]
+custom_config_nexus_path = args["custom_config_nexus_path"]
+config_name = args["config_name"]
 
 
-config_dir = '';
-config_jar = '';
-solr_config = node['user']['dir']+"/solr-config";
 
 
-if (node['solr_version'].start_with? "5.") || (node['solr_version'].start_with? "6.")
+
+if not node['solr_version'].start_with? "4."
   solr_config = node['user']['dir']+"/solr-config"+node['solr_version'][0,1];
 end
 
 
-if !customConfigJar.empty?
-	if customConfigJar.include? "jar"
-  		config_dir = customConfigJar.split("/").last.split(".jar").first;
-	  	if !config_dir.empty?
-	    	config_jar = "#{config_dir}"+".jar";
-	  	end
-	end
+if !custom_config_nexus_path.empty?
+  if custom_config_nexus_path.include? "jar"
+    config_dir = custom_config_nexus_path.split("/").last.split(".jar").first;
+    if !config_dir.empty?
+      config_jar = "#{config_dir}"+".jar";
+    end
+  else
+    raise "Configuration jar file name is missing in the given path -- #{custom_config_nexus_path}."
+  end
+else
+  raise "Required parameter (custom_config_nexus_path) is missing."
 end
-
 
 zkhost = node['zk_host_fqdns']
-
-if (!customConfigName.empty?) && (!config_jar.empty?)
-
-  extractCustomConfig(solr_config,config_jar,customConfigJar)
-
-  downloadconfig(node['solr_version'],"#{zkhost}",customConfigName)
-  uploadprodconfig(node['solr_version'],"#{zkhost}",customConfigName)
+customdir = "custom-tmp-dir"
+custom_dir_full_path = "#{solr_config}"+"/#{customdir}"
+if (!"#{config_name}".empty?) && (!"#{config_jar}".empty?)
+  remote_file "#{solr_config}/#{config_jar}" do
+    source custom_config_nexus_path
+    owner "app"
+    group "app"
+    mode '0777'
+  end
+  extractCustomConfig(solr_config, config_jar, custom_config_nexus_path, customdir)
+  ruby_block 'validate_solr_config' do
+    block do
+      validate_and_upload_config_jar_contents(custom_dir_full_path, config_name)
+    end
+  end
+else
+  raise "Required parameter (config_name) is missing."
 end
-
-
 

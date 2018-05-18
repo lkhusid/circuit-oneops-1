@@ -20,18 +20,6 @@ attribute 'clustername',
     :order => 1
   }
 
-
-attribute 'artifactversion',
-  :description => 'Artifact Version in Nexus',
-  :required => 'required',
-  :default => 'LATEST-RELEASE',
-  :format => {
-    :help => 'Artifact Version in Nexus http://gec-maven-nexus.walmart.com/nexus/content/repositories/pangaea_releases/com/walmart/platform/mysql/mysql-agent/',
-    :category => '1.Global',
-    :order => 1
-}
-
-
 attribute 'drclouds',
 :description => 'DR Clouds',
 :default => '',
@@ -40,7 +28,6 @@ attribute 'drclouds',
     :category => '1.Global',
     :order => 1
 }
-
 
 attribute 'cloudrdbmspackversion',
 :description => 'Cloud RDBMS Pack Version',

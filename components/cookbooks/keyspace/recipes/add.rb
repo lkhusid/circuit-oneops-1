@@ -45,7 +45,7 @@ template create_keyspace_file do
   source "create_keyspace.erb"
 end
 
-execute "/opt/cassandra/bin/cqlsh #{ip} -u #{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].username} -p '#{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].password}' -f #{create_keyspace_file}" do
+execute "/opt/cassandra/bin/cqlsh #{ip} -u '#{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].username}' -p '#{node.workorder.payLoad.Keyspace_Cassandra[0][:ciAttributes].password}' -f #{create_keyspace_file}" do
   sensitive true
   returns [0]
 end

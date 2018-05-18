@@ -22,7 +22,11 @@ else
   win_service_display_name = windows_service.service_display_name
 end
 
+failure_actions = [ windows_service.first_failure , windows_service.second_failure , windows_service.subsequent_failure]
 service_dependencies = ( windows_service.dependencies.nil? ||  windows_service.dependencies.empty? ) ? nil : JSON.parse(windows_service.dependencies)
+reset_fail_counter = windows_service.reset_fail_counter.to_i * 24 * 60 * 60
+restart_service_after = windows_service.restart_service_after.to_i * 60 * 1000
+
 windowsservice windows_service.service_name do
   action [:create, :update]
   service_name windows_service.service_name
@@ -32,6 +36,10 @@ windowsservice windows_service.service_name do
   dependencies service_dependencies
   username user_name
   password windows_service.password
+  failure failure_actions
+  reset_fail_counter  reset_fail_counter
+  restart_service_after restart_service_after
+  command windows_service.command
 end
 
 include_recipe 'windowsservice::restart_service'

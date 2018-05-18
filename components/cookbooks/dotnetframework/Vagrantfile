@@ -1,7 +1,7 @@
 #VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure("2") do |config|
-  config.vm.box = 'win2016chef12118'
+  config.vm.box = 'windows2016'
   config.vm.guest = :windows
 
   config.vm.provider "virtualbox" do |v|
@@ -23,7 +23,10 @@ Vagrant.configure("2") do |config|
     chef.json = {
       "dotnetframework": {
         "dotnet_version_package_name": "{ \".Net 4.6\":\"dotnet4.6\", \".Net 3.5\":\"dotnet3.5\" }",
-        "chocolatey_package_source": "https://chocolatey.org/api/v2/"
+        "chocolatey_package_source": "https://chocolatey.org/api/v2/",
+        "dotnet_core_package_name": "dotnetcore-windowshosting",
+        "install_dotnetcore": "true",
+        "dotnet_core_version": '["2.0.5"]'
       },
       "workorder": {
         "services": {
@@ -33,8 +36,25 @@ Vagrant.configure("2") do |config|
                 "mirrors": "{ \"chocolatey-repo\":\"http://chocodev.cloud.com/chocolatey\"}"
               }
             }
-          }
+          },
+          "compute": {
+            "vagrant": {
+              "ciAttributes": {
+                "adminstatus": "active",
+                "auth": "",
+                "env_vars": "{ \"DATACENTER\": \"vagrant\" }"
+              }
+            }
+          },
         },
+        "payLoad": {
+          "Environment": [
+              "ciAttributes": {
+                "profile": "devprofile"
+              },
+              "ciName": "dev"
+            ]
+          },
         "cloud": {
           "nsId": 110104,
           "ciAttributes": {

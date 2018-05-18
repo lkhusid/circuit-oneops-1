@@ -17,10 +17,10 @@ module AzureNetwork
 
     # this will build the public_ip object to be used for creating a public
     # ip in azure
-    def build_public_ip_object(ci_id, name = 'publicip')
+    def build_public_ip_object(ci_id, name = 'publicip', idle_timeout_in_minutes = 5)
       public_ip_address = Fog::Network::AzureRM::PublicIp.new
       public_ip_address.location = @location
-      public_ip_address.idle_timeout_in_minutes = 5
+      public_ip_address.idle_timeout_in_minutes = idle_timeout_in_minutes unless idle_timeout_in_minutes.nil?
       public_ip_address.name = Utils.get_component_name(name, ci_id)
       public_ip_address.public_ip_allocation_method = Fog::ARM::Network::Models::IPAllocationMethod::Dynamic
       OOLog.info("Public IP name is: #{public_ip_address.name}")
@@ -50,8 +50,14 @@ module AzureNetwork
       OOLog.info("Deleting public IP '#{public_ip_name}' from '#{resource_group_name}' ")
       start_time = Time.now.to_i
       begin
-        public_ip = @network_client.public_ips.get(resource_group_name, public_ip_name)
-        result = !public_ip.nil? ? public_ip.destroy : Chef::Log.info('AzureNetwork::PublicIp - 404 code, trying to delete something that is not there.')
+        public_ip_exists = @network_client.public_ips.check_public_ip_exists(resource_group_name, public_ip_name)
+        if !public_ip_exists
+          OOLog.info("The Public IP #{public_ip_name} does not exist. Moving on...")
+          result = nil
+        else
+          public_ip = @network_client.public_ips.get(resource_group_name, public_ip_name)
+          result = !public_ip.nil? ? public_ip.destroy : Chef::Log.info('AzureNetwork::PublicIp - 404 code, trying to delete something that is not there.')
+        end
       rescue MsRestAzure::AzureOperationError => e
         OOLog.fatal("Error deleting PublicIP '#{public_ip_name}' in ResourceGroup '#{resource_group_name}'. Exception: #{e.body}")
       rescue => e

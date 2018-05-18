@@ -21,6 +21,8 @@ if(server_name.size > 63)
   Chef::Log.info("Truncated server name to 64 chars : #{server_name}")
 end
 
+(node[:workorder].has_key?('config') && node[:workorder][:config].has_key?('FAST_IMAGE'))   ? (fast_flag = node[:workorder][:config][:FAST_IMAGE])      : (fast_flag = 'false')
+(node[:workorder].has_key?('config') && node[:workorder][:config].has_key?('TESTING_MODE')) ? (testing_flag = node[:workorder][:config][:TESTING_MODE]) : (testing_flag = 'false')
 cloud_name = node[:workorder][:cloud][:ciName]
 cloud = node[:workorder][:services][:compute][cloud_name][:ciAttributes]
 
@@ -42,6 +44,7 @@ imagemap = JSON.parse( cloud[:imagemap] )
 # size / flavor
 size_id = sizemap[rfcCi["ciAttributes"]["size"]]
 Chef::Log.debug("node_lookup SizeID: #{size_id}")
+
 # image_id
 image_id = ''
 if !os.nil? && os[:ciAttributes].has_key?("image_id") && !os[:ciAttributes][:image_id].empty?
@@ -49,8 +52,14 @@ if !os.nil? && os[:ciAttributes].has_key?("image_id") && !os[:ciAttributes][:ima
 else
   image_id = imagemap[ostype]
 end
-Chef::Log.debug("node_lookup imageID: #{image_id}")
-if rfcCi["rfcAction"] != "delete" && (image_id.nil? || image_id.empty?)
+
+if (image_id.nil? || image_id.empty?)
+  Chef::Log.debug("Image has to be selected from fast-images")
+else
+  Chef::Log.debug("node_lookup imageID: #{image_id}")
+end
+
+if rfcCi["rfcAction"] != "delete" && (image_id.nil? || image_id.empty?) && !fast_flag
   exit_with_error "Compute image id provided is null or empty. Please specify different OS type."
 end
 

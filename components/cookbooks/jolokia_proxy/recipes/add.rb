@@ -18,7 +18,7 @@ if mirrors.nil? || !mirrors.has_key?('jetty')
 end
 
 node.override[:jolokia_proxy][:mirror]=mirrors['jetty']
-node.override[:jolokia_proxy][:jolokia_war_mirror]=mirrors['jolokia-mirror']
+node.override[:jolokia_proxy][:jolokia_war_mirror]=mirrors['jolokia-war']
 
 node.override[:jolokia_proxy][:jolokia_log4j_location]=mirrors['jolokia-log4j']
 node.override[:jolokia_proxy][:jolokia_slf4j_location]=mirrors['jolokia-slf4j']

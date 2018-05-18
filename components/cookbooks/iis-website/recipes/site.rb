@@ -49,6 +49,12 @@ end
   end
 end
 
+dotnetcore = node.workorder.rfcCi.ciAttributes
+
+if dotnetcore.has_key?("install_dotnetcore")
+ runtime_version = "" if ((dotnetcore.install_dotnetcore == "true") || (runtime_version == "NoManagedCode"))
+end
+
 iis_app_pool platform_name do
   managed_runtime_version runtime_version
   process_model_identity_type identity_type
@@ -89,6 +95,7 @@ end
 
 include_recipe 'iis::disable_ssl'
 include_recipe 'iis::enable_tls'
+include_recipe 'iis::disable_weak_ciphers'
 
 iis_log_location 'setting log location' do
   central_w3c_log_file_directory log_directory_path

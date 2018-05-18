@@ -19,8 +19,8 @@ Vagrant.configure("2") do |config|
   config.vm.provision :chef_solo do |chef|
     chef.log_level      = :info
     chef.cookbooks_path = [".."]
-
     chef.add_recipe("iis-website::add")
+    chef.cookbooks_path = ["..", "../../../../oneops/oneops-admin/lib/shared/cookbooks"]
     chef.json = {
       "iis-website": {
       "compression_max_disk_usage": "100",
@@ -38,7 +38,7 @@ Vagrant.configure("2") do |config|
       "logtargetw3c": "1",
       "url_compression_dc_before_cache": "false",
       "requestfiltering_allow_double_escaping": "false",
-      "repository_url": "http://repo.nuget/service/local/nuget/nuget-snapshots/",
+      "repository_url": "https://api.nuget.org/v3/index.json",
       "identity_type": "LocalService",
       "binding_type": "https",
       "requestfiltering_allow_high_bit_characters": "true",
@@ -49,7 +49,7 @@ Vagrant.configure("2") do |config|
       "session_time_out": "20",
       "binding_port": "443",
       "dc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
-      "version": "latest",
+      "version": "3.0.0",
       "iis_iusrs_group_service_accounts": "[]",
       "compresion_min_file_size": "2400",
       "anonymous_authentication": "true",
@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
       "dc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
       "sc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
       "requestfiltering_max_query_string": "2048",
-      "package_name": "AFNetSampleApplication",
+      "package_name": "bootstrap",
       "logformat": "W3C",
       "dc_level": "0",
       "sc_level": "7",
@@ -66,19 +66,67 @@ Vagrant.configure("2") do |config|
       "dc_cpu_usage_to_disable": "90",
       "physical_path": "c:\\apps",
       "log_file_directory": "c:\\logs",
-      "enable_static_compression": "true"
+      "enable_static_compression": "true",
+      "dotnet_version_package_name": "{ \".Net 4.6\":\"dotnet4.6\", \".Net 3.5\":\"dotnet3.5\" }",
+      "chocolatey_package_source": "https://chocolatey.org/api/v2/",
+      "dotnet_core_package_name": "dotnetcore-windowshosting",
+      "install_dotnetcore": "true",
+      "dotnet_core_version": '["2.0.5"]'
       },
       "workorder": {
+        "services": {},
         "rfcCi": {
           "ciAttributes": {
-            "binding_type": "https",
+            "package_version": "3.0.0",
+            "compression_max_disk_usage": "100",
+            "session_state_cookieless": "UseCookies",
+            "static_mime_types": "{}",
             "runtime_version": "v4.0",
+            "requestfiltering_file_extension_allow_unlisted": "true",
+            "requestfiltering_max_url": "4096",
+            "sc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/atom+xml\":\"true\",\n    \"application/json\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
+            "enabled": "true",
+            "dc_cpu_usage_to_reenable": "50",
+            "logs_retention_days": "7",
+            "logs_cleanup_up_time": "02:00:00",
+            "enable_dynamic_compression": "true",
+            "logtargetw3c": "1",
+            "url_compression_dc_before_cache": "false",
+            "requestfiltering_allow_double_escaping": "false",
+            "repository_url": "https://api.nuget.org/v3/index.json",
+            "identity_type": "LocalService",
+            "binding_type": "https",
+            "requestfiltering_allow_high_bit_characters": "true",
+            "sc_cpu_usage_to_disable": "90",
+            "period": "Daily",
+            "windows_authentication": "false",
+            "requestfiltering_max_allowed_content_length": "30000000",
+            "session_time_out": "20",
             "binding_port": "443",
-            "identity_type": "ApplicationPoolIdentity",
-            "physical_path": "C:\\apps",
-            "version": "latest",
-            "package_name": "AFNetSampleApplication",
-            "repository_url": "http://repo.nuget/service/local/nuget/nuget-snapshots/"
+            "dc_mime_types": "{\n    \"text/*\":\"true\",\n    \"message/*\":\"true\",\n    \"application/x-javascript\":\"true\",\n    \"application/xml\":\"true\",\n    \"*/*\":\"false\"\n  }",
+            "version": "3.0.0",
+            "iis_iusrs_group_service_accounts": "[]",
+            "compresion_min_file_size": "2400",
+            "anonymous_authentication": "true",
+            "requestfiltering_verbs": "{ \"TRACE\": \"false\" }",
+            "session_state_cookie_name": "ASP.NET_SessionId",
+            "dc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
+            "sc_file_directory": "c:\\logs\\IISTemporaryCompressedFiles",
+            "requestfiltering_max_query_string": "2048",
+            "package_name": "bootstrap",
+            "logformat": "W3C",
+            "dc_level": "0",
+            "sc_level": "7",
+            "sc_cpu_usage_to_reenable": "50",
+            "dc_cpu_usage_to_disable": "90",
+            "physical_path": "c:\\apps",
+            "log_file_directory": "c:\\logs",
+            "enable_static_compression": "true",
+            "dotnet_version_package_name": "{ \".Net 4.6\":\"dotnet4.6\", \".Net 3.5\":\"dotnet3.5\" }",
+            "chocolatey_package_source": "https://chocolatey.org/api/v2/",
+            "dotnet_core_package_name": "dotnetcore-windowshosting",
+            "install_dotnetcore": "false",
+            "dotnet_core_version": '["2.0.5"]'
           },
           "ciClassName": "bom.oneops.1.Iis-website",
           "rfcAction": "create"
@@ -97,8 +145,8 @@ Vagrant.configure("2") do |config|
           "ciAttributes": {
           },
           "attrProps": {},
-          "ciId": 855020,
-          "ciName": "plat007",
+          "ciId": 855021,
+          "ciName": "plat008",
         },
         "payLoad": {
           "OO_GLOBAL_VARS": [
@@ -121,7 +169,7 @@ Vagrant.configure("2") do |config|
             {
               "ciAttributes": {
                 "dotnet_version_package_name": "{ \".Net 4.6\":\"dotnet4.6\", \".Net 3.5\":\"dotnet3.5\" }",
-                "chocolatey_package_source": "https://chocolatey.org/api/v2/"
+                "chocolatey_package_source": "https://chocolatey.org/api/v2/",
               },
               "ciBaseAttributes": {
                 "dotnet_version_package_name": "{ \".Net 4.6\":\"dotnet4.6\", \".Net 3.5\":\"dotnet3.5\" }",
@@ -168,8 +216,6 @@ Vagrant.configure("2") do |config|
         },
       },
     }
-
-
 
   end
 

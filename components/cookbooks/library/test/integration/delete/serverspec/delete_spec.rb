@@ -1,13 +1,12 @@
-require 'spec_helper'
+is_windows = ENV['OS'] == 'Windows_NT'
 
-describe package(JSON.parse($node['workorder']['rfcCi']['ciAttributes']['packages'])[0]) do
-  it { should_not be_installed }
-end
+CIRCUIT_PATH = "#{is_windows ? 'C:/Cygwin64' : ''}/home/oneops"
+require "#{CIRCUIT_PATH}/circuit-oneops-1/components/spec_helper.rb"
 
-describe package(JSON.parse($node['workorder']['rfcCi']['ciAttributes']['packages'])[1]) do
-  it { should_not be_installed }
-end
+packages = JSON.parse($node['workorder']['rfcCi']['ciAttributes']['packages'])
 
-describe package(JSON.parse($node['workorder']['rfcCi']['ciAttributes']['packages'])[2]) do
-  it { should_not be_installed }
+packages.each do |pack|
+  describe package(pack) do
+    it { should_not be_installed }
+  end
 end

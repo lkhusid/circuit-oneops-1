@@ -19,7 +19,7 @@ if "#{solr_version}".start_with? "4."
 end
 
 
-if ("#{solr_version}".start_with? "5.") || ("#{solr_version}".start_with? "6.")
+if ("#{solr_version}".start_with? "5.") || ("#{solr_version}".start_with? "6.") || ("#{solr_version}".start_with? "7.")
 	execute "solr#{solrmajorversion} restart" do
 	  command "service solr#{solrmajorversion} restart"
 	  user "root"

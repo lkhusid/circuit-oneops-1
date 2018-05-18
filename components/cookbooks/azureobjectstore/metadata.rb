@@ -10,22 +10,20 @@ grouping 'default',
          :packages => %w[base service.filestore mgmt.cloud.service cloud.service cloud.zone.service],
          :namespace => true
 
-attribute 'storage_account_name',
-          :description => 'Storage Account Name',
-          :required => 'required',
-          :format => {
-            :help => 'Storage Account Name',
-            :category => '2.Authentication',
-            :order => 1
-          }
+attribute 'tenant_id',
+  :description => 'Tenant ID',
+  :required => 'required',
+  :format => {
+    :help => 'Tenant ID for Azure',
+    :category => '1.Authentication',
+    :order => 1
+  }
 
-attribute 'storage_account_access_key',
-          :description => 'Storage Account Access Key',
-          :required => 'required',
-          :encrypted => true,
-          :default => '',
-          :format => {
-            :help => 'Storage Account Access Key',
-            :category => '2.Authentication',
-            :order => 2
-          }
+attribute 'proxy',
+  :description => 'API Proxy',
+  :required => 'optional',
+  :format => {
+    :help => 'API proxy is used to address timeout issues when making direct API calls to Azure',
+    :category => '1.Authentication',
+    :order => 2
+  }

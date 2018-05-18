@@ -29,7 +29,7 @@ if provider_class =~ /azure/
   rg_manager = AzureBase::ResourceGroupManager.new(node)
   resource_group = rg_manager.rg_name
   instance_name = node[:workorder][:payLoad][:DependsOn].select{|d| (d[:ciClassName].split('.').last == 'Compute') }.first[:ciAttributes][:instance_name]
-  server = node[:storage_provider].servers(:resource_group => resource_group).get(resource_group, instance_name)
+  server = get_compute(provider_class, node[:storage_provider], instance_name, resource_group)
 end
 
 dev_map.split(" ").each do |dev|
@@ -45,8 +45,10 @@ dev_map.split(" ").each do |dev|
     while !ok && retry_count < max_retry_count do
       ok = true
       volume = nil
+
+      #Getting volume
       begin
-        if provider_class =~ /azure/ && vol_id =~ /datadisk/
+        if provider_class =~ /azure/ && vol_id =~ /datadisk/ && !server.nil?
           volume = server.data_disks.select{|dd| (dd.name == vol_id)}[0]
         elsif provider_class =~ /azure/ && vol_id !~ /datadisk/
           volume = node.storage_provider.managed_disks.get(resource_group, vol_id)
@@ -58,13 +60,16 @@ dev_map.split(" ").each do |dev|
         next
       end
 
+      #Detaching volume from VM
       begin
-        if provider_class =~ /azure/ && vol_id =~ /datadisk/
-          Chef::Log.info("Detaching unmanaged data disk")
-          server.detach_data_disk(volume.name) unless volume.nil?
-        elsif provider_class =~ /azure/ && volume.respond_to?('owner_id')
-          Chef::Log.info("Detaching managed data disk")
-          server.detach_managed_disk(volume.name) unless volume.owner_id.nil?
+        if provider_class =~ /azure/
+          if vol_id =~ /datadisk/ && !server.nil? && !volume.nil?
+            Chef::Log.info("Detaching unmanaged data disk")
+            server.detach_data_disk(volume.name)
+          elsif volume.respond_to?('owner_id') && !server.nil? && !volume.owner_id.nil?
+            Chef::Log.info("Detaching managed data disk")
+            server.detach_managed_disk(volume.name)
+          end
         elsif !volume.nil?
           data = { 'os-detach' => { 'volume_id' => "#{vol_id}" } }
           node.storage_provider.action(vol_id, data)
@@ -73,6 +78,7 @@ dev_map.split(" ").each do |dev|
         Chef::Log.error("getting volume detach exception: "+e.message)
       end
 
+      #Destroying volume
       begin
         if provider_class =~ /azure/ && vol_id =~ /datadisk/
           #Unmanaged disks

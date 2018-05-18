@@ -14,7 +14,11 @@ else
   keytool -import -alias presto-coordinator -keystore /tmp/presto.jks -storepass presto -file /tmp/presto-coordinator.pem -noprompt
 fi
 
+<% if @enable_ldap %>
 ${bindir}/presto-cli-executable.jar --keystore-path /tmp/presto.jks --keystore-password presto --server "${presto_url}" --user "${USER}" --password "$@"
+<% else %>
+${bindir}/presto-cli-executable.jar --keystore-path /tmp/presto.jks --keystore-password presto --server "${presto_url}" "$@"
+<% end %>
 <% else %>
 presto_url="http://<%= @coordinator_fqdn %>:<%= @port %>"
 

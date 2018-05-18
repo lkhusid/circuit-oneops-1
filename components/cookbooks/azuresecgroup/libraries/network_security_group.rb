@@ -52,7 +52,12 @@ module AzureNetwork
     end
 
     def delete_security_group(resource_group_name, net_sec_group_name)
-      @network_service.network_security_groups.get(resource_group_name, net_sec_group_name).destroy
+      nsg_exists = @network_service.network_security_groups.check_net_sec_group_exists(resource_group_name, net_sec_group_name)
+      if !nsg_exists
+        OOLog.info("The NSG #{net_sec_group_name} does not exist. Moving on...")
+      else
+        @network_service.network_security_groups.get(resource_group_name, net_sec_group_name).destroy
+      end
     rescue MsRestAzure::AzureOperationError => e
       OOLog.info("AzureOperationError Error deleting NSG #{net_sec_group_name}")
       OOLog.info("Error response: #{e.body}") unless e.body.nil?
@@ -130,6 +135,100 @@ module AzureNetwork
         priority: priority,
         direction: direction
       }
+    end
+
+    def check_network_security_group_exists(resource_group_name, network_security_group_name)
+      @network_service.network_security_groups.check_net_sec_group_exists(resource_group_name, network_security_group_name)
+    rescue MsRestAzure::AzureOperationError => e
+      OOLog.fatal("AzureOperationError Exception trying to check existence of network security group #{network_security_group_name} response: #{e.body}")
+    rescue Exception => e
+      OOLog.fatal("Exception trying to check existence of network security group #{network_security_group_name} #{e.body} Exception is: #{e.message}")
+    end
+
+    def create_nsg_rule(sec_rule_item, priority, description, nsg_name, rg_name)
+      security_rule_access = Fog::ARM::Network::Models::SecurityRuleAccess::Allow
+      security_rule_description = description
+      security_rule_source_addres_prefix = sec_rule_item[3]
+      security_rule_destination_port_range = sec_rule_item[1].to_s
+      security_rule_direction = Fog::ARM::Network::Models::SecurityRuleDirection::Inbound
+      security_rule_priority = priority
+      security_rule_protocol = case sec_rule_item[2].downcase
+                               when 'tcp'
+                                 Fog::ARM::Network::Models::SecurityRuleProtocol::Tcp
+                               when 'udp'
+                                 Fog::ARM::Network::Models::SecurityRuleProtocol::Udp
+                               else
+                                 Fog::ARM::Network::Models::SecurityRuleProtocol::Asterisk
+                               end
+      security_rule_provisioning_state = nil
+      security_rule_destination_addres_prefix = '*'
+      security_rule_source_port_range = '*'
+      security_rule_name = nsg_name + '-' + priority.to_s
+      nsg_rule = {
+                    name: security_rule_name,
+                    resource_group: rg_name,
+                    protocol: security_rule_protocol,
+                    network_security_group_name: nsg_name,
+                    source_port_range: security_rule_source_port_range,
+                    destination_port_range: security_rule_destination_port_range,
+                    source_address_prefix: security_rule_source_addres_prefix,
+                    destination_address_prefix: security_rule_destination_addres_prefix,
+                    access: security_rule_access,
+                    priority: security_rule_priority,
+                    direction: security_rule_direction
+                  }
+      nsg_rule
+    end
+
+    def get_sec_rules(node, nsg_name, rg_name)
+      # Creating security rules objects
+      rules = node['secgroup']['inbound'].tr('"[]\\', '').split(',')
+      sec_rules = []
+      priority = 100
+      description = node['secgroup']['description']
+      reg_ex = /(\d+|\*|\d+-\d+)\s(\d+|\*|\d+-\d+)\s([A-Za-z]+|\*)\s\S+/
+      rules.each do |item|
+        raise "#{item} is not a valid security rule" unless reg_ex.match(item)
+        item2 = item.split(' ')
+        nsg_rule = create_nsg_rule(item2, priority, description, nsg_name, rg_name)
+        sec_rules << nsg_rule
+        priority += 100
+      end
+      sec_rules
+    end
+
+    def match_nsg_rules(nsg_list, sec_rules)
+      nsg_list.each do |nsg|
+        next unless nsg.security_rules.count == sec_rules.count
+        rules_matched = 0
+        sec_rules.each do |sec_rule|
+          nsg.security_rules.each do |nsg_rule|
+            next unless nsg_rule.protocol == sec_rule[:protocol] &&
+                        nsg_rule.source_port_range == sec_rule[:source_port_range] &&
+                        nsg_rule.destination_port_range == sec_rule[:destination_port_range] &&
+                        nsg_rule.source_address_prefix == sec_rule[:source_address_prefix] &&
+                        nsg_rule.destination_address_prefix == sec_rule[:destination_address_prefix] &&
+                        nsg_rule.access == sec_rule[:access] &&
+                        nsg_rule.direction == sec_rule[:direction] &&
+                        nsg_rule.priority == sec_rule[:priority]
+            rules_matched += 1
+          end
+        end
+
+        if rules_matched == sec_rules.count
+          puts "***RESULT:net_sec_group_id=#{nsg.id}"
+          return nsg.id
+        end
+      end
+      nil
+    end
+
+    def get_matching_nsgs(nsg_list, pack_name)
+      matched_nsgs = []
+      nsg_list.each do |nsg|
+        matched_nsgs << nsg if nsg.name.include? "#{pack_name}_"
+      end
+      matched_nsgs
     end
     # end of class
   end

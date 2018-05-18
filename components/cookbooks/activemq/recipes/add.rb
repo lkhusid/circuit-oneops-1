@@ -398,12 +398,14 @@ end
 
 if node.workorder.cloud.ciAttributes.priority == "1"
     service 'activemq' do
+        provider Chef::Provider::Service::Init::Redhat
         supports :restart => true, :status => true, :stop => true, :start => true
         action [:enable, :start]
     end
 else
     # disable and stop secondary
     service 'activemq' do
+        provider Chef::Provider::Service::Init::Redhat
         supports :restart => true, :status => true, :stop => true, :start => true
         action [:disable, :stop]
     end

@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+
+# This recipe contains collection level monitors. They are:
+#   ShardStatus - Monitors the below metrics:
+#      Percentage of Shards UP With all Active Replicas.
+#      Percentage of Shards With min Active Replicas.
+
+
+require 'net/http'
+require 'rubygems'
+require 'xmlsimple'
+require 'json'
+require 'excon'
+require 'open-uri'
+
+monitor = ARGV[0]
+collection_name = ARGV[1]
+minNoOfActiveReplicasRequired = ARGV[2]
+port_no = '<%= @port_no %>'
+
+if monitor == "ShardStatus"
+  ip = `hostname -I`
+  ipaddress = "#{ip}".strip
+  request_url = "http://#{ipaddress}:#{port_no}/solr/admin/zookeeper?detail=true&path=%2Fcollections"+"/#{collection_name}/state.json"
+  puts "curl -s #{request_url}"
+
+  collection_state = `curl -s "#{request_url}"`
+
+  noOfShardsWithMinActiveReplicas = 0
+  numShardsUp = 0
+  pctgShardsWithMinActiveReplicas = 0
+  pctgShardsUp = 0
+
+  parsed_collection_state = ''
+  if !collection_state.empty?
+    parsed_collection_state = JSON.parse(collection_state)
+  
+    coll_info = JSON.parse(parsed_collection_state["znode"]["data"])
+    coll_response = coll_info[collection_name]
+    shardList = coll_response["shards"].keys
+
+    shardList.each do |shard|
+      shardstate = coll_response["shards"][shard]["state"]
+      activeReplicas = 0
+      if shardstate == "active"
+        replicaList = coll_response["shards"][shard]["replicas"].keys
+        replicaList.each do |replica|
+          replicastate = coll_response["shards"][shard]["replicas"][replica]["state"]
+          if replicastate == "active"
+            activeReplicas = activeReplicas + 1
+          end
+        end
+        if Integer(activeReplicas) >= Integer(minNoOfActiveReplicasRequired)
+          noOfShardsWithMinActiveReplicas = noOfShardsWithMinActiveReplicas + 1
+        end
+        if Integer(activeReplicas) == replicaList.length
+          numShardsUp = numShardsUp + 1
+        end
+      end
+    end
+
+    noOfShards = shardList.length
+    if noOfShards != 0
+      pctgShardsWithMinActiveReplicas = noOfShardsWithMinActiveReplicas.to_f / noOfShards.to_f * 100
+      pctgShardsUp = numShardsUp.to_f / noOfShards.to_f * 100
+    end
+    perf = "pctgShardsWithMinActiveReplicas=#{pctgShardsWithMinActiveReplicas} pctgShardsUp=#{pctgShardsUp}"
+    puts perf + "|" + perf
+  end
+end

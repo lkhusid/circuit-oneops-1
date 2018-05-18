@@ -195,3 +195,15 @@ template "/etc/init.d/zookeeper-server" do
  variables     template_variables
 
 end
+
+
+#Zookeeper jaas conf file for SASL
+template "/etc/zookeeper/zookeeper_jaas.conf" do
+  source "zookeeper_jaas.conf.erb"
+  owner "root"
+  group "root"
+  mode  '0644'
+  variables   template_variables
+end
+
+

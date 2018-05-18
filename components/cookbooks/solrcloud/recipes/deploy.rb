@@ -43,7 +43,7 @@ if node['solr_version'].start_with? "4."
   execute 'notify-tomcat-restart' do
     command "service tomcat#{node['tomcatversion']} restart"
     user "root"
-    action :run
+    action :nothing
     only_if { ::File.exists?("/etc/init.d/tomcat#{node['tomcatversion']}") }
   end
 

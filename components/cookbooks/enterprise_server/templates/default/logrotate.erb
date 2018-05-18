@@ -1,0 +1,16 @@
+<%= node['enterprise_server']['logs']['server_log_path']%>/catalina.out{
+ copytruncate
+ daily
+ rotate 8
+ missingok
+ size 256M
+ maxage 7
+}
+
+<%= node['enterprise_server']['logs']['server_log_path']%>/<%= node['enterprise_server']['logs']['access_log_prefix']%>*<%= node['enterprise_server']['logs']['access_log_suffix']%>{
+ copytruncate
+ yearly
+ size 256M
+ rotate 8
+ missingok
+}

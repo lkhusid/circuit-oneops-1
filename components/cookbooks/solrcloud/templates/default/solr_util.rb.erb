@@ -1,0 +1,252 @@
+#!/usr/bin/env ruby
+
+
+require 'rubygems'
+require 'net/http'
+require 'json'
+require '/opt/solr/solrmonitor/rest_client'
+require '/opt/solr/solrmonitor/auth_helper'
+
+include Solr::RestClient
+include Solr::AuthHelper
+
+
+def parseShardListObject(shardList, collectionInfo, cores)
+  active = 0
+  recovering = 0
+  down = 0
+
+  shardList.each do |shard|
+    shardState = collectionInfo["shards"][shard]["state"]
+    if shardState == "active"
+      replicas = collectionInfo["shards"][shard]["replicas"].keys
+      replicas.each do |replica|
+        replicaCore = collectionInfo["shards"][shard]["replicas"][replica]["core"]
+         if cores.include? replicaCore
+          replicaState = collectionInfo["shards"][shard]["replicas"][replica]["state"]
+          if replicaState == "active"
+            active = active + 1
+          elsif replicaState == "recovering"
+            recovering = recovering + 1
+          elsif replicaState == "down" || replicaState == "gone"
+            down = down + 1
+          end
+        end
+      end
+    end
+  end
+  return active, recovering, down
+end
+
+# This method computes the replica stats of active,recovering,down states and failed state.
+def computeReplicaStats(solrPortNo, cores, failedCores)
+  activeReplicas = 0
+  recoveringReplicas = 0
+  downReplicas = 0
+
+  clusterStatusUrl = "/solr/admin/collections?action=CLUSTERSTATUS&wt=json"
+
+
+  clusterStatusResp = solr_rest_api_get_auth("127.0.0.1", solrPortNo, clusterStatusUrl)
+
+  if(clusterStatusResp.code == '200')
+    if !clusterStatusResp.body.empty?
+      clusterStatusRespObj = JSON.parse(clusterStatusResp.body)
+
+      clusterStatusCollections = clusterStatusRespObj["cluster"]["collections"]
+      collections = clusterStatusCollections.keys
+      collections.each do |collection|
+        collectionInfo = clusterStatusCollections[collection]
+        shards = collectionInfo["shards"].keys
+
+        activeNodes, recoveringNodes, downNodes = parseShardListObject(shards, collectionInfo, cores)
+        activeReplicas = activeReplicas + activeNodes
+        recoveringReplicas = recoveringReplicas + recoveringNodes
+        downReplicas = downReplicas + downNodes
+      end
+
+      failedCoresSize = failedCores.length
+      totalCores = cores.length + failedCores.length
+      if totalCores != 0
+        pctgActiveReplicas = activeReplicas / totalCores * 100
+        pctgRecoveringReplicas = recoveringReplicas / totalCores * 100
+        pctgDownReplicas = downReplicas / totalCores * 100
+        pctgFailedReplicas = failedCoresSize / totalCores * 100
+      end
+    end
+  else
+    raise "Node is in down state."
+  end
+  puts "pctgActiveReplicas = #{pctgActiveReplicas}, pctgRecoveringReplicas = #{pctgRecoveringReplicas}, pctgDownReplicas = #{pctgDownReplicas}, pctgFailedReplicas = #{pctgFailedReplicas}"
+  return pctgActiveReplicas, pctgRecoveringReplicas, pctgDownReplicas, pctgFailedReplicas
+end
+
+#
+# This function calculates the no.of active,recovering,down and failed cores that are hosted on this node.
+# Return value : true or false
+#
+def checkSolrNodeStatus(solrPortNo)
+  activeReplicas = 0
+  recoveringReplicas = 0
+  downReplicas = 0
+
+  if(checkSolrProcessIsRunning(solrPortNo))
+    coreListUrl = "/solr/admin/cores?action=STATUS&wt=json"
+
+    coreApiResponse = solr_rest_api_get_auth("127.0.0.1", solrPortNo, coreListUrl)
+
+    if(coreApiResponse.code == '200')
+      if !coreApiResponse.body.empty?
+        coreApiJsonResponse = JSON.parse(coreApiResponse.body)
+        coreNames = coreApiJsonResponse["status"].keys
+        failedCores = coreApiJsonResponse["initFailures"].keys
+        activeReplicas, recoveringReplicas, downReplicas, failedReplicas = computeReplicaStats(solrPortNo, coreNames, failedCores)
+      end
+    else
+      raise "Node is in down state."
+    end
+  else
+    raise "Node is in down state."
+  end
+  return activeReplicas, recoveringReplicas, downReplicas, failedReplicas
+end
+
+def checkSolrProcessIsRunning(solrPortNo)
+  isRunning = false
+  healthCheckUrl = "/solr/"
+
+
+  healthCheckResponse = solr_rest_api_get_auth("127.0.0.1", solrPortNo, healthCheckUrl)
+
+  if(healthCheckResponse.code == '200')
+   isRunning = true
+  end
+
+  return isRunning
+end
+
+def check_solr_process_status_based_on_core_health(host_ip, solr_port_no)
+
+  local_cores = []
+  down_cores = []
+  recovering_cores = []
+  active_cores = []
+
+  solrCollectionUrl = "/solr/admin/collections?"
+
+  # Get the cluster status
+  clusterstatus_url = "#{solrCollectionUrl}action=CLUSTERSTATUS&wt=json"
+  cluster_status = solr_rest_api(host_ip, solr_port_no, clusterstatus_url)
+
+  collections = cluster_status["cluster"]["collections"].keys
+
+  # Get the json of collections from clusterstatus which includes shard and replica details
+  cluster_status_collections = cluster_status["cluster"]["collections"]
+
+  # Iterate through the collections in the cluster status
+  collections.each do |collection|
+    unless cluster_status_collections[collection]["shards"].nil?
+
+      # Get all the shard names
+      shards = cluster_status_collections[collection]["shards"].keys
+      shards_list = cluster_status_collections[collection]["shards"]
+
+      shards.each do |shard|
+
+        unless shards_list[shard]["replicas"].nil?
+
+          # Get all the replicas irrespective if shard is active or not
+          replicas = shards_list[shard]["replicas"].keys
+          replicas_list = shards_list[shard]["replicas"]
+
+          replicas.each do |replica|
+
+            if replicas_list[replica]["base_url"].include? host_ip
+              local_cores.push(replicas_list[replica ]["core"])
+
+              if replicas_list[replica]["state"] == "down"
+                if !down_cores.include?( replicas_list[replica]["core"] )
+                  down_cores.push( replicas_list[replica]["core"] )
+                end
+              end
+
+              if replicas_list[replica]["state"] == "active"
+                if !active_cores.include?( replicas_list[replica]["core"] )
+                  active_cores.push( replicas_list[replica]["core"] )
+                end
+              end
+
+              if replicas_list[replica]["state"] == "recovering"
+                if !recovering_cores.include?( replicas_list[replica]["core"] )
+                  recovering_cores.push( replicas_list[replica]["core"] )
+                end
+              end
+
+            end
+          end
+        end
+      end
+    end
+  end
+
+  return local_cores, down_cores
+end
+
+def solr_rest_api(host, port, url)
+
+  response = solr_rest_api_get_auth(host, port, url)
+
+  if response != nil then
+    response_body = response.body
+    if !response_body.empty?
+      begin
+        resp_obj = JSON.parse(response_body)
+        return resp_obj
+
+      rescue JSON::ParserError => e
+        puts "HTTP response code : #{response.code}"
+        if response.code != 200
+          puts "Solr API returned an error #{response_body}"
+          error_status = {"status" => "ERROR"}
+          return error_status
+        end
+      end
+    end
+  else
+    raise "Node is in down state."
+  end
+end
+
+def solr_rest_api_get_auth(host, port, uri)
+
+  http = Net::HTTP.new(host, port)
+  http.open_timeout = 50 #timeout
+  http.use_ssl = false
+
+  username = nil
+  password = nil
+
+  if auth_enabled?
+    admincreds = get_solr_admin_credentials()
+    username = admincreds['username']
+    password = admincreds['password']
+  end
+
+  resp = nil
+
+  http.start do |http|
+    req = Net::HTTP::Get.new(uri)
+
+    unless username.nil? || password.nil?
+      req.basic_auth(username, password)
+    end
+
+    resp, data = http.request(req)
+  end
+
+  return resp
+
+end
+
+
+

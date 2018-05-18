@@ -11,11 +11,15 @@ kafka_version = node.workorder.rfcCi.ciAttributes.version
 
 Chef::Log.info("install patch")
 `sudo yum -y install patch`
-`yum -y install redhat-lsb-core`
+#`yum -y install redhat-lsb-core`
 
 Chef::Log.info("install zookeeper gem")
-`sudo gem install zookeeper --no-rdoc --no-ri`
+chef_gem 'zookeeper' do
+  options ('--no-ri  --no-rdoc')
+  action :install
+end
 Chef::Log.info("finished installing zookeeper gem")
+
 
 kafka_rpm = "kafka-#{kafka_version}.noarch.rpm"
 
@@ -34,32 +38,50 @@ if base_url.empty?
   Chef::Log.error("#{mirror_url_key} mirror is empty for #{cloud}.")
 end
 
-# kafka rpm download link
-kafka_download = base_url + "#{kafka_rpm}"
+if kafka_version.to_i < 1
+   kafka_download = base_url + "#{kafka_rpm}"
 
-execute "remove kafka" do
-  user "root"
-  exists = <<-EOF
-  rpm -qa | grep 'kafka'
-  EOF
-  command "rpm -e $(rpm -qa '*kafka*'); rm -rf /usr/local/kafka/*"
-  only_if exists, :user => "root"
+   execute "remove kafka" do
+     user "root"
+     exists = <<-EOF
+     rpm -qa | grep 'kafka'
+     EOF
+     command "rpm -e $(rpm -qa '*kafka*'); rm -rf /usr/local/kafka/*"
+     only_if exists, :user => "root"
+   end
+
+   # download kafka
+   remote_file ::File.join(Chef::Config[:file_cache_path], "#{kafka_rpm}") do
+     owner "root"
+     mode "0644"
+     source kafka_download
+     action :create
+   end
+
+   # install kafka
+   execute 'install kafka' do
+     user "root"
+     cwd Chef::Config[:file_cache_path]
+     command "rpm -i #{kafka_rpm} --force"
+   end
+else
+   kafka_download = "https://repository.walmart.com/content/repositories/public/org/apache/kafka/kafka_2.11/#{kafka_version}/kafka_2.11-#{kafka_version}.tgz"
+   `rm -rf /usr/local/kafka/* && mkdir -p /usr/local/kafka`
+
+   remote_file "/usr/local/kafka/kafka_2.11-#{kafka_version}.tgz" do
+     owner "root"
+     mode "0644"
+     source kafka_download
+     action :create
+   end
+
+   execute 'install kafka' do
+     user "root"
+     cwd '/usr/local/kafka'
+     command "tar -zxf kafka_2.11-#{kafka_version}.tgz -C /usr/local/kafka --strip-components=1"
+   end
 end
 
-# download kafka
-remote_file ::File.join(Chef::Config[:file_cache_path], "#{kafka_rpm}") do
-  owner "root"
-  mode "0644"
-  source kafka_download
-  action :create
-end
-
-# install kafka
-execute 'install kafka' do
-  user "root"
-  cwd Chef::Config[:file_cache_path]
-  command "rpm -i #{kafka_rpm} --force"
-end
 
 template "/usr/local/kafka/bin/kafka_status.sh" do
   source "kafka_status.sh.erb"

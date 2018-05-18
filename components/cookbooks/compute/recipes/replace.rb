@@ -16,5 +16,12 @@
 # Cookbook Name:: compute
 # Recipe:: replace
 #
+
+require 'excon'
+extend Fqdn::Base
+Chef::Resource::RubyBlock.send(:include, Fqdn::Base)
+
+include_recipe "fqdn::get_infoblox_connection"
+
 include_recipe "compute::delete"
 include_recipe "compute::add"

@@ -192,6 +192,8 @@ Array(1..slice_count).each do |i|
       Utils.set_proxy(node[:workorder][:payLoad][:OO_CLOUD_VARS])
 
       rg_manager = AzureBase::ResourceGroupManager.new(node)
+      as_manager = AzureBase::AvailabilitySetManager.new(node)
+
       compute_attr = node[:workorder][:payLoad][:DependsOn].select{|d| (d[:ciClassName].split('.').last == 'Compute') }.first[:ciAttributes]
       vm = node[:storage_provider].servers(:resource_group => rg_manager.rg_name).get(rg_manager.rg_name, compute_attr[:instance_name])
 
@@ -202,7 +204,7 @@ Array(1..slice_count).each do |i|
       end
       vol_name = rfcCi[:ciName] + '-' + rfcCi[:ciId].to_s + '-' + dev.split('/').last.to_s
 
-      availability_set_response = node[:storage_provider].availability_sets.get(rg_manager.rg_name, rg_manager.rg_name)
+      availability_set_response = node[:storage_provider].availability_sets.get(rg_manager.rg_name, as_manager.as_name)
 
       if availability_set_response.sku_name == 'Aligned'
         volume = node.storage_provider.managed_disks.create(

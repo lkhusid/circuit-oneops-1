@@ -163,7 +163,6 @@ attribute 'sizemap',
               :category => '3.Mappings',
               :order => 1
           }
-
 attribute 'imagemap',
           :description => 'Images Map',
           :data_type => 'hash',

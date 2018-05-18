@@ -1,0 +1,184 @@
+packages:
+  - sudo
+  - file
+  - make
+  - libgcc
+  - ruby
+  - ruby-libs
+  - rubygems
+  - perl
+  - perl-Digest-MD5
+  - nagios
+  - nagios-plugins
+  - iptables-services
+  - ntp
+  - which
+  - tar
+  - zip
+  - unzip
+  - bzip2
+  - sysstat
+  - autoconf
+  - automake
+  - bison
+  - nmap-ncat
+gems:
+  - fog
+  - fog-core
+  - aws-s3
+  - ghost
+  - rake
+  - xml-simple
+  - nokogiri
+  - highline
+  - fog-profitbricks
+  - fog-aliyun
+  - fog-softlayer
+  - chef
+  - mime-types
+  - rack
+files:
+  - name: /etc/nagios/conf.d
+    type: d
+    mode: 750
+    owner: nagios
+    group: nagios
+# --------------------------------------- item break to make it easier to read.
+#  - name: /opt/oneops/workorder
+#    type: d
+#    mode: 755
+#    owner: oneops
+#    group: oneops
+# ---------------------------------------
+  - name: /etc/logrotate.d/oneops
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/selinux/config
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/sysctl.conf
+    type: f
+    mode: 600
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/dhcp
+    type: d
+    mode: 750
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/dhcp/dhclient.conf
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /var/cache/bind
+    type: d
+    mode: 755
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/bind
+    type: d
+    mode: 755
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/resolv.conf
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /opt/oneops/domain
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/hosts
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/profile.d/oneops_compute_cloud_service.sh
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/profile.d/oneops.sh
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/profile.d/oneops.conf
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /var/log/messages
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/cloud
+    type: d
+    mode: 755
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/cloud/cloud.cfg.d/99_hostname.cfg
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/cloud/cloud.cfg
+    type: f
+    mode: 664
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/named.conf
+    type: f
+    mode: 640
+    owner: root
+    group: named
+# ---------------------------------------
+  - name: /etc/bind/named.conf.local
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/sysconfig/clock
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/security/limits.d/oneops.conf
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------
+  - name: /etc/ssh/sshd_config.backup
+    type: f
+    mode: 644
+    owner: root
+    group: root
+# ---------------------------------------

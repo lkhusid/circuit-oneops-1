@@ -1,16 +1,29 @@
+is_windows = ENV['OS']=='Windows_NT' ? true : false
+$circuit_path = "#{is_windows ? 'C:/Cygwin64' : ''}/home/oneops"
+require "#{$circuit_path}/circuit-oneops-1/components/spec_helper.rb"
 
-require 'spec_helper'
+user = $node['user']['username'].gsub('\\','\\\\\\')
+group = JSON.parse($node['user']['group'])
 
-describe user($node['user']['username']) do
+describe user(user) do
   it { should_not exist }
-end
+end unless user.include?('\\') #Can not correctly check domain user existence for users in a different domain
 
-if !$node['user']['username'].to_s.empty? && !$node['user']['group'].eql?('[]')
-	describe user($node['user']['username']) do
-	  it { should_not belong_to_group $node['user']['group'] }
-	end
+if is_windows
+  group.push('Administrators') unless group.include?('Administrators')
+  group.each do |g|
+    describe command("& {net localgroup #{g} } | select-string -pattern '^#{user}$'") do
+      its(:stdout) { should be_empty  }
+    end
+  end
+else
+  describe group(user) do
+    it { should_not exist }
+  end
 
-	describe group($node['user']['group']) do
-	  it { should_not exist }
-	end
+  group.each do |g|
+    describe user(user) do
+      it { should_not belong_to_group g }
+    end
+  end
 end

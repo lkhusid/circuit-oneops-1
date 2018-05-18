@@ -16,17 +16,18 @@ spark_dir = "#{spark_base}/spark"
 spark_tmp_dir = configNode['spark_tmp_dir']
 spark_events_dir = configNode['spark_events_dir']
 
-if is_client_only && enable_historyserver
-  # Create the Spark events directory
-  directory "#{spark_events_dir}" do
-    owner     'spark'
-    group     'spark'
-    # Mode set to 3777 to turn on the setgid bit and make world writable
-    mode      '3777'
-    recursive true
-    action :create
-  end
+# Create the Spark events directory.  It should be on all
+# machines and not just the client.
+directory "#{spark_events_dir}" do
+  owner     'spark'
+  group     'spark'
+  # Mode set to 3777 to turn on the setgid bit and make world writable
+  mode      '3777'
+  recursive true
+  action :create
+end
 
+if is_client_only && enable_historyserver
   # Create the service template for the history server.
   template "#{spark_dir}/service/spark-historyserver" do
     source "initd-historyserver.erb"

@@ -53,6 +53,7 @@ if node[:workorder][:rfcCi].has_key?(:ciState) && node[:workorder][:rfcCi][:ciSt
   case provider_service
   when /infoblox/
     provider = "infoblox"
+    include_recipe "fqdn::cleanup" # remove existing ip to dns that has been replaced.
   when /azuredns/
     provider = "azuredns"
   when /designate/

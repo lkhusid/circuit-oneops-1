@@ -119,6 +119,26 @@ attribute 'iis_iusrs_group_service_accounts',
     :order     => 7
   }
 
+attribute 'iisreset_before_deployment',
+  :description => 'IISReset before deploy',
+  :default     => 'false',
+  :format      => {
+    :help      => 'Specify whether to do IISReset before deploy',
+    :category  => '2.IIS Web site',
+    :form     => {'field' => 'checkbox'},
+    :order     => 8
+  }
+
+attribute 'iisreset_after_deployment',
+  :description => 'IISReset after deploy',
+  :default     => 'false',
+  :format      => {
+    :help      => 'Specify whether to do IISReset after deploy',
+    :category  => '2.IIS Web site',
+    :form     => {'field' => 'checkbox'},
+    :order     => 9
+  }
+
 attribute 'enabled',
   :description => 'Enable IIS Logging',
   :default     => 'true',
@@ -200,7 +220,9 @@ attribute 'runtime_version',
   :category  => '4.IIS Application Pool',
   :order     => 1,
   :form      => { 'field' => 'select',
-                  'options_for_select' => [['v2.0', 'v2.0'], ['v4.0', 'v4.0']]
+                  'options_for_select' => [['v2.0', 'v2.0'],
+                                           ['v4.0', 'v4.0'],
+                                           ['No Managed Code', 'NoManagedCode']]
                 }
 }
 

@@ -1,5 +1,4 @@
 # SELINUX
-
 case node.platform
 when "fedora","redhat","centos"
   selinux_file = "/etc/selinux/config"
@@ -15,12 +14,10 @@ when "fedora","redhat","centos"
 end
 
 # firewall
-
 if node.platform_family == "rhel" && node.platform_version.to_i >= 7
   
   execute "systemctl mask firewalld ; systemctl stop firewalld"
-  package "iptables-services"  
-  
+  package "iptables-services" unless node['fast_image']
 end
 
 attrs = node[:workorder][:rfcCi][:ciAttributes]

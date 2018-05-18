@@ -152,10 +152,16 @@ if is_zk_specified || (actionName == "replace") || (actionName == "update")
           # Action REPLACE: The master was replaced.
 
           if (is_zk_specified && ((actionName == "add") || (thisMasterAction == "add") || (thisMasterAction == "update"))) || (thisMasterAction == "replace")
-            Chef::Log.debug("Starting master on #{masterIP} with master URL #{thisMasterURL}")
+            # Only change the Spark Master URL if the installation is
+            # a Zookeeper installation
+            if is_zk_specified
+              Chef::Log.debug("Starting master on #{masterIP} with master URL #{thisMasterURL}")
 
-            # Echo the spark master URL to this server
-            `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{masterIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master > /dev/null"`
+              # Echo the spark master URL to this server
+              `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{masterIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master > /dev/null"`
+            else
+              Chef::Log.debug("Starting master on #{masterIP}")
+            end
 
             # Restart the Spark master service on this node
             `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{masterIP} "sudo service spark restart"`
@@ -184,10 +190,16 @@ if is_zk_specified || (actionName == "replace") || (actionName == "update")
           # Start this worker if its corresponding cloud has been
           # restarted or if the worker has been replaced or added.
           if (restartedClouds.include? cloudid) || ((actionName == "add") || (thisWorkerAction == "replace") || (thisWorkerAction == "add") || (thisWorkerAction == "update"))
-            Chef::Log.debug("Starting worker on #{workerIP} with master URL #{thisMasterURL}")
+            # Only change the Spark Master URL if the installation is
+            # a Zookeeper installation
+            if is_zk_specified
+              Chef::Log.debug("Starting worker on #{workerIP} with master URL #{thisMasterURL}")
 
-            # Echo the spark master URL to this server
-            `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{workerIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master  > /dev/null"`
+              # Echo the spark master URL to this server
+              `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{workerIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master  > /dev/null"`
+            else
+              Chef::Log.debug("Starting worker on #{workerIP}")
+            end
 
             # Restart the Spark worker service on this node
             `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{workerIP} "sudo service spark restart"`
@@ -210,11 +222,15 @@ if is_zk_specified || (actionName == "replace") || (actionName == "update")
 
           thisClientAction = thisClient.has_key?("rfcAction") ? thisClient.rfcAction : "";
 
-          # Update this client. Make sure the Spark master URL is accurate.
-          Chef::Log.debug("Updating client on #{clientIP} with master URL #{thisMasterURL}")
+          # Only change the Spark Master URL if the installation is
+          # a Zookeeper installation
+          if is_zk_specified
+            # Update this client. Make sure the Spark master URL is accurate.
+            Chef::Log.debug("Updating client on #{clientIP} with master URL #{thisMasterURL}")
 
-          # Echo the spark master URL to this server
-          `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{clientIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master  > /dev/null"`
+            # Echo the spark master URL to this server
+            `ssh -i #{ssh_key_file} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null oneops@#{clientIP} "echo -n \"#{thisMasterURL}\" | sudo tee /opt/spark/conf/spark.master  > /dev/null"`
+          end
         end
       end
       notifies :delete, "file[#{ssh_key_file}]", :delayed

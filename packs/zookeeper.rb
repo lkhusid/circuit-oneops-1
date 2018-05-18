@@ -41,7 +41,7 @@ resource "zookeeper",
              'initial_timeout_ticks' => "10",
              'sync_timeout_ticks' => "5",
              'max_session_timeout' => "40000",
-             'max_client_connections' => "1000",
+             'max_client_connections' => "60",
              'autopurge_snapretaincount' => "10",
              'autopurge_purgeinterval' => "6"
              },
@@ -55,7 +55,7 @@ resource "zookeeper",
                                'up' => metric(:unit => '%', :description => 'Percent Up'),
                            },
                            :thresholds => {
-                               'ZookeeperProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                               'ZookeeperProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                            }
              },
             'cluster_health' =>  {'description' => 'Cluster Health',
@@ -225,8 +225,8 @@ resource "volume",
                   'metrics' => { 'space_used' => metric( :unit => '%', :description => 'Disk Space Percent Used'),
                                  'inode_used' => metric( :unit => '%', :description => 'Disk Inode Percent Used') },
                   :thresholds => {
-                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',90,5,1),reset('<',90,5,1)),
+                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',80,5,1),reset('<',70,5,1)),
+                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',80,5,1),reset('<',70,5,1)),
                   },
                 }
     }
@@ -277,7 +277,7 @@ resource "jolokia_proxy",
 
 # depends_on
 [
-  {:from => 'volume', :to => 'user-zookeeper'},
+  {:from => 'user-zookeeper', :to => 'volume'},
   {:from => 'volume', :to => 'os'},
   {:from => 'user-zookeeper', :to => 'os'},
   {:from => 'zookeeper', :to => 'user-zookeeper'},
@@ -288,6 +288,7 @@ resource "jolokia_proxy",
   {:from => 'zookeeper', :to => 'java'},
   {:from => 'java', :to => 'os'},
   {:from => 'diskcleanup-job', :to => 'os'},
+  {:from => 'diskcleanup-job', :to => 'volume'},
   {:from => 'jolokia_proxy', :to => 'java'}
 ].each do |link|
   relation "#{link[:from]}::depends_on::#{link[:to]}",

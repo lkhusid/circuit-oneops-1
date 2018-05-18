@@ -18,7 +18,7 @@ if "#{solr_version}".start_with? "4."
 	end
 end
 
-if ("#{solr_version}".start_with? "5.") || ("#{solr_version}".start_with? "6.")
+if ("#{solr_version}".start_with? "5.") || ("#{solr_version}".start_with? "6.") || ("#{solr_version}".start_with? "7.")
 	execute "solr#{solrmajorversion} status" do
 	  command "service solr#{solrmajorversion} status"
 	  user "root"

@@ -38,6 +38,16 @@ zookeeper.connect=<%= (zk_peers.to_a).join(":9091,") %>:9091
 
 
 <% if !node['kafka']['version'].eql?('0.8.2.1') && node['kafka']['enable_rack_awareness'].eql?('true') %>
+<% if (node.workorder.cloud.ciName.include? "azure-japan") %>
+<% if ( JSON.parse(node.workorder.payLoad.ManagedVia[0][:ciAttributes][:zone])['update_domain'] % 3 == 0) %>
+broker.rack=2
+<% else %>
+broker.rack=<%= JSON.parse(node.workorder.payLoad.ManagedVia[0][:ciAttributes][:zone])['fault_domain'] %>
+<% end %>
+<% elsif (node.workorder.cloud.ciName.include? "-az") %>
+broker.rack=<%= JSON.parse(node.workorder.payLoad.ManagedVia[0][:ciAttributes][:zone])['fault_domain'] %>
+<% else %>
 broker.rack=<%= node.workorder.cloud.ciName %>
+<% end %>
 <% end %>
 

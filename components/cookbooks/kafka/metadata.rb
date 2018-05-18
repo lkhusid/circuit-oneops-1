@@ -20,7 +20,7 @@ attribute 'version',
     :category => '1.Global',
     :help => 'Version of kafka',
     :order => 1,
-    :form => {'field' => 'select', 'options_for_select' => [['0.10.2.0', '0.10.2.0']]}
+    :form => {'field' => 'select', 'options_for_select' => [['0.10.2.0', '0.10.2.0'],['1.0.0', '1.0.0']]}
   }
 
 attribute 'use_external_zookeeper',
@@ -54,6 +54,30 @@ attribute 'zk_quorum_size',
     :form => {'field' => 'select', 'options_for_select' => [['3', '3'], ['5', '5']]}
 }
 
+
+attribute 'is_zk_secured',
+  :description => "Is ZooKeeper Secured",
+  :default => 'false',
+  :format => {
+    :category => '1.Global',
+    :filter => {'all' => {'visible' => 'use_external_zookeeper:eq:true && version:neq:0.8.2.1'}},
+    :help => 'Check this box only if your ZooKeeper is Secured or SASL enabled',
+    :order => 5,
+    :form => {'field' => 'checkbox'}
+}
+
+attribute 'zk_sasl_admin_password',
+  :description          => 'Zookeeper SASL "admin" password',
+  :default               => '',
+  :encrypted => true,
+  :format => {
+    :category => '1.Global',
+    :filter => {'all' => {'visible' => 'is_zk_secured:eq:true'}},
+    :help => 'Password of the "admin" user for sasl/plain in Zookeeper',
+    :order => 6
+}
+
+
 attribute 'kafka_server_log_retention_bytes',
   :description          => 'Kafka Log4j retention in MB',
   :required => "required",
@@ -61,7 +85,7 @@ attribute 'kafka_server_log_retention_bytes',
   :format => {
     :category => '1.Global',
     :help => 'Megabytes of Kafka Log4j logs to retain',
-    :order => 5,
+    :order => 7,
     :pattern => "[0-9]+"
 }
 
@@ -72,7 +96,7 @@ attribute 'restart_flavor',
   :format => {
     :category => '1.Global',
     :help => 'How do you want Kafka restart upon config/binary changes',
-    :order => 6,
+    :order => 8,
     :form => {'field' => 'select', 'options_for_select' => [['Rolling Restart (slow, no interruption)', 'rolling'], ['No Restart', 'no']]}
 }
 
@@ -83,7 +107,7 @@ attribute 'rolling_restart_max_tries',
   :format => {
     :category => '1.Global',
     :help => 'Timeout = rolling_restart_max_tries * rolling_restart_sleep_time. If Kafka holds large amount of data, increase this number to give more tolerance (time) of rolling restart',
-    :order => 7,
+    :order => 9,
     :filter => {'all' => {'visible' => 'restart_flavor:eq:rolling'}},
     :pattern => "[0-9]+"
 }
@@ -95,7 +119,7 @@ attribute 'rolling_restart_sleep_time',
   :format => {
     :category => '1.Global',
     :help => 'Timeout = rolling_restart_max_tries * rolling_restart_sleep_time. If Kafka holds large amount of data, increase this number to give more tolerance (time) of rolling restart',
-    :order => 8,
+    :order => 10,
     :filter => {'all' => {'visible' => 'restart_flavor:eq:rolling'}},
     :pattern => "[0-9]+"
 }
@@ -107,7 +131,7 @@ attribute 'rolling_restart_sleep_time',
   :format => {
     :category => '1.Global',
     :help => 'JVM param specification in MB e.g. 1024',
-    :order => 9,
+    :order => 11,
     :pattern => "[0-9]+"
   }
 

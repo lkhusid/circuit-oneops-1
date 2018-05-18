@@ -30,6 +30,11 @@ file "/etc/kafka-manager/application.conf" do
     only_if { File.exists?("/etc/kafka-manager/application.conf") }
 end
 
+file "/etc/kafka-manager/logback.xml" do
+  action :delete
+  only_if { File.exists?("/etc/kafka-manager/logback.xml") }
+end
+
 # get the common prefix of hostname, e.g. kafka82-609889 is the common prefix of kafka82-609889-3-4783711, kafka82-609889-2-4783708, kafka82-609889-1-4783705
 array = node[:hostname].split("-")
 # NOTE: hostname_common_prefix will not be very helpful, unless making reverse DNS resolution work for each Kafka broker node
@@ -59,7 +64,6 @@ directory "/etc/kafka-console" do
   action :create
 end
 
-
 # kafka-manager.conf
 template "/etc/kafka-manager/application.conf" do
   source "application.conf.erb"
@@ -67,6 +71,13 @@ template "/etc/kafka-manager/application.conf" do
   group  'root'
   mode   '0644'
   variables :zookeeper_fqdn => zookeeper_fqdn
+end
+
+template "/etc/kafka-manager/logback.xml" do
+  source "logback.xml.erb"
+  owner  'root'
+  group  'root'
+  mode   '0644'
 end
 
 # /etc/default/kafka-manager
@@ -79,18 +90,18 @@ end
 
 # kafka-manager service
 service "kafka-manager" do
-  provider Chef::Provider::Service::Systemd
-  action [:start, :enable]
-  supports :status => true, :restart => true,:stop => true, :start => true, :reload => true
+  provider Chef::Provider::Service::Init
+  service_name 'kafka-manager'
+  supports  :restart => true, :status => true, :stop => true, :start => true
+  action :start
 end
 
 kafka_version = payLoad["ciAttributes"]["version"]
-  
+
 # add the current Kafka cluster into kafka-manager
 template "/etc/kafka-manager/add_init_cluster.sh" do
   source "add_init_cluster.sh.erb"
-  owner  	'root'
-  
+  owner  'root'
   group  'root'
   mode   '0755'
   variables ({
@@ -98,5 +109,3 @@ template "/etc/kafka-manager/add_init_cluster.sh" do
     :kafka_version => kafka_version
   })
 end
-
-

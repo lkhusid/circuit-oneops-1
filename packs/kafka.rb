@@ -26,7 +26,7 @@ resource "os",
        "ostype"  => "centos-7.2",
        "limits" => '{"nofile": 16384}',
        "sysctl"  => '{"net.ipv4.tcp_mem":"3064416 4085888 6128832", "net.ipv4.tcp_rmem":"4096 1048576 16777216", "net.ipv4.tcp_wmem":"4096 1048576 16777216", "net.core.rmem_max":"16777216", "net.core.wmem_max":"16777216", "net.core.rmem_default":"1048576", "net.core.wmem_default":"1048576", "fs.file-max":"1048576"}',
-             "dhclient"  => 'false' }
+             "dhclient"  => 'true' }
   
 resource 'compute',
          :cookbook => 'oneops.1.compute',
@@ -41,7 +41,7 @@ resource "os-console",
        "ostype"  => "centos-7.2",
        "limits" => '{"nofile": 16384}',
        "sysctl"  => '{"net.ipv4.tcp_mem":"3064416 4085888 6128832", "net.ipv4.tcp_rmem":"4096 1048576 16777216", "net.ipv4.tcp_wmem":"4096 1048576 16777216", "net.core.rmem_max":"16777216", "net.core.wmem_max":"16777216", "net.core.rmem_default":"1048576", "net.core.wmem_default":"1048576", "fs.file-max":"1048576"}',
-             "dhclient"  => 'false' }
+             "dhclient"  => 'true' }
   
 resource 'compute-console',
   :design => true,
@@ -116,7 +116,7 @@ resource "kafka",
                                'up' => metric(:unit => '%', :description => 'Percent Up'),
                            },
                            :thresholds => {
-                               'KafkaProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                               'KafkaProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                            }
              },
             'jmxprocess' => {:description => 'JmxProcess',
@@ -128,7 +128,7 @@ resource "kafka",
                      'up' => metric(:unit => '%', :description => 'Percent Up'),
                  },
                  :thresholds => {
-                     'JmxProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                     'JmxProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                  }
              },
 #               'kafkazkconn' => {:description => 'KafkaZKConn',
@@ -226,7 +226,7 @@ resource "kafka-console",
 	             'up' => metric(:unit => '%', :description => 'Percent Up'),
              },
 			 :thresholds => {
-	           'KafkaManagerProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+	           'KafkaManagerProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
              }
         },
         'nginxprocess' => {:description => 'NginxProcess',
@@ -238,7 +238,7 @@ resource "kafka-console",
                 'up' => metric(:unit => '%', :description => 'Percent Up'),
             },
             :thresholds => {
-                'NginxProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                'NginxProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
             }
         }
      }
@@ -328,8 +328,8 @@ resource "volume-persistent",
         'metrics' => {'space_used' => metric(:unit => '%', :description => 'Disk Space Percent Used'),
             'inode_used' => metric(:unit => '%', :description => 'Disk Inode Percent Used')},
         :thresholds => {
-            'LowDiskSpace' => threshold('1m', 'avg', 'space_used', trigger('>=', 90, 5, 2), reset('<', 85, 5, 1)),
-            'LowDiskInode' => threshold('1m', 'avg', 'inode_used', trigger('>=', 90, 5, 2), reset('<', 85, 5, 1))
+            'LowDiskSpace' => threshold('1m', 'avg', 'space_used', trigger('>=', 60, 5, 2), reset('<', 55, 5, 1)),
+            'LowDiskInode' => threshold('1m', 'avg', 'inode_used', trigger('>=', 60, 5, 2), reset('<', 55, 5, 1))
         }
     }
 }
@@ -356,8 +356,8 @@ resource "volume-kafka",
                   'metrics' => { 'space_used' => metric( :unit => '%', :description => 'Disk Space Percent Used'),
                                  'inode_used' => metric( :unit => '%', :description => 'Disk Inode Percent Used') },
                   :thresholds => {
-                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',90,5,1),reset('<',90,5,1)),
-                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',90,5,1),reset('<',90,5,1)),
+                    'LowDiskSpace' => threshold('5m','avg','space_used',trigger('>',60,5,1),reset('<',55,5,1)),
+                    'LowDiskInode' => threshold('5m','avg','inode_used',trigger('>',60,5,1),reset('<',55,5,1)),
                   },
                 }
     }

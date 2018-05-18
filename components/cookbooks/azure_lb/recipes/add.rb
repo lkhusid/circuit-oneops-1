@@ -272,33 +272,23 @@ else
   nic_svc = AzureNetwork::NetworkInterfaceCard.new(creds)
   nic_svc.rg_name = resource_group_name
   nic_svc.location = location
+  platform_id = node['workorder']['box']['ciId']
 
-  # Traverse the compute-natrules
-  compute_natrules.each do |compute|
-    # Get the azure VM
-    vm = vm_svc.get(resource_group_name, compute[:instance_name])
+  nics = nic_svc.get_all_nics_in_rg(resource_group_name)
+  nics = nics.select { |item| item.name.include? platform_id.to_s } if Utils.is_new_cloud(node)
 
-    if vm.nil?
-      OOLog.info("VM Not Fetched: '#{compute[:instance_name]}' ")
-      next # could not find VM. Nothing to be done; skipping
-    else
-      # the asumption is that each VM will have only one NIC
-      nic_id = vm.network_interface_card_ids[0]
-      nic_name = nic_svc.get_nic_name(nic_id)
-      # nic = nic_svc.get(resource_group_name, nic_name)
-      nic = nic_svc.get(nic_name)
-
-      if nic.nil?
-        next # Could not find NIC. Nothing to be done; skipping
-      else
-        # Update the NIC with LB info - Associate VM with LB
+   # Traverse each NIC and update it with the LB info
+   nics.each do |nic|
+    compute_natrules.each do |compute|
+      if nic.virtual_machine_id.eql? compute[:instance_id]
         nic.load_balancer_backend_address_pools_ids = backend_address_pool_ids
         compute_nat_rules_id = "/subscriptions/#{subscription_id}/resourceGroups/#{resource_group_name}/providers/Microsoft.Network/loadBalancers/#{lb_name}/inboundNatRules/#{compute[:nat_rule][:name]}"
         nic.load_balancer_inbound_nat_rules_ids = [compute_nat_rules_id]
         nic_svc.create_update(nic)
+        break
       end
     end
-  end # end of compute_natrules loop
+  end
 end # end of main lb IF
 
 lbip = nil

@@ -7,14 +7,17 @@ require 'fog'
 token = node[:workorder][:ci][:ciAttributes]
 
 begin
-conn = Fog::Volume.new({
-  :provider => 'OpenStack',
-  :openstack_api_key => token[:password],
-  :openstack_username => token[:username],
-  :openstack_tenant => token[:tenant],
-  :openstack_auth_url => token[:endpoint]
-})
-Chef::Log.info("credentials ok")
+  conn = Fog::Volume.new({
+    :provider => 'OpenStack',
+    :openstack_api_key => token[:password],
+    :openstack_username => token[:username],
+    :openstack_tenant => token[:tenant],
+    :openstack_auth_url => token[:endpoint],
+    :openstack_project_name => token[:domain],
+    :openstack_domain_name => domain
+  })
+
+  Chef::Log.info("credentials ok")
 
 rescue Exception => e
   Chef::Log.error("credentials bad: #{e.inspect}")

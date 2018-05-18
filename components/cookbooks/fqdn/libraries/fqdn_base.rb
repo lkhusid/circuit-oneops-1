@@ -90,6 +90,18 @@ def get_customer_domain
   return customer_domain
 end #def get_customer_domain
 
+def is_wildcard_enabled(node)
+  if node['workorder'].has_key?('config') && !node['workorder']['config'].empty?
+    config = node['workorder']['config']
+    if config.has_key?('is_wildcard_enabled') && !config['is_wildcard_enabled'].empty? && config['is_wildcard_enabled'] == 'true'
+      return true
+    else
+      return false
+    end
+  end
+  return false
+end
+
 module Fqdn
 
   module Base

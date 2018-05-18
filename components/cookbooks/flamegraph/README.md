@@ -1,2 +1,0 @@
-Flamegraph Ingestion Cookbook
-========================

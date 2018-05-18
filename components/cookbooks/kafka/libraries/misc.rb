@@ -233,13 +233,13 @@ def setup_ssl_get_props
     hostname.gsub!("\n", "")
 
     if sslEnabled
-      keystore = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.Keystore" }
+      keystore = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.oneops.1.Keystore" }
       if keystore.nil? || keystore.size==0
         Chef::Log.error("Keystore component is missing.")
         exit 1
       end
       Chef::Log.info('keystore' + keystore.to_s)
-      cert = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.Certificate" }
+      cert = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.oneops.1.Certificate" }
       if cert.nil? || cert.size==0
         Chef::Log.error("Certificate component is missing.")
         exit 1

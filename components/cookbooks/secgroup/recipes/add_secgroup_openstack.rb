@@ -10,13 +10,16 @@ description = node.workorder.rfcCi.ciAttributes[:description] || node.secgroup_n
 
 cloud_name = node['workorder']['cloud']['ciName']
 cloud = node['workorder']['services']['compute'][cloud_name]['ciAttributes']
+domain = cloud.key?('domain') ? cloud[:domain] : 'default'
       
 conn = Fog::Network.new({
   :provider => 'OpenStack',
   :openstack_api_key => cloud[:password],
   :openstack_username => cloud[:username],
   :openstack_tenant => cloud[:tenant],
-  :openstack_auth_url => cloud[:endpoint]
+  :openstack_auth_url => cloud[:endpoint],
+  :openstack_project_name => cloud[:tenant],
+  :openstack_domain_name => domain
 })
 
 security_groups = conn.security_groups.all.select { |g| g.name == node.secgroup_name}

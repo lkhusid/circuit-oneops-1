@@ -88,15 +88,21 @@ module AzureNetwork
         OOLog.info("Deleting load balancer '#{load_balancer_name}' from '#{resource_group_name}' ")
         start_time = Time.now.to_i
         result = @azure_network_service.load_balancers.get(resource_group_name, load_balancer_name).destroy
-        end_time = Time.now.to_i
-        duration = end_time - start_time
       rescue  MsRestAzure::AzureOperationError => e
         msg = "Error Code: #{e.body['error']['code']}"
         msg += "Error Message: #{e.body['error']['message']}"
         OOLog.fatal("Error deleting load balancer '#{load_balancer_name}'. #{msg} ")
       rescue => ex
-        OOLog.fatal("Error deleting load balancer '#{load_balancer_name}'. #{ex.message} ")
+        if ex.to_s =~ %r/Resource group \S+ could not be found./ 
+          OOLog.info("The Resource Group #{resource_group_name} does not exist. Moving on...")
+        elsif ex.to_s =~ %r/The Resource \S+ under resource group \S+ was not found./
+          OOLog.info("The Load Balancer #{load_balancer_name} does not exist. Moving on...")
+        else
+          OOLog.fatal("Error deleting load balancer '#{load_balancer_name}'. #{ex.message} ")
+        end
       end
+      end_time = Time.now.to_i
+      duration = end_time - start_time
       OOLog.info("operation took #{duration} seconds")
       result
     end
@@ -197,6 +203,28 @@ module AzureNetwork
         return found[0]
       end
 
+    end
+
+    def get_backend_ip_configurations(resource_group_name, lb_name, azure_creds, backend_address_pool_id = nil)
+
+      creds = azure_creds
+      token_provider                  = MsRestAzure::ApplicationTokenProvider.new(creds[:tenant_id], creds[:client_id], creds[:client_secret])
+      credentials                     = MsRest::TokenCredentials.new(token_provider)
+      network_client                  = Azure::ARM::Network::NetworkManagementClient.new(credentials)
+      network_client.subscription_id  = creds[:subscription_id]
+
+
+      lb = network_client.load_balancers.get(resource_group_name, lb_name, nil, nil)
+      backend_ip_configurations = nil
+
+      if backend_address_pool_id.nil?
+        backend_ip_configurations = lb.backend_address_pools[0].backend_ipconfigurations
+      else
+        backend_address_pool = lb.backend_address_pools.detect {|p| p.id == backend_address_pool_id}
+        backend_ip_configurations = backend_address_pool.backend_ipconfigurations unless backend_address_pool.nil?
+      end
+
+      return backend_ip_configurations
     end
   end
 end

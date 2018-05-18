@@ -1,5 +1,7 @@
 require "ostruct"
 require_relative "ext_kernel"
+require_relative "iis_web_app"
+
 
 module OO
   class IIS
@@ -8,6 +10,7 @@ module OO
       class NullEntity < OpenStruct
         def nil?; true; end
         def Delete_(*attrs, &block); end
+        def Count; 0; end
       end
 
       silence_warnings do
@@ -23,14 +26,27 @@ module OO
 
       def reload
         @entity = @web_administration.find(SITE, @name) || NullEntity.new
+        @web_site = get_website || NullEntity.new
       end
 
       def exists?
         not @entity.nil?
       end
 
+      def app_virtual_path
+        '/'
+      end
+
       def start
         @entity.Start
+      end
+
+      def get_website
+        @web_administration.readable_section_for(SITE_SECTION) do |section|
+          collection = section.Collection
+          position = (0..(collection.Count-1)).find { |i| collection.Item(i).GetPropertyByName("name").Value == @name }
+          collection.Item(position) unless position.nil?
+        end
       end
 
       def create(attributes)
@@ -43,6 +59,47 @@ module OO
 
       def delete
         @web_administration.delete(SITE, @name).tap { reload }
+      end
+
+      def application_exists?(path)
+        app_position = get_application_position(path)
+        !app_position.nil?
+      end
+
+      def get_application(path)
+        app_position = get_application_position(path)
+        applications = @web_site.Collection
+        application_element = applications.Item(app_position)
+        WebApp.new(application_element).application_attributes
+      end
+
+      def get_application_position(path)
+        collection = @web_site.Collection
+        (0..(collection.Count-1)).find { |i| collection.Item(i).Properties.Item("path").Value == path }
+      end
+
+      def create_application(attributes)
+        @web_administration.application_writable_section_for(SITE_SECTION, @name) do |site|
+          application_collection = site.Collection
+          application_element = application_collection.CreateNewElement("application")
+          WebApp.new(application_element).create(attributes)
+          application_collection.AddElement(application_element)
+        end
+      end
+
+      def update_application(attributes)
+        @web_administration.application_writable_section_for(SITE_SECTION, @name) do |site|
+          application_collection = site.Collection
+          application_element = application_collection.Item(get_application_position(attributes["application_path"]))
+          WebApp.new(application_element).update(attributes)
+        end
+      end
+
+      def delete_application(path)
+        @web_administration.application_writable_section_for(SITE_SECTION, @name) do |site|
+          application_collection = site.Collection
+          application_collection.DeleteElement(get_application_postion(path))
+        end
       end
 
       def resource_needs_change(attributes)
@@ -72,17 +129,17 @@ module OO
           update_attributes["bindings"] = attributes["bindings"] unless (bindings - new_bindings).empty?
 
           applications = site.Collection
-          (0..(applications.Count-1)).each do |i|
-            app_element = applications.Item(i)
-            app_pool = app_element.GetPropertyByName("applicationPool").Value
-            update_attributes["application_pool"] = attributes["application_pool"] if app_pool != attributes["application_pool"]
-            virtual_dirs = app_element.Collection
-            (0..(virtual_dirs.Count-1)).each do |i|
-              virtual_directory = virtual_dirs.Item(i)
-              virtual_directory_physical_path = virtual_directory.GetPropertyByName("physicalPath").Value
-              update_attributes["virtual_directory_physical_path"] = attributes["virtual_directory_physical_path"] if virtual_directory_physical_path != attributes["virtual_directory_physical_path"]
-            end
-          end
+          app_position = (0..(applications.Count-1)).find { |i| applications.Item(i).Properties.Item("path").Value == app_virtual_path }
+          app_element = applications.Item(app_position)
+          app_pool = app_element.GetPropertyByName("applicationPool").Value
+          update_attributes["application_pool"] = attributes["application_pool"] if app_pool != attributes["application_pool"]
+
+          virtual_dirs = app_element.Collection
+          virtual_directory_position = (0..(virtual_dirs.Count-1)).find { |i| virtual_dirs.Item(i).Properties.Item("path").Value == app_virtual_path }
+          virtual_directory = virtual_dirs.Item(virtual_directory_position)
+          virtual_directory_physical_path = virtual_directory.GetPropertyByName("physicalPath").Value
+          update_attributes["virtual_directory_physical_path"] = attributes["virtual_directory_physical_path"] if virtual_directory_physical_path != attributes["virtual_directory_physical_path"]
+
         end
         update_attributes.empty?
       end
@@ -109,11 +166,11 @@ module OO
           end
           site_collection = site_element.Collection
           application_element = site_collection.CreateNewElement("application")
-          application_element.Properties.Item("path").Value = attributes["application_path"]
+          application_element.Properties.Item("path").Value = app_virtual_path
           application_element.Properties.Item("applicationPool").Value = attributes["application_pool"]
           application_collection = application_element.Collection
           virtual_directory_element = application_collection.CreateNewElement("virtualDirectory")
-          virtual_directory_element.Properties.Item("path").Value = attributes["virtual_directory_path"]
+          virtual_directory_element.Properties.Item("path").Value = app_virtual_path
           virtual_directory_element.Properties.Item("physicalPath").Value = attributes["virtual_directory_physical_path"]
           application_collection.AddElement(virtual_directory_element)
           site_collection.AddElement(application_element)
@@ -142,17 +199,17 @@ module OO
               end
             end
           end
+
           applications = site.Collection
-          (0..(applications.Count-1)).each do |i|
-            app_element = applications.Item(i)
-            app_element.Properties.Item("applicationPool").Value = attributes["application_pool"] if attributes.has_key?("application_pool")
-            virtual_dirs = app_element.Collection
-            (0..(virtual_dirs.Count-1)).each do |i|
-              virtual_directory = virtual_dirs.Item(i)
-              virtual_directory.Properties.Item("physicalPath").Value = attributes["virtual_directory_physical_path"] if attributes.has_key?("virtual_directory_physical_path")
-              virtual_directory.Properties.Item("path").Value = attributes["virtual_directory_path"] if attributes.has_key?("virtual_directory_path")
-            end
-          end
+          app_position = (0..(applications.Count-1)).find { |i| applications.Item(i).Properties.Item("path").Value == app_virtual_path }
+          app_element = applications.Item(app_position)
+          app_element.Properties.Item("applicationPool").Value = attributes["application_pool"] if attributes.has_key?("application_pool")
+
+          virtual_dirs = app_element.Collection
+          virtual_directory_position = (0..(virtual_dirs.Count-1)).find { |i| virtual_dirs.Item(i).Properties.Item("path").Value == app_virtual_path }
+          virtual_directory = virtual_dirs.Item(virtual_directory_position)
+          virtual_directory.Properties.Item("physicalPath").Value = attributes["virtual_directory_physical_path"] if attributes.has_key?("virtual_directory_physical_path")
+
         end
         reload
       end

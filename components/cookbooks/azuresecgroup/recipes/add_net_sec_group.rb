@@ -15,54 +15,66 @@ credentials = {
     client_id: compute_service['client_id'],
     subscription_id: compute_service['subscription']
 }
-ns_path_parts = node['workorder']['rfcCi']['nsPath'].split('/')
-org = ns_path_parts[1]
-assembly = ns_path_parts[2]
-environment = ns_path_parts[3]
-platform_ci_id = node['workorder']['box']['ciId']
+
 location = compute_service[:location]
+rg_manager = AzureBase::ResourceGroupManager.new(node)
+nsg_service = AzureNetwork::NetworkSecurityGroup.new(credentials)
 
-network_security_group_name = node[:name]
-
-# Get resource group name
-resource_group_name = AzureResources::ResourceGroup.get_name(org, assembly, platform_ci_id, environment, location)
-
-# Creating security rules objects
-nsg = AzureNetwork::NetworkSecurityGroup.new(credentials)
-rules = node['secgroup']['inbound'].tr('"[]\\', '').split(',')
 sec_rules = []
-priority = 100
-reg_ex = /(\d+|\*|\d+-\d+)\s(\d+|\*|\d+-\d+)\s([A-Za-z]+|\*)\s\S+/
-rules.each do |item|
-  raise "#{item} is not a valid security rule" unless reg_ex.match(item)
-  item2 = item.split(' ')
-  security_rule_access = Fog::ARM::Network::Models::SecurityRuleAccess::Allow
-  security_rule_description = node['secgroup']['description']
-  security_rule_source_addres_prefix = item2[3]
-  security_rule_destination_port_range = item2[1].to_s
-  security_rule_direction = Fog::ARM::Network::Models::SecurityRuleDirection::Inbound
-  security_rule_priority = priority
-  security_rule_protocol = case item2[2].downcase
-                           when 'tcp'
-                             Fog::ARM::Network::Models::SecurityRuleProtocol::Tcp
-                           when 'udp'
-                             Fog::ARM::Network::Models::SecurityRuleProtocol::Udp
-                           else
-                             Fog::ARM::Network::Models::SecurityRuleProtocol::Asterisk
-                           end
-  security_rule_provisioning_state = nil
-  security_rule_destination_addres_prefix = '*'
-  security_rule_source_port_range = '*'
-  security_rule_name = network_security_group_name + '-' + priority.to_s
-  sec_rules << { name: security_rule_name, resource_group: resource_group_name, protocol: security_rule_protocol, network_security_group_name: network_security_group_name, source_port_range: security_rule_source_port_range, destination_port_range: security_rule_destination_port_range, source_address_prefix: security_rule_source_addres_prefix, destination_address_prefix: security_rule_destination_addres_prefix, access: security_rule_access, priority: security_rule_priority, direction: security_rule_direction }
-  priority += 100
+resource_group_name = nil
+network_security_group_name = nil
+
+is_new_cloud = Utils.is_new_cloud(node)
+
+if is_new_cloud
+  all_nsgs_in_rg = nil
+  matched_nsgs = []
+  pack_name = Utils.get_pack_name(node)
+
+  rg_manager.rg_name = Utils.get_nsg_rg_name(location)
+  rg_manager.location = location
+
+  resource_group_name = rg_manager.rg_name
+
+  rg_exists = rg_manager.exists?
+
+  if rg_exists
+    all_nsgs_in_rg = nsg_service.list_security_groups(resource_group_name)
+    unless all_nsgs_in_rg.empty?
+      matched_nsgs = nsg_service.get_matching_nsgs(all_nsgs_in_rg, pack_name)
+    end
+  else
+    rg_manager.add
+  end
+
+  network_security_group_name = Utils.get_nsg_name(node)
+
+  sec_rules = nsg_service.get_sec_rules(node, network_security_group_name, resource_group_name)
+
+  unless matched_nsgs.empty?
+    matched_nsg_id = nsg_service.match_nsg_rules(matched_nsgs, sec_rules)
+    unless matched_nsg_id.nil?
+      node.set['updated_nsg_id'] = matched_nsg_id
+      return
+    end
+  end
+else
+  network_security_group_name = node[:name]
+
+  # Get resource group name
+  resource_group_name = rg_manager.rg_name
+
+  sec_rules = nsg_service.get_sec_rules(node, network_security_group_name, resource_group_name)
 end
 
 parameters = Fog::Network::AzureRM::NetworkSecurityGroup.new
 parameters.location = location
 parameters.security_rules = sec_rules
 
-nsg_result = nsg.create_update(resource_group_name, network_security_group_name, parameters)
+nsg_result = nsg_service.create_update(resource_group_name, network_security_group_name, parameters)
+# send the name of NSG to compute workorder
+puts "***RESULT:net_sec_group_id=#{nsg_result.id}"
+node.set['updated_nsg_id'] = nsg_result.id
 
 if !nsg_result.nil?
   Chef::Log.info("The network security group has been created\n\rid: '#{nsg_result.id}'\n\r'#{nsg_result.location}'\n\r'#{nsg_result.name}'\n\r")

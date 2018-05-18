@@ -25,21 +25,29 @@ Excon.defaults[:write_timeout] = 300
 
 cloud_name = node[:workorder][:cloud][:ciName]
 compute_service = node[:workorder][:services][:compute][cloud_name][:ciAttributes]
+domain = compute_service.key?('domain') ? compute_service[:domain] : 'default'
+(node[:workorder].has_key?('config') && node[:workorder][:config].has_key?('FAST_IMAGE'))   ? (fast_flag = node[:workorder][:config][:FAST_IMAGE])      : (fast_flag = 'false')
+(node[:workorder].has_key?('config') && node[:workorder][:config].has_key?('TESTING_MODE')) ? (testing_flag = node[:workorder][:config][:TESTING_MODE]) : (testing_flag = 'false')
+Chef::Log.info("FAST_IMAGE flag: #{fast_flag}, TESTING_MODE flag #{testing_flag}")
 
 conn = Fog::Compute.new({
   :provider => 'OpenStack',
   :openstack_api_key => compute_service[:password],
   :openstack_username => compute_service[:username],
   :openstack_tenant => compute_service[:tenant],
-  :openstack_auth_url => compute_service[:endpoint]
-})
-
+  :openstack_auth_url => compute_service[:endpoint],
+  :openstack_project_name => compute_service[:tenant],
+  :openstack_domain_name => domain
+})  
 
 rfcCi = node["workorder"]["rfcCi"]
 nsPathParts = rfcCi["nsPath"].split("/")
 customer_domain = node["customer_domain"]
 owner = node.workorder.payLoad.Assembly[0].ciAttributes["owner"] || "na"
 ostype = node.workorder.payLoad.os[0].ciAttributes["ostype"]
+
+# Fast Image matching pattern
+fast_image_pattern = /[a-zA-Z]{1,20}-#{ostype.gsub(/\./, "")}-\d{4}-v\d{8}-\d{4}/i
 
 #Baremetal condition
 additional_properties = JSON.parse(node.workorder.services.compute[cloud_name][:ciAttributes][:additional_properties])
@@ -133,12 +141,34 @@ ruby_block 'set flavor/image/availability_zone' do
       # size / flavor
       flavor = conn.flavors.get node.size_id
       Chef::Log.info("flavor: "+flavor.inspect.gsub("\n"," ").gsub("<","").gsub(">",""))
-
-      # image_id
-      image = conn.images.get node.image_id
-      Chef::Log.info("image: "+image.inspect.gsub("\n"," ").gsub("<","").gsub(">",""))
-
       exit_with_error "Invalid compute size provided #{node.size_id} .. Please specify different Compute size." if flavor.nil?
+
+      # Fast image logic
+
+      (node[:workorder][:payLoad].has_key?("os")) ? (os = node[:workorder][:payLoad][:os].first) : (os = nil)
+
+      fast_image = nil
+      if node.has_key?('image_id') && !node[:image_id].nil? && !node[:image_id].empty?
+        default_image = conn.images.get node.image_id
+      else
+        default_image = nil
+      end
+      image_list    = conn.images
+      custom_id     = (!os.nil? && os[:ciAttributes].has_key?("image_id") && !os[:ciAttributes][:image_id].empty?)
+
+      fast_image    = get_image(image_list, flavor, fast_flag, testing_flag, default_image, custom_id, node[:ostype])
+      
+      if !fast_image.nil? && fast_image.name =~ fast_image_pattern
+        node.set[:fast_image] = true
+        node.set[:image_id]   = fast_image.id
+      else
+        node.set[:fast_image] = false
+      end
+      image = fast_image
+      #----------------
+
+
+      Chef::Log.info("image: "+image.inspect.gsub("\n"," ").gsub("<","").gsub(">",""))
       exit_with_error "Invalid compute image provided #{node.image_id} .. Please specify different OS type." if image.nil?
 
       if image.name.downcase =~ /baremetal/
@@ -201,6 +231,10 @@ ruby_block 'set flavor/image/availability_zone' do
       exit_with_error "#{msg}"
     else
       node.set[:existing_server] = true
+      # detects fast image on update
+      fast_image = conn.images.get server.image['id']
+      node.set[:fast_image] = (!fast_image.nil? && fast_image.name =~ fast_image_pattern)
+      image = fast_image
     end
 
   end
@@ -543,6 +577,7 @@ ruby_block 'set node network params' do
       if ! server_image.nil?
         puts "***RESULT:server_image_id=" + server_image_id
         puts "***RESULT:server_image_name=" + server_image.name
+        node.set['image_name'] = server_image.name
       end
     end
   end

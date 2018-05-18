@@ -12,7 +12,7 @@ clustername = node['cloudrdbms']['clustername']
 runonenv = node['cloudrdbms']['runOnEnv']
 
 Chef::Log.info("CloudRDBMS started to list available backups with backup_id=#{backup_id}")
-%x( sudo /app/backup_n_restore.sh list_backups -e "#{runonenv}" -c "#{clustername}" -i "#{backup_id}" -o "/tmp/sorted_backups" >/tmp/list_backups.log 2>&1 )
+%x( sudo /app/backup_n_restore.sh list_backups -i "#{backup_id}" -o "/tmp/sorted_backups" >/tmp/list_backups.log 2>&1 )
 
 if $?.exitstatus != 0
   Chef::Log.info("#{`sudo cat /tmp/list_backups.log`}")

@@ -6,6 +6,6 @@ describe file('/usr/local/bin/objectstore') do
   it { should_not exist }
 end
 
-describe file('/etc/objectstore_creds.json') do
+describe file('/etc/objectstore_config.json') do
   it { should_not exist }
 end

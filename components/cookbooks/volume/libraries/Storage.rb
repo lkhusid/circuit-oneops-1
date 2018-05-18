@@ -179,10 +179,10 @@ module VolumeComponent
     def attach (max_retry_count = 5, sleep_sec = 10)
 
       #storage is attached and device_id is not assigned (not determined) - means it was created with the old code - detach and re-attach
-      detach if (get_is_attached && !get_assigned_device_id)
+      #detach if (get_is_attached && !get_assigned_device_id)
 
       #storage attached and device_id is assigned - just exit
-      return if (get_is_attached && get_assigned_device_id)
+      return if (get_is_attached) # && get_assigned_device_id)
 
       #capture current device list from /dev
       start_time = Time.now.to_i

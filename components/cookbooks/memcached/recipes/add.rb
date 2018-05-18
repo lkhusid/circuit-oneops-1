@@ -1,6 +1,7 @@
 ci=node['memcached']
   
 cli_opts=[
+  "-U 0", # Disabled UDP
   "-u #{ci[:user]}",
   "-p #{ci[:port]}",
   "-m #{ci['max_memory']}",
@@ -58,7 +59,7 @@ template "memcached_service" do
     source "memcached.erb"
     owner "root"
     group "root"
-    mode "0755"
+    mode "0644"
     variables(
       :cli_opts => cli_opts,
       :memcached_user => ci['user']

@@ -7,13 +7,16 @@ class TelegrafWriter
   CONST_MAX_LOG_FILE_ROTATION_DAYS = 10
   CONST_MAX_LOG_FILE_SIZE = 10 * 1024 * 1024
   MISSING_FIELD_VALUE = 0
+  DEFAULT_LOGSTATS_PATH = "/opt/meghacache/log/telegraf/stats.log"
+  DEFAULT_LOGMCROUTER_PATH = "/opt/meghacache/log/telegraf/mcroutertko.log"
 
-  def initialize(name, logfiles_path, rotate = nil, log_size = nil)
+  def initialize(name, logfiles_path, rotate = nil, log_size = nil, logstats_path = nil)
 
     @name = name
     @rotate = rotate
     @log_size = log_size
     @logfiles_path = logfiles_path
+    @logstats_path = (nil != logstats_path) ? logstats_path : DEFAULT_LOGSTATS_PATH
 
     #Use defaults if log file rotation isn't set up
     if (rotate == nil || rotate == 0)
@@ -29,7 +32,7 @@ class TelegrafWriter
     @logger = Logger.new(@logfiles_path, @rotate,  @log_size)
     @logger.level = Logger::ERROR
     
-    @stats_log = Logger.new('/opt/meghacache/log/telegraf/stats.log', @rotate,  @log_size)
+    @stats_log = Logger.new(@logstats_path , @rotate,  @log_size)
     @stats_log.formatter = proc { |_s, _d, _p, msg| "#{msg}\n" }
       
   end

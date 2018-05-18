@@ -11,15 +11,14 @@ grouping 'default',
 
 # installation attributes
 attribute 'version',
-  :description          => 'Telegraf version',
+  :description => 'Telegraf version',
   :required => "required",
-  :default               => '1.0.0',
+  :default => '1.0.0',
   :format => {
     :important => true,
     :category => 'Global',
     :help => 'Version of Telegraf. Defaults to 1.2.1 for windows',
-    :order => 1,
-    :form => {'field' => 'select', 'options_for_select' => [['v0.13.2', '0.13.2'],['v1.0.0', '1.0.0']]}
+    :order => 1
   }
 
 

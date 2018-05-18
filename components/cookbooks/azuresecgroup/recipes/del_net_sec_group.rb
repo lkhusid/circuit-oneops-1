@@ -8,6 +8,11 @@ Utils.set_proxy(node['workorder']['payLoad']['OO_CLOUD_VARS'])
 
 # get all necessary info from node
 cloud_name = node['workorder']['cloud']['ciName']
+
+is_new_cloud = Utils.is_new_cloud(node)
+
+return if is_new_cloud
+
 compute_service = node['workorder']['services']['compute'][cloud_name]['ciAttributes']
 cred_hash = {
     tenant_id: compute_service['tenant_id'],
@@ -25,7 +30,8 @@ location = compute_service[:location]
 network_security_group_name = node[:name]
 
 # Get resource group name
-resource_group_name = AzureResources::ResourceGroup.get_name(org, assembly, platform_ci_id, environment, location)
+rg_manager = AzureBase::ResourceGroupManager.new(node)
+resource_group_name = rg_manager.rg_name
 
 # Creating security rules objects
 nsg = AzureNetwork::NetworkSecurityGroup.new(cred_hash)

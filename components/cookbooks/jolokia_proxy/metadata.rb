@@ -44,7 +44,6 @@ attribute 'jolokia_war_version',
   :format => {
     :category => '1.Configuration Parameters',
     :help => 'Version of the Jolokia war file ',
-    :form => {'field' => 'select', 'options_for_select' => ['1.3.3']},
     :order => 3
   }    
 

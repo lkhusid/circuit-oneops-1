@@ -17,7 +17,6 @@ include_recipe "compute::ssh_port_wait"
 monitoring_enabled = true
 
 cloud_name = node[:workorder][:cloud][:ciName]
-Chef::Log.info("Workorder: #{node[:workorder]}")
 provider = node[:workorder][:services][:compute][cloud_name][:ciClassName].gsub("cloud.service.","").downcase.split(".").last
 if provider =~ /azure/
   node.set["use_initial_user"] = true

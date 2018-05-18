@@ -1,0 +1,44 @@
+<configuration>
+
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.Logger$ColoredLevel" />
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/kafka-manager.log</file>
+        <encoder>
+           <pattern>%date - [%level] - from %logger in %thread %n%message%n%xException%n</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+           <fileNamePattern>logs/kafka-manager.%i.log.zip</fileNamePattern>
+           <minIndex>1</minIndex>
+           <maxIndex>20</maxIndex>
+         </rollingPolicy>
+
+         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>50MB</maxFileSize>
+        </triggeringPolicy>
+    </appender>
+
+    <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <logger name="play" level="INFO" />
+    <logger name="application" level="INFO" />
+    <logger name="kafka.manager" level="INFO" />
+
+    <!-- Off some logs as they are annoying, and anyway we manage configuration ourself -->
+    <logger name="com.avaje.ebean.config.PropertyMapLoader" level="OFF" />
+    <logger name="com.avaje.ebeaninternal.server.core.XmlConfigLoader" level="OFF" />
+    <logger name="com.avaje.ebeaninternal.server.lib.BackgroundThread" level="OFF" />
+    <logger name="com.gargoylesoftware.htmlunit.javascript" level="OFF" />
+    <logger name="org.apache.zookeeper" level="INFO"/>
+    <logger name="org.apache.kafka.common.metrics.Metrics" level="OFF"/>
+    <logger name="org.apache.kafka.clients" level="WARN"/>
+    <logger name="org.apache.curator" level="OFF"/>
+
+    <root level="WARN">
+        <appender-ref ref="ASYNCFILE" />
+    </root>
+
+</configuration>

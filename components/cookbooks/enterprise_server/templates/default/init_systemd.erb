@@ -1,0 +1,36 @@
+# Systemd unit file for tomcat
+
+[Unit]
+Description=Enterprise Server Application Container
+After=syslog.target network.target
+
+[Service]
+Type=forking
+
+
+<% if(node['enterprise_server']['startup_shutdown'].has_key?('pre_startup_command') && !node['enterprise_server']['startup_shutdown']['pre_startup_command'].gsub(/\r\n?/,"\n").nil? && !node['enterprise_server']['startup_shutdown']['pre_startup_command'].gsub(/\r\n?/,"\n").empty?) %>
+ExecStartPre=<%= node['enterprise_server']['scripts_dir'] %>/prestartup.sh
+<% end %>
+ExecStart=<%= node['enterprise_server']['instance_dir'] %>/bin/startup.sh
+<% if(node['enterprise_server']['startup_shutdown'].has_key?('post_startup_command') && !node['enterprise_server']['startup_shutdown']['post_startup_command'].gsub(/\r\n?/,"\n").nil? && !node['enterprise_server']['startup_shutdown']['post_startup_command'].gsub(/\r\n?/,"\n").empty?) %>
+ExecStartPost=<%= node['enterprise_server']['scripts_dir'] %>/poststartup.sh
+<% end %>
+<% if(node['enterprise_server']['startup_shutdown'].has_key?('pre_shutdown_command') && !node['enterprise_server']['startup_shutdown']['pre_shutdown_command'].gsub(/\r\n?/,"\n").nil? && !node['enterprise_server']['startup_shutdown']['pre_shutdown_command'].gsub(/\r\n?/,"\n").empty?) %>
+ExecStop=<%= node['enterprise_server']['scripts_dir'] %>/preshutdown.sh
+<% end %>
+ExecStop=<%= node['enterprise_server']['instance_dir'] %>/bin/shutdown.sh
+<% if(node['enterprise_server']['startup_shutdown'].has_key?('post_shutdown_command') && !node['enterprise_server']['startup_shutdown']['post_shutdown_command'].gsub(/\r\n?/,"\n").nil? && !node['enterprise_server']['startup_shutdown']['post_shutdown_command'].gsub(/\r\n?/,"\n").empty?) %>
+ExecStopPost=<%= node['enterprise_server']['scripts_dir'] %>/postshutdown.sh
+<% end %>
+
+Restart=on-failure
+
+RestartSec=2
+
+TimeoutSec=<%= node['enterprise_server']['startup_shutdown']['stop_time'] %>
+
+User=<%= node['enterprise_server']['global']['server_user'] %>
+Group=<%= node['enterprise_server']['global']['server_group'] %>
+
+[Install]
+WantedBy=multi-user.target

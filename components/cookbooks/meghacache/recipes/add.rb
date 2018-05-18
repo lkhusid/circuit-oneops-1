@@ -51,7 +51,22 @@ cookbook_file "/opt/meghacache/lib/telegraf_writer.rb" do
     mode '0755'
 end
 
+cookbook_file "/opt/meghacache/lib/network_stats.rb" do
+    source "network_stats.rb"
+    owner 'root'
+    group 'root'
+    mode '0755'
+end
+
 file '/opt/meghacache/log/telegraf/stats.log' do
+  content "# Logfile created on #{Time.now.to_s} by #{__FILE__}\n"
+  owner 'root'
+  group 'root'
+  mode '0644'
+  action :create_if_missing
+  end
+
+file '/opt/meghacache/log/telegraf/mcroutertko.log' do
   content "# Logfile created on #{Time.now.to_s} by #{__FILE__}\n"
   owner 'root'
   group 'root'
@@ -109,11 +124,43 @@ if  deep_fetch(node, 'workorder', 'payLoad', 'memcached.first', 'ciAttributes', 
     cron "collect_graphite_stats" do
       user 'root'
       minute "*/1"
-      command "sudo /bin/ruby /opt/meghacache/bin/collect_graphite_stats.rb"
+      command "sudo /bin/ruby /opt/meghacache/bin/collect_graphite_stats.rb 2>&1 | /bin/logger"
       only_if { ::File.exists?("/opt/meghacache/bin/collect_graphite_stats.rb") }
+    end
+
+    template "mcrouter_mon.rb" do
+        path "/opt/meghacache/lib/mcrouter_mon.rb"
+        source "mcrouter_mon.rb.erb"
+        owner "root"
+        group "root"
+        mode "0755"
+        variables({
+                  :graphite_servers => graphite_servers,
+                  :graphite_prefix => graphite_prefix,
+                  :graphite_logfiles_path => graphite_logfiles_path,
+                  :oo_org => oo_org,
+                  :oo_assembly => oo_assembly,
+                  :oo_env => oo_env,
+                  :oo_platform => oo_platform,
+                  :oo_cloud => oo_cloud
+                  })
+    end
+
+    template "mcrouter_mon.service" do
+        path "/usr/lib/systemd/system/mcrouter_mon.service"
+        source "mcrouter_mon.service.erb"
+        owner "root"
+        group "root"
+        mode "0644"
+        variables(
+           :mcrouter_mon_path => "/opt/meghacache/lib/mcrouter_mon.rb"
+        )
     end
 
 else
     Chef::Log.warn "WARNING: Unable to deploy Graphite stats collection cron job"
-
 end
+
+execute "systemctl daemon-reload"
+execute "systemctl enable mcrouter_mon.service"
+execute "systemctl restart mcrouter_mon.service"

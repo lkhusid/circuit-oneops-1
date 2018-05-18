@@ -3,7 +3,7 @@ maintainer       'Platform Messaging'
 maintainer_email 'GECMSGDE54@email.wal-mart.com'
 license          'Copyright Walmart Technology, All rights reserved.'
 description      'Installs and Configures Kafka Rest Proxy'
-version          '0.1.0'
+version          '0.1.1'
 
 grouping 'default',
          :access => "global",
@@ -127,7 +127,7 @@ attribute 'show_restproxy_properties',
 attribute 'restproxy_properties',
 :description => "Customimze kafka-rest.properties for Kafka rest proxy configuration",
 :data_type => "hash",
-:default => '{"consumer.request.max.bytes":"67108864","consumer.request.timeout.ms":"1000","consumer.threads":"1","simpleconsumer.pool.size.max":"25"}',
+:default => '{"consumer.request.max.bytes":"67108864","consumer.request.timeout.ms":"305000","consumer.threads":"1","simpleconsumer.pool.size.max":"25"}',
 :format => {
     :important => true,
     :help => 'Customize Kafka rest proxy config. Add new config if needed',

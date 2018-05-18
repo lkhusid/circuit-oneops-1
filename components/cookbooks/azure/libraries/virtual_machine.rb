@@ -70,8 +70,12 @@ module AzureCompute
       begin
         OOLog.info("Deleting VM '#{vm_name}' in '#{resource_group_name}' ")
         start_time = Time.now.to_i
-        virtual_machine = get(resource_group_name, vm_name)
-        virtual_machine.destroy
+        virtual_machine_exists = @compute_service.servers.check_vm_exists(resource_group_name, vm_name)
+        if !virtual_machine_exists
+          OOLog.info("Virtual Machine '#{vm_name}' was not found in '#{resource_group_name}', skipping deletion..")
+        else
+          virtual_machine = get(resource_group_name, vm_name).destroy
+        end
         end_time = Time.now.to_i
         duration = end_time - start_time
       rescue RuntimeError => e
@@ -132,6 +136,24 @@ module AzureCompute
         OOLog.fatal("Error powering off VM. #{vm_name}. Error Message: #{e.message}")
       rescue => e
         OOLog.fatal("Azure::Virtual Machine - Exception trying to Power Off virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+      end
+
+      OOLog.info("operation took #{duration} seconds")
+      response
+    end
+
+    def redeploy(resource_group_name, vm_name)
+      begin
+        OOLog.info("Redeploying VM: #{vm_name} in resource group: #{resource_group_name}")
+        start_time = Time.now.to_i
+        virtual_machine = @compute_service.servers.get(resource_group_name, vm_name)
+        response = virtual_machine.redeploy
+        end_time = Time.now.to_i
+        duration = end_time - start_time
+      rescue RuntimeError => e
+        OOLog.fatal("Error redeploying VM. #{vm_name}. Error Message: #{e.message}")
+      rescue => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to redeploy virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")

@@ -27,7 +27,8 @@ node.set['vhd_uri'] = vhd_uri
 node.set['datadisk_uri'] = datadisk_uri
 
 # delete the NIC. A NIC is created with each VM, so we will delete the NIC when we delete the VM
-nic_name = Utils.get_component_name('nic', vm_client.compute_ci_id)
+nic_platform_ci_id = node['workorder']['box']['ciId'] if Utils.is_new_cloud(node)
+nic_name = Utils.get_component_name('nic', vm_client.compute_ci_id, nic_platform_ci_id)
 network_profile = AzureNetwork::NetworkInterfaceCard.new(vm_client.creds)
 network_profile.delete(vm_client.resource_group_name, nic_name)
 

@@ -36,6 +36,8 @@ end
 pkg_name = get_java_ospkg_name(node['platform_family'], version, pkg)
 Chef::Log.info "Java package name to be installed: #{pkg_name}"
 
+shell_out!('echo "timeout=500" >> /etc/yum.conf')
+
 package "#{pkg_name}"
 log "OpenJDK-#{version} #{pkg} package installation is done!"
 

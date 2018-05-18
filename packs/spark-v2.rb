@@ -4,6 +4,7 @@ name "spark-v2"
 description "Apache Spark (V2 Build)"
 type "Platform"
 category "Spark"
+version "2"
 
 # Versioning attributes
 spark_version = "2"
@@ -1667,6 +1668,15 @@ resource "client",
            :help => "hostname dns entry"
          }
 
+resource "hostname-client",
+         :cookbook => "oneops.1.fqdn",
+         :design => true,
+         :requires => {
+           :constraint => "1..1",
+           :services => "dns",
+           :help => "hostname dns entry"
+         }
+
 resource "volume-work-client",
          :cookbook => "oneops.1.volume",
          :design => true,
@@ -1732,6 +1742,8 @@ end
 [
   {:from => 'volume-work-client', :to => 'compute-client'},
   {:from => 'volume-work-client', :to => 'os-client'},
+  {:from => 'hostname-client', :to => 'compute-client'},
+  {:from => 'hostname-client', :to => 'os-client'},
   {:from => 'os-client', :to => 'compute-client'},
   {:from => 'java-client', :to => 'os-client'},
   {:from => 'user-client', :to => 'os-client'},

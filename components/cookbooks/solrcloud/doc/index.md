@@ -107,7 +107,7 @@ The following are the current features built into the OneOps pack. This will be 
 * updateclusterstate - Removes dead replicas and updates the cluster state to zookeeper.
 * uploadsolrconfig - Uploads the custom config to zookeeper.
   * Parameters:
-    * CustomConfigJar - Custom config jar nexus path.
+    * CustomConfigJar - Custom config jar url.
     * CustomConfigName - Custom config name.
 * dynamicschemaupdate - Updates managed schema and uploads to Zookeeper. It returns immediately if the timeout parameter is not set and the remaining cores get the latest schema asynchronously. This action reloads the core automatically and uses the latest schema from the next request onwards.
   * Parameters:

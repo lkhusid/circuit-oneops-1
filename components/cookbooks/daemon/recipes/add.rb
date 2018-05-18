@@ -29,6 +29,16 @@ if !control_script_location.empty? && control_script_location != "/etc/init.d/#{
   `ln -sf #{control_script_location} /etc/init.d/#{service_name}`
 end
 
+service_type = nil
+initService = "/etc/init.d/#{service_name}"
+systemdService = "/usr/lib/systemd/system/#{service_name}.service"
+
+if File.exist?(systemdService)
+  service_type = "systemd"
+elsif File.exist?(initService)
+  service_type = "init"
+end
+
 file "#{control_script_location}" do
   only_if { !control_script_content.empty? }
   owner "root"
@@ -38,7 +48,6 @@ file "#{control_script_location}" do
   action :create
 end
 
-# enable daemon service
 service "#{service_name}" do
   action :enable
 end
@@ -54,6 +63,7 @@ end
 
 # restart daemon service when pattern has been specified
 service "#{service_name}" do
+  provider Chef::Provider::Service::Init if service_type == "init" && node[:platform_family].include?("rhel")
   pattern "#{pat}"
   action :restart
   only_if { !pat.empty? }

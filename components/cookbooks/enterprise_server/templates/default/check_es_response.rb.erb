@@ -1,0 +1,19 @@
+#!/usr/bin/ruby
+
+if ARGV[0] == nil
+	puts "Usage: <log file path and name>"
+else
+	perf_data = ""
+	file_location = "#{ARGV[0]}"
+
+	if File.exist?("#{file_location}")
+		lines = IO.readlines("#{file_location}")
+		lastLine = lines.last
+		resCodes = lastLine.strip.split("||")
+		if (resCodes.size()>1)
+			perf_data = resCodes[1]
+		end
+	end
+	puts perf_data + "|" + perf_data
+end
+

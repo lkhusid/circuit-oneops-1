@@ -1,0 +1,55 @@
+# Created On : <%= Time.now.getutc %>
+
+admin:
+  port: 9990
+  ip: 0.0.0.0
+
+namers:
+- kind: com.w5t.sr
+  tenants:
+<%= @tenant_configs %>
+
+routers:
+- protocol: http
+  client:
+    failureAccrual:
+      kind: com.w5t.failureaccrual
+  identifier:
+    kind: com.w5t.stratiHeaders
+  dtab: |
+    /svc => /#/com.w5t.sr/out;
+  httpAccessLog: logs/access.log
+  label: out
+  loggers:
+  - kind: com.w5t.policy
+    policyEnd: Consumer
+    alerting: spotlight
+  - kind: com.w5t.soa10.rewriter
+  servers:
+  - port: 4140
+    ip: 0.0.0.0
+
+- protocol: http
+  client:
+    failureAccrual:
+      kind: com.w5t.failureaccrual
+  identifier:
+    kind: com.w5t.stratiHeaders
+  dtab: |
+    /svc => /#/com.w5t.sr/in;
+    /svc/ecv => /#/com.w5t.sr/ecv;
+  httpAccessLog: logs/access.log
+  label: in
+  loggers:
+  - kind: com.w5t.policy
+    policyEnd: Producer
+    alerting: spotlight
+  servers:
+  - port: 4141
+    ip: 0.0.0.0
+
+telemetry:
+- kind: com.w5t.telemetry
+
+usage:
+  enabled: false

@@ -1,0 +1,46 @@
+{
+"entryPoint": "ansibleFlow",
+"arguments": { 
+  "ansibleParams" : {
+    "playbook": "ansible/<%= @playbook %>.yml",
+      "debug" : "True",
+      "config": { 
+      "defaults": { 
+        "forks": 9,
+        "remote_user": "opensysdba"
+      },
+      "privilege_escalation": {
+        "become" : "True",
+        "become_user" : "root",
+        "become_method" : "sudo"
+       }
+     },
+     "inventory": {
+       "action_nodes": {
+         "hosts": [ "<%= @local_ip %>" ],
+         "vars": {
+           "default": {
+             "cloudrdbms":  {
+               "clustername": "<%= @clustername %>",
+               "drclouds": "<%= @drclouds %>",
+               "cloudrdbmspackversion": "<%= @cloudrdbmspackversion %>"
+               }
+             },
+           "restore": {
+             "cloudrdbms": {
+               "time": "<%= @time %>",
+               "oneops_cloud_tenant": "<%= @oneops_cloud_tenant %>",
+               "oneops_assembly": "<%= @oneops_assembly %>",
+               "oneops_environment": "<%= @oneops_environment %>",
+               "oneops_platform": "<%= @oneops_platform %>"
+             }
+           }
+         }
+       },
+        "all": {
+          "hosts": [ <%= @string_of_ips %> ]
+        }
+      }
+    }
+  }
+}

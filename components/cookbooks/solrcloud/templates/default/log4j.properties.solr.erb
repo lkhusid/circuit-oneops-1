@@ -1,6 +1,10 @@
 #  Logging level
-solr.log=${solr.solr.home}/../logs
-log4j.rootLogger=INFO, file, CONSOLE
+# solr.solr.home is a symlink to /blockstorage when we enable cinder
+# For such cases, /app/solrdata6/data/../logs becomes a non-existent directory and creation of log files begins to fail
+# So we change the logs directory path to one which is always accessible.
+# TODO: See where other occurrences of solr.home would be a problem for symlinks
+solr.log=<%= node["data_dir_path"] %>/logs
+log4j.rootLogger=WARN, file, CONSOLE
 
 log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
 
@@ -9,7 +13,7 @@ log4j.appender.CONSOLE.layout.ConversionPattern=%-4r [%t] %-5p %c %x \u2013 %m%n
 
 #- size rotation with log cleanup.
 log4j.appender.file=org.apache.log4j.RollingFileAppender
-log4j.appender.file.MaxFileSize=4MB
+log4j.appender.file.MaxFileSize=256MB
 log4j.appender.file.MaxBackupIndex=9
 
 #- File to log to and log format
@@ -22,3 +26,32 @@ log4j.logger.org.apache.hadoop=WARN
 
 # set to INFO to enable infostream log messages
 log4j.logger.org.apache.solr.update.LoggingInfoStream=OFF
+
+# Log the slow query logger logs
+<% if node['solr_custom_params']['slow_query_logger'] != nil && !node['solr_custom_params']['slow_query_logger'].empty? %>
+<%= node['solr_custom_params']['slow_query_logger'] %>=INFO, slow-query, CONSOLE
+<% end %>
+
+
+#- size rotation with log cleanup.
+log4j.appender.slow-query=org.apache.log4j.RollingFileAppender
+log4j.appender.slow-query.MaxFileSize=4MB
+log4j.appender.slow-query.MaxBackupIndex=9
+
+#- File to log to and log format
+log4j.appender.slow-query.File=${solr.log}/slow-query.log
+log4j.appender.slow-query.layout=org.apache.log4j.PatternLayout
+log4j.appender.slow-query.layout.ConversionPattern=%-5p - %d{yyyy-MM-dd HH:mm:ss.SSS}; %C; %m\n
+
+# Delete Query Logging
+log4j.logger.DeleteQueryLogger=INFO, delete-query, CONSOLE
+
+#- size rotation with log cleanup.
+log4j.appender.delete-query=org.apache.log4j.RollingFileAppender
+log4j.appender.delete-query.MaxFileSize=4MB
+log4j.appender.delete-query.MaxBackupIndex=9
+
+#- File to log to and log format
+log4j.appender.delete-query.File=${solr.log}/delete-query.log
+log4j.appender.delete-query.layout=org.apache.log4j.PatternLayout
+log4j.appender.delete-query.layout.ConversionPattern=%-5p - %d{yyyy-MM-dd HH:mm:ss.SSS}; %C; %m\n

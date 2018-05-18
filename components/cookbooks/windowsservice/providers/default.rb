@@ -8,10 +8,24 @@ WINDOWS_SERVICE_PROPERTIES = {
   'dependencies'          =>  'dependencies'
 }
 
+RECOVERY_ATTRIBUTES = {
+  'failure'               => 'failure_actions',
+  'reset_fail_counter'    => 'failure_reset_period',
+  'restart_service_after' => 'failure_delay',
+  'command'               => 'failure_command'
+}
+
 SERVICE_STARTUP_TYPE = {
   'auto start'   => 2,
   'demand start' => 3,
   'disabled'     => 4
+}
+
+SERVICE_RECOVERY_TYPE = {
+  'TakeNoAction' => 0,
+  'RestartService' => 1,
+  'RestartComputer'=> 2,
+  'RunCommand' => 3
 }
 
 def whyrun_supported?
@@ -54,6 +68,9 @@ action :update do
     windows_service_attributes['start_type'] = SERVICE_STARTUP_TYPE[windows_service_attributes['start_type']] unless windows_service_attributes['start_type'].nil?
     @service_windows.update_service(windows_service_attributes)
     update_dependencies
+    windows_service_attributes = update_service_recovery(windows_service_attributes)
+    Chef::Log.info "Windows Service Attributes - #{windows_service_attributes}"
+    @service_windows.update_service(windows_service_attributes)
     new_resource.updated_by_last_action(true)
   else
     Chef::Log.info "#{new_resource.service_name} does not exist. Nothing to do."
@@ -62,7 +79,8 @@ end
 
 action :start do
   if @current_resource.exists
-    if @current_resource.status != 'running'
+    if @current_resource.status != 'running' && @current_resource.startup_type != 'disabled'
+      Chef::Log.info "Inside Start #{@current_resource.service_name} #{@current_resource.status}"
       @service_windows.start_service(new_resource.service_name, new_resource.arguments)
       sleep new_resource.wait_for_status.to_i
       status = @service_windows.service_status(@current_resource.service_name)
@@ -94,7 +112,26 @@ def get_windows_service_attributes
   WINDOWS_SERVICE_PROPERTIES.each_pair do |property_name, value_property_name|
     attributes[value_property_name] = new_resource.send(property_name)
   end
+  RECOVERY_ATTRIBUTES.each_pair do |property_name, value_property_name|
+    attributes[value_property_name] = new_resource.send(property_name)
+  end
+
+  arr = attributes['failure_actions']
   attributes['start_type'] = SERVICE_STARTUP_TYPE[attributes['start_type']]
+  attributes["failure_delay"] = attributes["failure_delay"].to_i
+  attributes["failure_reset_period"] = attributes["failure_reset_period"].to_i
+  attributes['failure_actions'] = arr.map { |element| SERVICE_RECOVERY_TYPE[element] } unless arr.nil?
+
+  attributes
+end
+
+def update_service_recovery(attributes)
+  arr = new_resource.failure
+  attributes["failure_command"]= new_resource.command
+  attributes["failure_delay"] = new_resource.restart_service_after.to_i
+  attributes["failure_reset_period"] = new_resource.reset_fail_counter.to_i
+  attributes['failure_actions'] = arr.map { |element| SERVICE_RECOVERY_TYPE[element] } unless arr.nil?
+
   attributes
 end
 

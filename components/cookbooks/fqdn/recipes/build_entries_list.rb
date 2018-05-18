@@ -107,13 +107,15 @@ end
 # full aliases uses as-is, cnamed to the platform entry
 full_aliases = Array.new
 if node.workorder.rfcCi.ciAttributes.has_key?("full_aliases") && !is_hostname_entry
+  if node.workorder.rfcCi.ciAttributes.full_aliases =~ /\*/ && !is_wildcard_enabled(node)
+    fail_with_fault "unsupported use of wildcard functinality for this organization"
+  end
   begin
     full_aliases = JSON.parse(node.workorder.rfcCi.ciAttributes.full_aliases)
   rescue Exception =>e
     Chef::Log.info("could not parse full_aliases json: "+node.workorder.rfcCi.ciAttributes.full_aliases)
   end
 end
-
 
 if service_attrs[:cloud_dns_id].nil? || service_attrs[:cloud_dns_id].empty?
   fail_with_fault "no cloud_dns_id for dns cloud service: #{cloud_service[:nsPath]} #{cloud_service[:ciName]}"

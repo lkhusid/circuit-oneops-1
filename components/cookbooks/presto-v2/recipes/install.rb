@@ -122,15 +122,6 @@ template '/etc/presto/log.properties' do
     })
 end
 
-# Create a link to log.properties under /usr/lib/presto/etc.  To
-# parallel the other files, this file should be under the /etc
-# directory, but the 0.152 build still looks only in
-# /usr/lib/presto/etc.  Create the link so that old and new
-# builds will work.
-link "/usr/lib/presto/etc/log.properties" do
-  to "/etc/presto/log.properties"
-end
-
 include_recipe "#{node['app_name']}::gmond"
 include_recipe "#{node['app_name']}::jmx"
 

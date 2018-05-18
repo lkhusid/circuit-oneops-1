@@ -285,6 +285,19 @@ module OO
 
       end
 
+      def application_writable_section_for(section, site_name, &block)
+        admin_manager = WIN32OLE.new("Microsoft.ApplicationHost.WritableAdminManager")
+        admin_manager.CommitPath = APPHOST_PATH
+        section = admin_manager.GetAdminSection(section, APPHOST_PATH)
+        collection = section.Collection
+        position = (0..(collection.Count-1)).find { |i| collection.Item(i).GetPropertyByName("name").Value == site_name }
+        site = collection.Item(position)
+        yield site
+
+        admin_manager.CommitChanges
+        reload
+      end
+
     end
   end
 end

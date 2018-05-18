@@ -7,6 +7,15 @@ else
   ci = node.workorder.ci
 end
 
+# Validation for Zookeeper "admin" user password
+if (node['zookeeper']['enable_zk_sasl_plain'] == "true" && node['zookeeper']['sasl_zk_admin_pwd'].strip.empty?)
+  nozksasladminpass = "The password for 'admin' user can't be empty in SASL/Plain Configuration section."
+  Chef::Log.error("FATAL: #{nozksasladminpass}")
+  puts "***FAULT:FATAL= #{nozksasladminpass}"
+  Chef::Application.fatal!(nozksasladminpass)
+end
+
+
 if ci.ciAttributes.has_key?("prod_level_checks_enabled")
   node.default[:prod_level_checks_enabled] = ci.ciAttributes.prod_level_checks_enabled
   prod_level_checks_enabled = node[:prod_level_checks_enabled]
@@ -139,3 +148,5 @@ if (clouds_with_less_computes.size > 0)
   else
     Chef::Log.info("Deployment has required minimum number of Computes.: #{min_computes_per_cloud}")
 end
+
+

@@ -12,27 +12,19 @@ class GraphiteWriter
                 :rotate,  :log_size, :logger, :metric_name_prefix,
                 :cloud_level_prefix
 
+  attr_reader :host
+
   CONST_MAX_LOG_FILE_ROTATION_DAYS = 10
   CONST_MAX_LOG_FILE_SIZE = 10 * 1024 * 1024
   CONST_METRIC_NAME_CONF_POOL_SIZE = 'configured_pool_size'
 
   def initialize(prefix, graphite_hosts, environment, cloudname, graphite_logfiles_path, metric_name_prefix = nil, rotate = nil, log_size = nil)
 
-    @graphite_hosts = graphite_hosts
-    @environment = environment
-    @cloudname = cloudname
+    @host = `hostname`.downcase.chop
     @graphite_logfiles_path = graphite_logfiles_path
-    @rotate = rotate
-    @log_size = log_size
-    @metric_name_prefix = metric_name_prefix
-    @cloud_level_prefix = "#{prefix}.#{@environment}.meghacache.#{@cloudname}"
+    @graphite_hosts=graphite_hosts
 
-    host = `hostname`.downcase.chop
-    if (@metric_name_prefix != nil)
-        @prefix = "#{@cloud_level_prefix}.nodes.#{host.gsub('.','-')}.#{@metric_name_prefix}"
-    else
-        @prefix = "#{@cloud_level_prefix}.nodes.#{host.gsub('.','-')}."
-    end
+    init_helper(cloudname, environment, metric_name_prefix, prefix)
 
     #Use defaults if log file rotation isn't set up
     if (rotate == nil || rotate == 0)
@@ -42,11 +34,29 @@ class GraphiteWriter
 
     #Use defaults if log file size isn't set up
     if (log_size == nil || log_size == 0)
-      log_size =  CONST_MAX_LOG_FILE_SIZE
+      log_size = CONST_MAX_LOG_FILE_SIZE
     end
     @log_size = log_size
-    @logger = Logger.new(@graphite_logfiles_path, @rotate,  @log_size)
+
+    @logger = Logger.new(@graphite_logfiles_path, @rotate, @log_size)
     @logger.level = Logger::ERROR
+
+  end
+
+  def init_helper(cloudname, environment, metric_name_prefix, prefix)
+    @environment = environment
+    @cloudname = cloudname
+    @metric_name_prefix = metric_name_prefix
+    @cloud_level_prefix = "#{prefix}.#{@environment}.meghacache.#{@cloudname}"
+
+
+    if (@metric_name_prefix != nil)
+      @prefix = "#{@cloud_level_prefix}.nodes.#{@host.gsub('.', '-')}.#{@metric_name_prefix}"
+    else
+      @prefix = "#{@cloud_level_prefix}.nodes.#{@host.gsub('.', '-')}."
+    end
+
+
   end
 
   #Opens tcp sockets to all graphite servers on the specified port#

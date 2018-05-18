@@ -57,12 +57,23 @@ if rfcAttrs.has_key?("mount_point") && !rfcAttrs["mount_point"].empty?
 
     ruby_block "killing open files at #{mount_point}" do
       block do
+       #1 kill processes that are accesing the mount
        execute_command("lsof #{mount_point} | awk '{print $2}' | grep -v PID | uniq | xargs kill -9")
+
+       #2 remove swap file from the mount
+         swap_file = execute_command("cat /proc/swaps | grep #{mount_point} | awk '{print $1}'").stdout.chop
+         if !swap_file.nil? && !swap_file.empty?
+           execute_command("swapoff #{swap_file}")
+         end
       end
       only_if { has_mounted }
     end
 
-    execute "umount -Rf #{mount_point}" do
+    umount_cmd = "umount -Rf #{mount_point}"
+    if node['platform_family'] == 'rhel' && node['platform_version'].to_i < 7
+      umount_cmd = "umount -f #{mount_point}"
+    end
+    execute umount_cmd do
       only_if { has_mounted }
     end
 

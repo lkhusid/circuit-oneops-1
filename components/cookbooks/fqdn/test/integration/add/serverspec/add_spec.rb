@@ -1,84 +1,91 @@
-require 'fog/azurerm'
+require 'resolv'
+require 'ipaddr'
+require 'excon'
 
-CIRCUIT_PATH = '/opt/oneops/inductor/circuit-oneops-1'.freeze
-COOKBOOKS_PATH = "#{CIRCUIT_PATH}/components/cookbooks".freeze
-AZURE_TESTS_PATH = "#{COOKBOOKS_PATH}/azuredns/test/integration/add/serverspec/tests".freeze
+is_windows = ENV['OS'] == 'Windows_NT'
 
-(
-  Dir.glob("#{COOKBOOKS_PATH}/azuredns/libraries/*.rb") +
-  Dir.glob("#{COOKBOOKS_PATH}/azure_base/libraries/*.rb")
-).each { |lib| require lib }
+begin
+  CIRCUIT_PATH = '/opt/oneops/inductor/circuit-oneops-1'
+  COOKBOOKS_PATH = "#{CIRCUIT_PATH}/components/cookbooks".freeze
+  require "#{CIRCUIT_PATH}/components/spec_helper.rb"
+  require "#{COOKBOOKS_PATH}/fqdn/test/integration/library.rb"
+rescue Exception =>e
+  CIRCUIT_PATH = "#{is_windows ? 'C:/Cygwin64' : ''}/home/oneops"
+  require "#{CIRCUIT_PATH}/circuit-oneops-1/components/spec_helper.rb"
+  require "/home/oneops/circuit-oneops-1/components/cookbooks/fqdn/test/integration/library.rb"
+end
 
-require "#{CIRCUIT_PATH}/components/spec_helper.rb"
-require "#{COOKBOOKS_PATH}/azure_base/test/integration/spec_utils"
+lib = Library.new
+entries = lib.build_entry_list
+entries.each do |entry|
+  dns_name = entry['name']
+  dns_value = entry['values']
+  dns_val = dns_value.is_a?(String) ? [dns_value] : dns_value
 
-provider = SpecUtils.new($node).get_provider
-if provider =~ /azure/
-  require "#{COOKBOOKS_PATH}/azure_base/test/integration/azure_spec_utils"
-  Dir.glob("#{AZURE_TESTS_PATH}/*.rb").each { |test| require test }
+  if !dns_val.nil? && dns_val.size != 0
+    dns_val.each do |value|
+      flag = lib.check_record(dns_name, value)
+      context "FQDN mapping" do
+        it "should be available" do
+          expect(flag).to eq(false)
+        end
+      end
+    end
+  end
 end
 
 cloud_name = $node['workorder']['cloud']['ciName']
 
-priority = $node['workorder']['cloud']['ciAttributes']['priority']
+depends_on_lb = false
+$node['workorder']['payLoad']['DependsOn'].each do |dep|
+  depends_on_lb = true if dep['ciClassName'] =~ /Lb/
+end
 
-metadata = $node['workorder']['payLoad']['RequiresComputes'][0]['ciBaseAttributes']['metadata'].nil? ?  $node['workorder']['payLoad']['RequiresComputes'][0]['ciAttributes']['metadata'] :  $node['workorder']['payLoad']['RequiresComputes'][0]['ciBaseAttributes']['metadata']
-metadata_obj= JSON.parse(metadata)
-org = metadata_obj['organization']
-assembly = metadata_obj['assembly']
-platform = metadata_obj['platform']
-env = metadata_obj['environment']
-domain = defined?($node['workorder']['payLoad']['remotedns'][0]['ciAttributes']['zone']) ? $node['workorder']['payLoad']['remotedns'][0]['ciAttributes']['zone'] :  $node['workorder']['services']['dns'][cloud_name]['ciAttributes']['zone']
+env = $node['workorder']['payLoad']['Environment'][0]['ciAttributes']
 
-is_azure = cloud_name =~ /azure/ ? true : false
+gdns_service = nil
+if $node['workorder']['services'].has_key?('gdns') &&
+    $node['workorder']['services']['gdns'].has_key?(cloud_name)
+  gdns_service = $node['workorder']['services']['gdns'][cloud_name]
+end
 
-fqdn = (platform+"."+env+"."+assembly+"."+org+"."+domain).downcase
-command_execute = "host "+fqdn
+if env.has_key?("global_dns") && env["global_dns"] == "true" && depends_on_lb &&
+    !gdns_service.nil? && gdns_service["ciAttributes"]["gslb_authoritative_servers"] != '[]'
 
-
-describe "FQDN on azure" do
-  context "FQDN entry" do
-    it "should exist" do
-      entries = `#{command_execute}`
-      expect(entries).not_to be_nil
-    end
+  cloud_service= nil
+  cloud_name = $node['workorder']['cloud']['ciName']
+  if $node['workorder']['services'].has_key?('lb')
+    cloud_service = $node['workorder']['services']['lb'][cloud_name]['ciAttributes']
+  else
+    cloud_service = $node['workorder']['services']['gdns'][cloud_name]['ciAttributes']
   end
 
 
-  if is_azure
-    cloud = cloud_name.split("-")[1]
+  host = $node['workorder']['services']['gdns'][cloud_name]['ciAttributes']['host']
+  ci = $node['workorder']['box']
+  gslb_service_name = lib.get_gslb_service_name
+  conn = lib.gen_conn(cloud_service,host)
 
-    if $node['workorder']['payLoad'].has_key?("lb")
+  resp_obj = JSON.parse(conn.request(
+      :method => :get,
+      :path => "/nitro/v1/config/gslbservice/#{gslb_service_name}").body)
 
-      context "FQDN mapping with LB" do
-        it "should exist" do
-          if $node['workorder']['services'].has_key?("gdns") && $node['workorder']['services']['gdns'].has_key?(cloud_name)
-            $node['workorder']['payLoad']['lb'].each do |service|
-              ip = service['ciAttributes']['dns_record']
-              if  priority == '1' && service['ciAttributes']['vnames'] =~ /#{cloud}/
-                entries = `#{command_execute}`
-                expect(entries).to include(ip) unless ip.nil?
-              end
-            end
-          end
-        end
-      end
+  if resp_obj["message"] =~ /The GSLB service does not exist/
 
+    gslb_service_name = lib.get_gslb_service_name_by_platform
 
-      context "FQDN not mapping with LB" do
-        it "should not exist" do
-          if $node['workorder']['services'].has_key?("gdns") && $node['workorder']['services']['gdns'].has_key?(cloud_name)
-            $node['workorder']['payLoad']['lb'].each do |service|
-              ip = service['ciAttributes']['dns_record']
-              if  priority == '2' && service['ciAttributes']['vnames'] =~ /#{cloud}/
-                entries = `#{command_execute}`
-                expect(entries).not_to include(ip) unless ip.nil?
-              end
-            end
-          end
-        end
+    resp_obj = JSON.parse(conn.request(
+        :method=>:get,
+        :path=>"/nitro/v1/config/gslbservice/#{gslb_service_name}").body)
+
+  end
+
+  if $node['workorder']['cloud']['ciAttributes']['priority'] == "1"
+    context "GSLB service" do
+      it "should exist" do
+        status = resp_obj["message"]
+        expect(status).to eq("Done")
       end
     end
-
   end
 end

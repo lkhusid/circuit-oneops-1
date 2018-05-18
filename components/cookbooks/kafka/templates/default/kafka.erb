@@ -24,6 +24,8 @@ PUBSUB_LOG="/var/log/kafka/kafka.log"
 TEMP_PUBSUB_CONFIG="$CONFIG_DIR/pubsub.properties"
 KAFKA_USER="<%= node['kafka']['user'] %>"
 SASL_FLAG="<%= node['kafka']['enable_sasl_plain'] %>"
+SASL_ZK_FLAG="<%= node['kafka']['is_zk_secured'] %>"
+
 
 export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:${CONFIG_DIR}/log4j.properties"
 export JMX_PORT="<%= node['kafka']['kafka_jmx_port'] %>"
@@ -35,7 +37,7 @@ function setup() {
     if [ -f "$BROKER_CONFIG" ]; then
         cat $BROKER_CONFIG >> $TEMP_PUBSUB_CONFIG
     fi
-    if [ "true" == "$SASL_FLAG" ]; then
+    if [ "true" == "$SASL_FLAG" ] || [ "true" == "$SASL_ZK_FLAG" ]; then
        export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf"
     fi
 }

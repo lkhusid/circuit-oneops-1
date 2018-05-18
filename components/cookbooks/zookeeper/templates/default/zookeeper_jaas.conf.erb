@@ -1,0 +1,17 @@
+
+<% if @zookeeper[:enable_zk_sasl_plain].eql?('true') %>
+Server {
+  org.apache.zookeeper.server.auth.DigestLoginModule required
+  username="admin"
+  password=<%=@zookeeper[:sasl_zk_admin_pwd]%>
+  user_admin=<%=@zookeeper[:sasl_zk_admin_pwd]%>
+<% if @zookeeper[:sasl_zk_user_pwds] && !@zookeeper[:sasl_zk_user_pwds].empty? %>
+  <% namepwds = JSON.parse(@zookeeper[:sasl_zk_user_pwds]) %>
+  <% namepwds.each { |name, pwd| %>
+  user_<%= name %>="<%= pwd %>"
+  <% } %>
+<% end %>
+;};
+<% end %>
+
+

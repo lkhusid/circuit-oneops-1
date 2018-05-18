@@ -58,7 +58,8 @@ node.set["raid_device"] = raid_device
 platform_name = node.workorder.box.ciName
 logical_name = node.workorder.rfcCi.ciName
 
-### filesystem - check for new attr and exit for backwards compat
+l_switch = size =~ /%/ ? '-l' : '-L'
+f_switch = ''
 _mount_point = nil
 _device = nil
 _fstype = nil
@@ -70,6 +71,12 @@ if attrs.has_key?("mount_point")
   _device = attrs["device"]
   _options = attrs["options"]
   _fstype = attrs["fstype"]
+end
+_options = 'defaults' if _options.nil? || _options.empty?
+
+if node['platform'] == 'redhat' && node['platform_version'].to_i < 7 &&
+_fstype == 'xfs'
+  exit_with_error('XFS filesystem is not currently supported for RedHat 6.x')
 end
 
 if node[:platform_family] == "rhel" && node[:platform_version].to_i >= 7
@@ -285,12 +292,6 @@ ruby_block 'create-ephemeral-volume-ruby-block' do
      end
     end
 
-    #lvcreate
-    l_switch = "-L"
-    if size =~ /%/
-      l_switch = "-l"
-    end
-
     vgdisplay = Mixlib::ShellOut.new("vgdisplay #{platform_name}-eph")
     vgdisplay.run_command
     Chef::Log.info("#{vgdisplay.stdout}")
@@ -349,14 +350,7 @@ ruby_block 'filesystem' do
         end
       end
 
-      if _options == nil || _options.empty?
-        _options = "defaults"
-      end
-
-      case _fstype
-        when 'nfs', 'nfs4'
-          include_recipe "volume::nfs"
-      end
+      include_recipe 'volume::nfs' if %w[nfs nfs4].include?(_fstype)
 
       Chef::Log.info("filesystem type: "+_fstype+" device: "+_device +" mount_point: "+_mount_point)
       # result attr updates cms
@@ -388,13 +382,9 @@ ruby_block 'filesystem' do
       Chef::Log.info("Type : = "+type )
       Chef::Log.info("-------------------------")
 
-      if type == "data"
-        if node[:platform_family] == "rhel" && (node[:platform_version]).to_i >= 7
-          cmd = "mkfs -t #{_fstype} #{_device}" # -f switch not valid in latest mkfs
-        else
-          cmd = "mkfs -t #{_fstype} -f #{_device}"
-        end
-        Chef::Log.info(cmd+" ... "+`#{cmd}`)
+      if type == 'data'
+        cmd = "mkfs -t #{_fstype} #{f_switch} #{_device}"
+        execute_command(cmd, true)
       end
 
       # in-line because of the ruby_block doesn't allow updated _device value passed to mount resource
@@ -421,10 +411,6 @@ ruby_block 'ramdisk tmpfs' do
       Chef::Log.info("device #{_device} for mount-point #{_mount_point} already mounted.Will unmount it.")
       result=`umount #{_mount_point}`
       Chef::Log.error("umount error: #{result.to_s}") if result.to_i != 0
-    end
-
-    if _options == nil || _options.empty?
-      _options = "defaults"
     end
 
     Chef::Log.info("mounting ramdisk :: filetype:#{_fstype} dir:#{_mount_point} device:#{_device} size:#{size} options:#{_options}")

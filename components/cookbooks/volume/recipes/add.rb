@@ -62,9 +62,23 @@ elsif mode == 'raid10' && (device_maps.size < 4 || device_maps.size%2 != 0)
   exit_with_error("Minimum of 4 storage slices and storage slice count mod 2 are required for #{mode}")
 end
 
-package 'lvm2'
-package 'mdadm' do
-  not_if{mode == 'no-raid'}
+l_switch = size =~ /%/ ? '-l' : '-L'
+f_switch = ''
+_mount_point = nil
+_device = nil
+_fstype = nil
+_options = nil
+if attrs.has_key?('mount_point')
+  _mount_point = attrs['mount_point']
+  _device = attrs['device']
+  _options = attrs['options']
+  _fstype = attrs['fstype']
+end
+_options = 'defaults' if _options.nil? || _options.empty?
+
+if node['platform'] == 'redhat' && node['platform_version'].to_i < 7 &&
+_fstype == 'xfs'
+  exit_with_error('XFS filesystem is not currently supported for RedHat 6.x')
 end
 
 storageUpdated = false
@@ -73,22 +87,25 @@ if !storage.nil?
 end
 include_recipe "shared::set_provider_new"
 
-dev_list = ""
-logical_name = rfcCi[:ciName]
-raid_device = "/dev/md/#{logical_name}"
-rfc_action = rfcCi[:rfcAction]
-no_raid_device = " "
-node.set["raid_device"] = raid_device
+dev_list      = ""
+logical_name  = rfcCi[:ciName]
+raid_name     = "/dev/md/#{logical_name}"
+rfc_action    = rfcCi[:rfcAction]
 platform_name = node[:workorder][:box][:ciName]
-token_class = node[:provider_class]
+token_class   = node[:provider_class]
+_fstype       = 'ext3' if token_class =~ /ibm/
 
-Chef::Log.info("-------------------------------------------------------------")
+Chef::Log.info("------------------------------------------------------------")
 Chef::Log.info("Volume Size      : #{size}")
-Chef::Log.info("Raid Device      : #{raid_device}")
 Chef::Log.info("RFC Action       : #{rfc_action}")
 Chef::Log.info("Storage Provider : #{node[:storage_provider_class]}")
 Chef::Log.info("Storage          : #{storage.inspect.gsub("\n",' ')}")
-Chef::Log.info("-------------------------------------------------------------")
+Chef::Log.info("------------------------------------------------------------")
+
+package 'lvm2'
+package 'mdadm' do
+  not_if{mode == 'no-raid'}
+end
 
 # need ruby block so package resource above run first
 ruby_block 'create-iscsi-volume-ruby-block' do
@@ -98,69 +115,43 @@ ruby_block 'create-iscsi-volume-ruby-block' do
     objStorage = VolumeComponent::Storage.new(node,storage,device_maps)
     objStorage.set_provider_data_all
     storage_devices = objStorage.storage_devices
-    compute = objStorage.compute
 
     storage_devices.each do |storage_device|
       storage_device.attach
-      dev_list += storage_device.assigned_device_id + " "
+      dev_list += storage_device.assigned_device_id + " " if storage_device.assigned_device_id
     end
-
-    has_created_raid = false
-    exec_count = 0
-    max_retry = 10
-
-    if storage_devices.size > 1 && mode != 'no-raid'
-
-      cmd = "yes |mdadm --create -l#{level} -n#{storage_devices.size.to_s} --assume-clean --chunk=256 #{raid_device} #{dev_list} 2>&1"
-      until ::File.exists?(raid_device) || has_created_raid || exec_count > max_retry do
-        Chef::Log.info(raid_device+" being created with: "+cmd)
-
-        out = `#{cmd}`
-        exit_code = $?.to_i
-        Chef::Log.info("exit_code: "+exit_code.to_s+" out: "+out)
-        if exit_code == 0
-          has_created_raid = true
-          # really always need to readahead 64k?
-          # TODO: analyze impact of 64k read-ahead - extra cost to perf
-          #`blockdev --setra 65536 /dev/md/#{node.workorder.rfcCi.ciName}`
-        else
-          exec_count += 1
-          sleep 10
-
-          ccmd = "for f in /dev/md*; do mdadm --stop $f; done"
-          Chef::Log.info("cleanup bad arrays: "+ccmd)
-          Chef::Log.info(`#{ccmd}`)
-
-          ccmd = "mdadm --zero-superblock #{dev_list}"
-          Chef::Log.info("cleanup incase re-using: "+ccmd)
-          Chef::Log.info(`#{ccmd}`)
-        end
-      end
-      node.set["raid_device"] = raid_device
-    else
-      Chef::Log.info("No Raid Device ID :" +no_raid_device)
-      raid_device = no_raid_device
-      node.set["raid_device"] = no_raid_device
-    end #if storage_devices.size > 1 && mode != 'no-raid'
-
   end
 end
 
+ruby_block 'create-raid-ruby-block' do
+  not_if {storage.nil? || mode == 'no-raid'}
+  block do
 
-### filesystem - check for new attr and exit for backwards compat
-_mount_point = nil
-_device = nil
-_fstype = nil
-_options = nil
-if attrs.has_key?("mount_point")
-  Chef::Log.info("using filesystem-in-volume logic")
-  _mount_point = attrs["mount_point"]
-  _device = attrs["device"]
-  _options = attrs["options"]
-  _fstype = attrs["fstype"]
+    exec_count = 0
+    max_retry = 10
+
+    cmd = "yes |mdadm --create -l#{level} -n#{device_maps.size.to_s} --assume-clean --chunk=256 #{raid_name} #{dev_list} 2>&1"
+    until raid_exist?(raid_name) || exec_count > max_retry do
+      Chef::Log.info(raid_name+" being created with: "+cmd)
+
+      out = `#{cmd}`
+      exit_code = $?.to_i
+      Chef::Log.info("exit_code: "+exit_code.to_s+" out: "+out)
+      if exit_code != 0
+        exec_count += 1
+        sleep 10
+
+        ccmd = "for f in /dev/md*; do mdadm --stop $f; done"
+        Chef::Log.info("cleanup bad arrays: "+ccmd)
+        Chef::Log.info(`#{ccmd}`)
+
+        ccmd = "mdadm --zero-superblock #{dev_list}"
+        Chef::Log.info("cleanup incase re-using: "+ccmd)
+        Chef::Log.info(`#{ccmd}`)
+      end
+    end
+  end
 end
-
-_options = 'defaults' if _options.nil? || _options.empty?
 
 if node[:platform_family] == "rhel" && node[:platform_version].to_i >= 7
   Chef::Log.info("starting the logical volume manager.")
@@ -182,15 +173,16 @@ ruby_block 'create-ephemeral-volume-on-azure-vm' do
     # Create restore directory with path
     `mkdir -p #{restore_script_dir}`
 
-    l_switch = size =~ /%/ ? '-l' : '-L'
-    f_switch = node[:platform_family] == 'rhel' && node[:platform_version].to_i >= 7 ? '' : '-f'
-
     mount_script = <<-HEREDOC
 #!/bin/bash
 EXIT_SUCCESS=0
 EXIT_CRITICAL=2
 IS_FORMATTED=0
 
+swapfile=$(cat /proc/swaps | grep #{initial_mountpoint} | awk '{print $1}')
+if [ $swapfile ]; then
+  swapoff $swapfile
+fi
 umount #{initial_mountpoint}
 pvcreate -f #{ephemeral_device}
 vgcreate #{platform_name}-eph #{ephemeral_device}
@@ -305,11 +297,6 @@ ruby_block 'create-ephemeral-volume-ruby-block' do
       Chef::Log.info("no ephemerals.")
     end
 
-    l_switch = "-L"
-    if size =~ /%/
-      l_switch = "-l"
-    end
-
     `vgdisplay #{platform_name}-eph`
     if $?.to_i == 0
       `lvdisplay /dev/#{platform_name}-eph/#{logical_name}`
@@ -318,9 +305,7 @@ ruby_block 'create-ephemeral-volume-ruby-block' do
       else
         Chef::Log.warn("logical volume #{platform_name}-eph/#{logical_name} already exists and hence cannot recreate .. prefer replacing compute")
       end
-
     end
-
   end
 end
 
@@ -328,7 +313,7 @@ ruby_block 'create-storage-non-ephemeral-volume' do
   only_if { storage != nil && token_class !~ /virtualbox|vagrant/ }
   block do
     if mode != "no-raid"
-      raid_devices = node.raid_device
+      raid_devices = get_raid_device(raid_name)
     else
       raid_devices = dev_list
     end
@@ -360,6 +345,7 @@ ruby_block 'create-storage-non-ephemeral-volume' do
     existing_dev = `pvdisplay -s`
     devices.each do |device|
       dev_short = device.split("/").last
+
       if existing_dev !~ /#{dev_short}/
         Chef::Log.info("pvcreate #{device} ..."+`pvcreate #{device}`)
         device_list += device+" "
@@ -377,17 +363,12 @@ ruby_block 'create-storage-non-ephemeral-volume' do
       Chef::Log.info("Volume Group Exists Already")
     end
 
-    l_switch = "-L"
-    if size =~ /%/
-      l_switch = "-l"
-    end
-
     `lvdisplay /dev/#{platform_name}/#{logical_name}`
 
     if $?.to_i != 0
       execute_command("yes | lvcreate #{l_switch} #{size} -n #{logical_name} #{platform_name}",true)
     else
-        Chef::Log.warn("logical volume #{platform_name}/#{logical_name} already exists and hence cannot recreate .. prefer replacing compute")
+      Chef::Log.warn("logical volume #{platform_name}/#{logical_name} already exists and hence cannot recreate .. prefer replacing compute")
     end
 
 
@@ -396,16 +377,7 @@ ruby_block 'create-storage-non-ephemeral-volume' do
     #1. User can extend peristent volume if space is available on storage
     #2. User can extend storage and can extend volume
     #3. Replace storage doesn't do anything, so it will not allow usre to change volume component too
-
-    check_persistent = false
-    node.workorder.payLoad[:DependsOn].each do |dep|
-      if dep["ciClassName"] =~ /Storage/
-        check_persistent = true
-        break
-      end
-    end
-
-    if ((check_persistent && rfc_action == "update" && token_class =~ /openstack/) || (rfc_action == "update" && storageUpdated))
+    if ((!storage.nil? && rfc_action == "update" && token_class =~ /openstack|azure/) || (rfc_action == "update" && storageUpdated))
       new_size = size
       old_size = rfcCi[:ciBaseAttributes][:size]
 
@@ -436,17 +408,10 @@ ruby_block 'create-storage-non-ephemeral-volume' do
       else
         execute_command("yes |lvextend #{l_switch} +#{size} /dev/#{platform_name}/#{logical_name}",true)
       end
-
     end
 
     execute_command("vgchange -ay #{platform_name}",true)
-
   end
-end
-
-
-if token_class =~ /ibm/
-  _fstype = "ext3"
 end
 
 package "xfsprogs" do
@@ -473,10 +438,7 @@ ruby_block 'filesystem' do
         end
       end
 
-      case _fstype
-        when 'nfs', 'nfs4'
-          include_recipe "volume::nfs"
-      end
+      include_recipe 'volume::nfs' if %w[nfs nfs4].include?(_fstype)
 
       Chef::Log.info("filesystem type: "+_fstype+" device: "+_device +" mount_point: "+_mount_point)
       # result attr updates cms
@@ -508,13 +470,9 @@ ruby_block 'filesystem' do
       Chef::Log.info("Type : = "+type )
       Chef::Log.info("-------------------------")
 
-      if type == "data"
-        if node[:platform_family] == "rhel" && (node[:platform_version]).to_i >= 7
-          cmd = "mkfs -t #{_fstype} #{_device}" # -f switch not valid in latest mkfs
-        else
-          cmd = "mkfs -t #{_fstype} -f #{_device}"
-        end
-        Chef::Log.info(cmd+" ... "+`#{cmd}`)
+      if type == 'data'
+        cmd = "mkfs -t #{_fstype} #{f_switch} #{_device}"
+        execute_command(cmd, true)
       end
 
       # in-line because of the ruby_block doesn't allow updated _device value passed to mount resource
@@ -547,10 +505,6 @@ ruby_block 'ramdisk tmpfs' do
       Chef::Log.info("device #{_device} for mount-point #{_mount_point} already mounted.Will unmount it.")
       result=`umount #{_mount_point}`
       Chef::Log.error("umount error: #{result.to_s}") if result.to_i != 0
-    end
-
-    if _options == nil || _options.empty?
-      _options = "defaults"
     end
 
     Chef::Log.info("mounting ramdisk :: filetype:#{_fstype} dir:#{_mount_point} device:#{_device} size:#{size} options:#{_options}")

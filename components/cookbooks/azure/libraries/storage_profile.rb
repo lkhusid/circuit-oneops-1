@@ -66,15 +66,15 @@ module AzureCompute
         OOLog.info("Deleting OS Managed Disk '#{managed_diskname}' in '#{resource_group_name}' ")
         start_time = Time.now.to_i
 
-		if !@compute_client.managed_disks.check_managed_disk_exists(resource_group_name, managed_diskname)
+        managed_disk_exists = @compute_client.managed_disks.check_managed_disk_exists(resource_group_name, managed_diskname)
+		    if !managed_disk_exists
           OOLog.info("Managed disk '#{managed_diskname}' was not found in '#{resource_group_name}', skipping deletion..")
-		else
+		    else
           os_managed_disk = @compute_client.managed_disks.get(resource_group_name, managed_diskname)
           os_managed_disk.destroy
-		end
+		    end
         end_time = Time.now.to_i
         duration = end_time - start_time
-
       rescue MsRestAzure::AzureOperationError => e
         OOLog.fatal("Error deleting Managed Disk '#{managed_diskname}' in ResourceGroup '#{resource_group_name}'. Exception: #{e.body}")
       rescue => e

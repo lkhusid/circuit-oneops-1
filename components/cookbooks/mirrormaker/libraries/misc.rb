@@ -6,11 +6,11 @@ def setup_ssl_get_props
 
   sslEnabled = attrs.enable_ssl_for_consumer.eql?('true') || attrs.enable_ssl_for_producer.eql?('true') ##Either producer or consumer side ssl is needed ?
 	if sslEnabled
-    keystore = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.Keystore" }
+    keystore = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.oneops.1.Keystore" }
     if keystore.nil? || keystore.size==0
       Chef::Application.fatal!("Keystore component is missing.")
     end
-    cert = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.Certificate" }
+    cert = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] == "bom.oneops.1.Certificate" }
     if cert.nil? || cert.size==0
       Chef::Application.fatal!("Certificate component is missing.")
       exit 1

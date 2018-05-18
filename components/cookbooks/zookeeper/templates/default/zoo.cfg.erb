@@ -26,6 +26,16 @@ syncLimit=<%=@zookeeper[:sync_timeout_ticks] %>
 leaderServes=<%=@leader_is_also_server %> 
 
 # maximum simultaneous connections to allow. 
+
+# Limits the number of concurrent connections (at the socket level) that a single client, identified
+# by IP address, may make to a single member of the ZooKeeper ensemble. This is used to prevent
+# certain classes of DoS attacks, including file descriptor exhaustion.
+# Setting this to 0 or omitting it entirely removes the limit on concurrent connections.
+# References for maxClientCnxns:
+# https://community.hortonworks.com/articles/51191/understanding-apache-zookeeper-connection-rate-lim.html
+# https://issues.apache.org/jira/browse/ZOOKEEPER-1030
+# https://github.com/apache/zookeeper/blob/master/src/java/main/org/apache/zookeeper/server/NettyServerCnxnFactory.java#L80
+# https://zookeeper.apache.org/doc/r3.4.10/zookeeperAdmin.html
 maxClientCnxns=<%=@zookeeper[:max_client_connections] %>
 
 maxSessionTimeout=<%=@zookeeper[:max_session_timeout] %>
@@ -50,4 +60,10 @@ autopurge.snapRetainCount=<%=@zookeeper[:autopurge_snapretaincount] %>
 # Set to "0" to disable auto purge feature
 autopurge.purgeInterval=<%=@zookeeper[:autopurge_purgeinterval] %>
 
+<% if @zookeeper[:enable_zk_sasl_plain].eql?('true') -%>
 
+authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+requireClientAuthScheme=sasl
+jaasLoginRenew=3600000
+
+<% end -%>

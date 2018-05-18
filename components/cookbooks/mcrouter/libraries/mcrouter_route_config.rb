@@ -1,7 +1,7 @@
 require 'json'
 
 class Cloud
-  attr_accessor :cloud_id, :ip, :ip_with_port, :compute_index, :is_active_cloud, :is_active_dc, :ci_name, :memcached_port, :mcrouter_port
+  attr_accessor :cloud_id, :ip, :ip_with_port, :compute_index, :is_active_cloud, :is_active_dc, :ci_name, :memcached_port, :mcrouter_port, :dc_name, :cloud_name
 end
 
 module McrouterRouteConfig
@@ -105,7 +105,7 @@ module McrouterRouteConfig
       node.workorder.payLoad.clouds.each do |c|
         if c.has_key?('ciId') and c.has_key?('ciName')
           # Convert cloud name to dc by removing numbers. ex. prod-dal2 becomes prod-dal
-          cloud_dc[c['ciId'].to_s] = c['ciName'].gsub(/\d+/, '')
+          cloud_dc[c['ciId'].to_s] = { :dc_name => c['ciName'].gsub(/\d+/, ''), :cloud_name => c['ciName'].to_s }
         end
       end
     end
@@ -194,24 +194,34 @@ module McrouterRouteConfig
       cloud_id=nil
       current_cloud=[]
       is_active_cloud=false
+      is_active_dc=false
+      dc_name=nil
+      cloud_name=nil
 
       cloud.each { |c|
         #if c.is_current_cloud
         current_cloud.push("#{c.ip_with_port}")
         cloud_id=c.cloud_id
         is_active_cloud=c.is_active_cloud
+        is_active_dc=c.is_active_dc
+        dc_name=c.dc_name
+        cloud_name=c.cloud_name
         #end
       }
       cloud_index = is_active_cloud ? 0 : index
       cloud_pools[cloud_index]= {"cloud-#{cloud_id}" => {
           #memcached boxes
           'servers' =>
-              current_cloud
+              current_cloud,
+          'region' => dc_name,
+          'cluster' => cloud_name
       }}
       cloud_hash_pools.store( "cloud-#{cloud_id}", {
           #memcached boxes
           'servers' =>
-              current_cloud
+              current_cloud,
+          'region' => dc_name,
+          'cluster' => cloud_name
       })
       index = is_active_cloud ? index : (index+1)
     }
@@ -246,9 +256,11 @@ module McrouterRouteConfig
   def self.set_cloud_computes(c, key, memcached_port, current_cloud_id, mcrouter_port, cloud_dc)
     cc=Cloud.new
     cc.cloud_id=key
+    cc.dc_name = cloud_dc[key.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')][:dc_name]
+    cc.cloud_name = cloud_dc[key.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')][:cloud_name]
     # current_cloud_id is of type Fixnum class, but key is String class
     cc.is_active_cloud = current_cloud_id.to_s == key ? true : false
-    cc.is_active_dc = cloud_dc[current_cloud_id.to_s.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')] == cloud_dc[key.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')] ? true : false
+    cc.is_active_dc = cloud_dc[current_cloud_id.to_s.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')][:dc_name] == cloud_dc[key.gsub(/#{McrouterRouteConfig::FAULT_DOMAIN_INFIX}\d/, '')][:dc_name] ? true : false
     port = memcached_port
     cc.ip_with_port="#{c["ciAttributes"]["public_ip"]}:#{port}"
     cc.ip="#{c["ciAttributes"]["public_ip"]}"

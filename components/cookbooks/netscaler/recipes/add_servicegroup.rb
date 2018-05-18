@@ -316,7 +316,7 @@ lbs.each do |lb|
       :method=>:get,
       :path=>"/nitro/v1/config/lbmonbindings_servicegroup_binding/#{mon[:monitor_name]}").body)
   
-    Chef::Log.info("lbmonbindings_servicegroup_binding "+resp_obj.inspect)
+  #  Chef::Log.info("lbmonbindings_servicegroup_binding "+resp_obj.inspect)
   
     binding = Array.new
     if !resp_obj["lbmonbindings_servicegroup_binding"].nil?

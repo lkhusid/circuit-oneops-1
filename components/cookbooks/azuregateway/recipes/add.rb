@@ -34,7 +34,7 @@ end
 def create_public_ip(creds, location, resource_group_name)
   public_ip = AzureNetwork::PublicIp.new(creds)
   public_ip.location = location
-  public_ip_address = public_ip.build_public_ip_object(node['workorder']['rfcCi']['ciId'], 'ag_publicip')
+  public_ip_address = public_ip.build_public_ip_object(node['workorder']['rfcCi']['ciId'], 'ag_publicip', nil)
   public_ip.create_update(resource_group_name, public_ip_address.name, public_ip_address)
 end
 

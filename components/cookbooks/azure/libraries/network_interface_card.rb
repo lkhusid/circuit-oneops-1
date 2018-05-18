@@ -9,7 +9,7 @@ require 'ipaddr'
 module AzureNetwork
   # class to implement all functionality needed for an Azure NIC.
   class NetworkInterfaceCard
-    attr_accessor :location, :rg_name, :private_ip, :profile, :ci_id, :network_client, :publicip, :subnet_cls, :virtual_network, :nsg, :flag, :tags
+    attr_accessor :location, :rg_name, :private_ip, :profile, :ci_id, :platform_ci_id, :network_client, :publicip, :subnet_cls, :virtual_network, :nsg, :flag, :tags
     attr_reader :creds, :subscription
 
     def initialize(creds)
@@ -45,7 +45,7 @@ module AzureNetwork
     def define_network_interface(nic_ip_config)
       network_interface = Fog::Network::AzureRM::NetworkInterface.new
       network_interface.location = @location
-      network_interface.name = Utils.get_component_name('nic', @ci_id)
+      network_interface.name = Utils.get_component_name('nic', @ci_id, @platform_ci_id)
       network_interface.ip_configuration_id = nic_ip_config.id
       network_interface.ip_configuration_name = nic_ip_config.name
       network_interface.subnet_id = nic_ip_config.subnet_id
@@ -99,18 +99,15 @@ module AzureNetwork
         puts("operation took #{duration} seconds")
         OOLog.info("NIC '#{network_interface.name}' was updated in #{duration} seconds")
         response
-      rescue MsRestAzure::AzureOperationError => e
-        error_msg = e.body.to_s
-        if error_msg.include? "\"code\"=>\"SubnetIsFull\""
-          raise AzureBase::CustomExceptions::SubnetIsFullError, error_msg
-        elsif error_msg.include? "\"code\"=>\"ResourceNotFound\""
-          Chef::Log.error('***FAULT:FATAL= NIC is no more available, please consider replacing compute')
-          Chef::Log.error('***FAULT:FATAL=' + error_msg)
-        else
-          OOLog.fatal("Error creating/updating NIC.  Exception: #{e.body}")
-        end
       rescue => ex
-        OOLog.fatal("Error creating/updating NIC.  Exception: #{ex.message}")
+        if ex.message =~ /Subnet \w.* with address prefix \w.* is already full/i
+          raise AzureBase::CustomExceptions::SubnetIsFullError, ex.message
+        elsif ex.message.include? 'ResourceNotFound'
+          Chef::Log.error('***FAULT:FATAL= NIC is no more available, please consider replacing compute')
+          Chef::Log.error('***FAULT:FATAL=' + ex.message)
+        else
+          OOLog.fatal("Error creating/updating NIC.  Exception: #{ex.message}")
+        end
       end
     end
 
@@ -130,7 +127,7 @@ module AzureNetwork
 
     # this manages building the network profile in preparation of creating
     # the vm.
-    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_name)
+    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_id)
       # get the objects needed to build the profile
       @virtual_network.location = @location
 
@@ -188,8 +185,7 @@ module AzureNetwork
         network_interface = define_network_interface(nic_ip_config)
 
         # include the network securtiry group to the network interface
-        network_security_group = @nsg.get(@rg_name, security_group_name)
-        network_interface.network_security_group_id = network_security_group.id unless network_security_group.nil?
+        network_interface.network_security_group_id = security_group_id unless security_group_id.nil?
         # create the nic
         nic = create_update(network_interface)
 
@@ -228,14 +224,14 @@ module AzureNetwork
       OOLog.info("Deleting NetworkInterfaceCard '#{nic_name}' from '#{resource_group_name}' ")
       start_time = Time.now.to_i
       begin
-      nic_exists = !@network_client.network_interfaces(resource_group: resource_group_name).select{|nic| (nic.name == nic_name)}.empty?
-      if !nic_exists
-        OOLog.info("NetworkInterfaceCard '#{nic_name}' in ResourceGroup '#{resource_group_name}' was not found. Skipping deletion...")
-        result = nil
-      else
-        nic = @network_client.network_interfaces.get(resource_group_name, nic_name)
-        result = !nic.nil? ? nic.destroy : OOLog.info('AzureNetwork::NetworkInterfaceCard - 404 code, trying to delete something that is not there.')
-      end
+        nic_exists = @network_client.network_interfaces.check_network_interface_exists(resource_group_name, nic_name)
+        if !nic_exists
+          OOLog.info("NetworkInterfaceCard '#{nic_name}' in ResourceGroup '#{resource_group_name}' was not found. Skipping deletion...")
+          result = nil
+        else
+          nic = @network_client.network_interfaces.get(resource_group_name, nic_name)
+          result = !nic.nil? ? nic.destroy : OOLog.info('AzureNetwork::NetworkInterfaceCard - 404 code, trying to delete something that is not there.')
+        end
       rescue MsRestAzure::AzureOperationError => e
         OOLog.fatal("Error deleting NetworkInterfaceCard '#{nic_name}' in ResourceGroup '#{resource_group_name}'. Exception: #{e.body}")
       rescue => e
@@ -245,6 +241,19 @@ module AzureNetwork
       duration = end_time - start_time
       OOLog.info("operation took #{duration} seconds")
       result
+    end
+
+    def get_all_nics_in_rg(resource_group_name)
+      OOLog.info("Getting all NetworkInterfaceCards from '#{resource_group_name}' ")
+      nic_list = []
+      begin
+        nic_list = @network_client.network_interfaces(resource_group: resource_group_name)
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Error getting list of NetworkInterfaceCards from '#{resource_group_name}'. Exception: #{e.body}")
+      rescue => e
+        OOLog.fatal("Error getting list of NetworkInterfaceCards from ResourceGroup '#{resource_group_name}'. Exception: #{e.message}")
+      end
+      nic_list
     end
   end
 end

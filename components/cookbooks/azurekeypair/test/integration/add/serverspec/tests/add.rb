@@ -32,12 +32,12 @@ describe "create Resource Group and availability set on azure" do
 
   context "availability set" do
     it "should exist" do
-      resource_group=@spec_utils.get_resource_group_name
+
       availability_set = AzureBase::AvailabilitySetManager.new($node)
 
       avg = availability_set.get
       expect(avg).not_to be_nil
-      expect(avg.name).to eq(resource_group)
+      expect(avg.name).to eq(availability_set.as_name)
 
     end
 

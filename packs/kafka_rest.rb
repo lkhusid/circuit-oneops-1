@@ -65,7 +65,7 @@ resource "os",
        "ostype"  => "centos-7.2",
        "limits" => '{"nofile": 16384}',
        "sysctl"  => '{"net.ipv4.tcp_mem":"3064416 4085888 6128832", "net.ipv4.tcp_rmem":"4096 1048576 16777216", "net.ipv4.tcp_wmem":"4096 1048576 16777216", "net.core.rmem_max":"16777216", "net.core.wmem_max":"16777216", "net.core.rmem_default":"1048576", "net.core.wmem_default":"1048576", "fs.file-max":"1048576"}',
-             "dhclient"  => 'false'
+             "dhclient"  => 'true'
 		}
 		
 resource "volume-kafkarest",
@@ -136,7 +136,7 @@ resource "kafka_rest",
                                'up' => metric(:unit => '%', :description => 'Percent Up'),
                            },
                            :thresholds => {
-                               'kafkarestprocess' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                               'kafkarestprocess' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                            }
              },
              'kafkarestlog' => {:description => 'Log',

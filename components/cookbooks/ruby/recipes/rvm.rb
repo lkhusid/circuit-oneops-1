@@ -15,7 +15,9 @@
 version = node[:ruby][:version]
 
 package "libyaml"
-execute "yum groupinstall -y 'development tools'"
+repolist = `yum repolist`
+
+execute "yum grouplist 'development tools' 2>&1 | grep -q 'no installed groups file' && echo 'SKIPPPING....'|| yum groupinstall -y 'development tools'"
 
 # setup sources
 cloud_name = node[:workorder][:cloud][:ciName]
@@ -105,4 +107,11 @@ rvm use #{version}
 gem install #{gem} #{opts} --no-rdoc --no-ri
 EOH
   end
+end
+
+bash "create oneops user eception" do
+    code <<-EOH
+sed -i '1 s/^/if [ \"$(whoami)\" != \"oneops\" ]; then\\n/' /etc/profile.d/rvm.sh
+echo 'fi' >> /etc/profile.d/rvm.sh
+EOH
 end

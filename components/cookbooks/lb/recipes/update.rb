@@ -30,15 +30,14 @@ if !config_items_changed.empty? && config_items_changed.has_key?("lb_service_typ
 else
   # Normal loadbalncer update
   case cloud_service[:ciClassName].split(".").last.downcase
-
-    when /octavia/
-      include_recipe "lb::build_load_balancers"
-      include_recipe "octavia::update"
-
-    when /netscaler/
-      include_recipe "lb::add"
-
-    when /azure_lb/
-      include_recipe "lb::add"
+  when /octavia/
+    include_recipe 'lb::build_load_balancers'
+    include_recipe 'octavia::update'
+  when /netscaler/
+    include_recipe 'lb::add'
+  when /azure_lb/
+    include_recipe 'lb::add'
+  when /azuregateway/
+    include_recipe 'lb::add'
   end
 end

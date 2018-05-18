@@ -41,7 +41,7 @@ resource "os",
        "ostype"  => "centos-7.2",
        "limits" => '{"nofile": 16384}',
        "sysctl"  => '{"net.ipv4.tcp_mem":"3064416 4085888 6128832", "net.ipv4.tcp_rmem":"4096 1048576 16777216", "net.ipv4.tcp_wmem":"4096 1048576 16777216", "net.core.rmem_max":"16777216", "net.core.wmem_max":"16777216", "net.core.rmem_default":"1048576", "net.core.wmem_default":"1048576", "fs.file-max":"1048576"}',
-             "dhclient"  => 'false'
+             "dhclient"  => 'true'
 		}
 
 resource "volume-mirrormaker",
@@ -111,7 +111,7 @@ resource "mirrormaker",
                                'up' => metric(:unit => '%', :description => 'Percent Up'),
                            },
                            :thresholds => {
-                               'MirrormakerProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                               'MirrormakerProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                            }
              },
              'mirrormakerlag' =>  {'description' => 'MirrorMaker Lag Monitoring',
@@ -179,7 +179,10 @@ resource "client-certs-download",
              :path => '',
              :post_download_exec_cmd => ''
          }
-
+resource "volume",
+  :cookbook => "oneops.1.volume",
+  :requires => { "constraint" => "0..1", "services" => "compute" }
+  
 # depends_on
 [
  {:from => 'client-certs-download', :to => 'user-mirrormaker'},
@@ -237,7 +240,7 @@ relation "ring::depends_on::mirrormaker",
 end
 
 # managed_via
-['user-mirrormaker', 'artifact', 'mirrormaker', 'java', 'library', 'volume-mirrormaker', 'keystore', 'client-certs-download'].each do |from|
+['user-mirrormaker', 'artifact', 'mirrormaker', 'java', 'library','volume-mirrormaker', 'keystore', 'client-certs-download'].each do |from|
   relation "#{from}::managed_via::compute",
            :except => ['_default'],
            :relation_name => 'ManagedVia',

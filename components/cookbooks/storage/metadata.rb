@@ -42,12 +42,13 @@ attribute 'volume_type',
   :required => "optional",
   :default => "STANDARD1",
   :format => {
-    :help => 'Select the storage type.Storage_types are mapped against volume types offered by cloud providers - see provider documentation for details. Storage type determines the volume type(IOPS) and service level(bandwidth).',
+    :help => 'Select the storage type.Storage_types are mapped against volume types offered by cloud providers - see provider documentation for details. Storage type determines the volume type(IOPS1 for 3500 and IOPS2 for 7000) and service level(bandwidth).',
     :category => '1.Configuration',
     :order => 3,
     :form => { 'field' => 'select', 'options_for_select' => [
       ["Standard-1", "STANDARD1"],
       ["IOPS-1", "IOPS1"],
+      ["IOPS-2", "IOPS2"],
       ] }
   }   
 # maps provider vol-id for md

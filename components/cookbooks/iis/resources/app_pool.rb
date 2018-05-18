@@ -7,7 +7,7 @@ default_action :create
 
 attribute :name, kind_of: String, name_attribute: true
 
-attribute :managed_runtime_version, kind_of: String, default: "v4.0", equal_to: ["v2.0", "v4.0"]
+attribute :managed_runtime_version, kind_of: String, default: "v4.0", equal_to: ["v2.0", "v4.0", ""]
 attribute :managed_pipeline_mode, kind_of: Symbol, default: :integrated, equal_to: [:classic, :integrated]
 attribute :enable32_bit_app_on_win64, kind_of: [TrueClass, FalseClass], default: false
 

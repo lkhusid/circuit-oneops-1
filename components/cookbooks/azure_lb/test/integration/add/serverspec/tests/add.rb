@@ -25,13 +25,14 @@ describe 'azure lb' do
   end
 
   it "has oneops org and assembly tags" do
-    tags_from_work_order = Utils.get_resource_tags($node)
+    if !$node['workorder'].has_key?("actionName")
+      tags_from_work_order = Utils.get_resource_tags($node)
+      lb_svc = AzureNetwork::LoadBalancer.new(@spec_utils.get_azure_creds)
+      load_balancer = lb_svc.get(@spec_utils.get_resource_group_name, @spec_utils.get_lb_name)
 
-    lb_svc = AzureNetwork::LoadBalancer.new(@spec_utils.get_azure_creds)
-    load_balancer = lb_svc.get(@spec_utils.get_resource_group_name, @spec_utils.get_lb_name)
-
-    tags_from_work_order.each do |key, value|
-      expect(load_balancer.tags).to include(key => value)
+      tags_from_work_order.each do |key, value|
+        expect(load_balancer.tags).to include(key => value)
+      end
     end
   end
 

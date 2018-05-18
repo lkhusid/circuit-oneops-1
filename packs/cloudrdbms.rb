@@ -119,9 +119,10 @@ resource "secgroup",
 # our Agent Java program needs this:
 resource "lb",
 :except => [ 'single' ],
-:design => false,
+:design => true,
 :attributes => {
-    "listeners"     => '["tcp 3306 tcp 3307"]'
+    "listeners"     => '["tcp 3306 tcp 3307"]',
+    "ecv_map"     => '{"3307":"port-check"}'
   }
 
 # we use this to have the hostnames stay the same after a compute REPLACE:
@@ -524,7 +525,6 @@ end
 {:from => 'cloudrdbms', :to => 'user-app'},
 {:from => 'user-app', :to => 'volume-app'},
 {:from => 'user-app', :to => 'compute'},
-{:from => 'hostname', :to => 'compute'},
 {:from => 'cloudrdbms', :to => 'java'},
 {:from => 'java', :to => 'os'},
 {:from => 'cloudrdbms', :to => 'volume-app'},
@@ -546,8 +546,17 @@ end
     :attributes => {"flex" => false, "min" => 1, "max" => 1}
 end
 
+# if a compute is replace, touch-update hostname
+[ 'hostname' ].each do |from|
+  relation "#{from}::depends_on::compute",
+    :relation_name => 'DependsOn',
+    :from_resource => from,
+    :to_resource   => 'compute',
+    :attributes    => { 'propagate_to' => 'from' }
+end
+
 # managed_via
-[ 'cloudrdbms', 'user-app', 'java', 'volume-app', 'artifact-app', 'cloudCRON', 'storage', 'volume-cinder', 'objectstore'].each do |from|
+[ 'cloudrdbms', 'user-app', 'java', 'volume-app', 'artifact-app', 'cloudCRON', 'volume-cinder', 'objectstore'].each do |from|
     relation "#{from}::managed_via::compute",
     :except => [ '_default' ],
     :relation_name => 'ManagedVia',

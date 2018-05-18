@@ -8,13 +8,17 @@ require 'json'
 token = node[:workorder][:ci][:ciAttributes]
 size_map = JSON.parse(token[:sizemap])
 
+domain = token.key?('domain') ? token[:domain] : 'default'
+
 conn = Fog::Compute.new({
-                            :provider => 'OpenStack',
-                            :openstack_api_key => token[:password],
-                            :openstack_username => token[:username],
-                            :openstack_tenant => token[:tenant],
-                            :openstack_auth_url => token[:endpoint]
-                        })
+  :provider => 'OpenStack',
+  :openstack_api_key => token[:password],
+  :openstack_username => token[:username],
+  :openstack_tenant => token[:tenant],
+  :openstack_auth_url => token[:endpoint],
+  :openstack_project_name => token[:tenant],
+  :openstack_domain_name => domain
+})  
 
 limits_all = conn.get_limits.body["limits"]
 

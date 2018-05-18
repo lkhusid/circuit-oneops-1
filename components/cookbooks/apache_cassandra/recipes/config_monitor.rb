@@ -1,18 +1,5 @@
 
 ## cron and templates for monitor ##
-template '/opt/nagios/libexec/commit_log_size.pl' do
-  source 'commit_log_size.pl.erb'
-  owner 'oneops'
-  group 'oneops'
-  mode '0755'
-end
-
-template '/opt/nagios/libexec/check_sst_sum.pl' do
-  source 'check_sst_sum.pl.erb'
-  owner 'oneops'
-  group 'oneops'
-  mode '0755'
-end
 
 template '/opt/nagios/libexec/nodetool_status.pl' do
   source 'nodetool_status.pl.erb'
@@ -33,7 +20,6 @@ cookbook_file '/opt/cassandra/check_azure_fault_domain.py' do
   owner 'cassandra'
   group 'cassandra'
   mode '0777'
-  only_if { Cassandra::Util.isAzure() }
 end
 
 ruby_block 'CREATE CRON FOR NODETOOLS' do

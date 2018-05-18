@@ -114,6 +114,24 @@ attribute 'zone',
               :order => 10
           }
 
+attribute 'instance_osdisk_id',
+          :description => "Instance OS  Disk Id",
+          :grouping => 'bom',
+          :format => {
+              :help => 'Unique Id of the OS Disk Id attached to Compute within the cloud provider',
+              :category => '1.Identity',
+              :order => 11
+          }
+
+attribute 'instance_nic_id',
+          :description => "Instance NIC Id",
+          :grouping => 'bom',
+          :format => {
+              :help => 'Unique Id of the NIC Id attached to Compute within the cloud provider',
+              :category => '1.Identity',
+              :order => 12
+          }
+
 # state
 
 attribute 'instance_state',
@@ -174,6 +192,7 @@ attribute 'size',
           ['S-MEM-LXD (LXD)','S-MEM-LXD'],
           ['L-MEM-LXD (LXD)','L-MEM-LXD'],
           ['BM-V1-56 (Standard Baremetal)','BM-V1-56'],
+          ['BM-V2-56 (Torbit Baremetal)','BM-V2-56'],
           ['S-Win (Windows)','S-WIN'],
           ['M-Win (Windows)','M-WIN'],
           ['L-Win (Windows)','L-WIN'],
@@ -357,3 +376,4 @@ recipe "status", "Compute Status"
 recipe "reboot", "Reboot Compute"
 recipe "repair", "Repair Compute"
 recipe "powercycle", "Powercycle - HARD reboot"
+recipe "redeploy", "Redeploy Compute - Only works on azure"

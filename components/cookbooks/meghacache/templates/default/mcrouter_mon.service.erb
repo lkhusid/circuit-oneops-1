@@ -1,0 +1,24 @@
+### BEGIN INIT INFO
+# Provides:          <NAME>
+# Required-Start:    $local_fs $network $named $time $syslog
+# Required-Stop:     $local_fs $network $named $time $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Description:       <DESCRIPTION>
+### END INIT INFO
+
+[Unit]
+Description=mcrouter_mon
+After=mcrouter.service
+
+[Service]
+Type=simple
+ExecStart=/bin/ruby <%= @mcrouter_mon_path %>
+User=root
+Restart=always
+RestartSec=2
+LimitNOFILE=64
+Nice=4
+
+[Install]
+WantedBy=multi-user.target

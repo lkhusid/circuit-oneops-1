@@ -220,7 +220,6 @@ attribute 'journal_dir',
 attribute 'max_client_connections',
   :description          => 'Max. Client Connections',
   :required => 'required',
-  :default               => '1000',
   :format => {
     :category => '2.Configuration Parameters',
     :help => 'Limits the number of concurrent connections (at the socket level) that a single client, identified by IP address, may make to a single member of the ZooKeeper ensemble. This is used to prevent certain classes of DoS attacks, including file descriptor exhaustion. The zookeeper default is 60; this file bumps that to 1000 and should be good for most users. Setting of 0 entirely removes the limit on concurrent connections',
@@ -333,6 +332,41 @@ attribute 'min_computes_per_cloud',
     :pattern => "[0-9]+",
     :filter => {"all" => {"visible" => ('prod_level_checks_enabled:eq:true')}}
   }
+
+
+
+attribute 'enable_zk_sasl_plain',
+  :description => 'Enable ZK SASL/Plain',
+  :default => 'false',
+  :format => {
+    :category => '4.SASL/Plain Configuration',
+    :help => 'Enable SASL/Plain to use username/password for Zookeeper connections',
+    :order => 1,
+    :form => {'field' => 'checkbox'}
+  }
+
+attribute 'sasl_zk_admin_pwd',
+  :description => 'Password for "admin" user for Zookeeper',
+  :encrypted => true,
+  :default => '',
+  :format => {
+    :help => 'Password of the sasl/plain "admin" user for Zookeeper',
+    :category => '4.SASL/Plain Configuration',
+    :order => 2,
+    :filter => {'all' => {'visible' => 'enable_zk_sasl_plain:eq:true'}}
+  }
+
+attribute 'sasl_zk_user_pwds',
+  :description => 'Username and password for sasl/plain clients',
+  :data_type => "hash",
+  :default => nil,
+  :format => {
+    :category => '4.SASL/Plain Configuration',
+    :help => 'First field for user; second field for password',
+    :order => 3,
+    :filter => {'all' => {'visible' => 'enable_zk_sasl_plain:eq:true'}}
+  }
+
 
 
 recipe "status", "Zookeeper Status"

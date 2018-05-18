@@ -22,9 +22,12 @@ org = metadata_obj['organization']
 assembly = metadata_obj['assembly']
 environment = metadata_obj['environment']
 platform_ciID = node['workorder']['box']['ciId']
+environment_ciID = node['workorder']['payLoad']['Environment'][0]['ciId']
+
+resource_group_name = Utils.get_resource_group(node , org, assembly, platform_ciID, environment, location, environment_ciID)
 
 
-resource_group_name = AzureResources::ResourceGroup.get_name(org, assembly, platform_ciID, environment, location)
+#resource_group_name = AzureResources::ResourceGroup.get_name(org, assembly, platform_ciID, environment, location)
 begin
   vm_svc = AzureCompute::VirtualMachine.new(credentials)
   vm_svc.restart(resource_group_name, vm_name)

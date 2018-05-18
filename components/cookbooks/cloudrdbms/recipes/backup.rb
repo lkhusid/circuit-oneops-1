@@ -1,47 +1,142 @@
 # Cloud RDBMS backup recipe
 #
-#
-if ! File.file?('/usr/local/bin/objectstore')
-     Chef::Log.info("CloudRDBMS exit backup because objectstore not installed: /usr/local/bin/objectstore")
-     return
-end
 
-#this recipe takes an argument, however this argument is not exposed to users
-#this way, we can use chef-solo to call the recipe with parameters.
-if node.workorder.arglist == nil || node.workorder.arglist.empty?
-  backup_type = "full"
-else
-  args=::JSON.parse(node.workorder.arglist)
-  backup_type=args["backup_type"]
-  backup_type = "full" if backup_type == nil || backup_type == ""
-  backup_type.strip!
-end
-if backup_type != "full" && backup_type != "incremental"
-  raise RuntimeError, "CloudRDBMS unsupported backup type, must be either full or incremental"
-end  
-
-current_ip=`/sbin/ifconfig | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}' | grep -v 127.0.0.1 | grep -v 10.0. | head -1`
-current_ip.strip!
-Chef::Log.info("CloudRDBMS starts #{backup_type} backup procedure from #{current_ip}")
-
-### Get the backup id of the current cluster
-backup_id = CloudrdbmsArtifact::get_backup_id_from_node(node)
+# Set my needed qualities to call ansible
+concordaddress = node['cloudrdbms']['concordaddress']
+managedserviceuser = node['cloudrdbms']['managedserviceuser']
+managedservicepass = node['cloudrdbms']['managedservicepass']
+playbook = "backup"
 clustername = node['cloudrdbms']['clustername']
-runonenv = node[:workorder][:payLoad][:Environment][0][:ciAttributes][:profile].downcase
+drclouds = node['cloudrdbms']['drclouds']
+cloudrdbmspackversion = node['cloudrdbms']['cloudrdbmspackversion']
 
-Chef::Log.info("CloudRDBMS backup configs: backup_type=#{backup_type}, backup_id=#{backup_id}")
+# Assume that every node is healthy and already joined the primary cluster.
+# This recipe is destructive, all existing data will be removed
+#
 
-mysql_status_results = `service mysql status 2>&1`
-mysql_status_results.strip!
-if ! (mysql_status_results =~ /SUCCESS/)
-  raise RuntimeError, "server #{current_ip} is not running, abort backup operations"
+if ! File.file?('/usr/local/bin/objectstore')
+  Chef::Log.info("CloudRDBMS exit backup because objectstore not installed: /usr/local/bin/objectstore")
+  return
 end
 
-Chef::Log.info("CloudRDBMS backup starts to generate and upload a database snapshot to objectstore")
-%x( sudo /app/backup_n_restore.sh "#{backup_type}" -e "#{runonenv}" -c "#{clustername}" -i "#{backup_id}" -r "yes" >/tmp/backup.log 2>&1 )
-if $?.exitstatus != 0
-  Chef::Log.info("#{`sudo cat /tmp/backup.log`}")
-  raise RuntimeError, "CloudRDBMS node #{current_ip} failed to generate and then upload a snapshot of the database to objectstore"
-else
-  Chef::Log.info("CloudRDBMS node #{current_ip} successfully generated and then uploaded a snapshot of the database to objectstore")
+current_node=`hostname -f`.strip!
+current_node.strip!
+Chef::Log.info("CloudRDBMS starts restore procedure at #{current_node}")
+
+
+Chef::Log.info("CloudRDBMS get var info")
+log "CloudRDBMS Show environment for concordaddress: '#{concordaddress}'"
+log "CloudRDBMS Show environment for managedserviceuser: '#{managedserviceuser}'"
+log "CloudRDBMS Show environment for clustername: '#{clustername}'"
+log "CloudRDBMS Show environment for drclouds: '#{drclouds}'"
+log "CloudRDBMS Show environment for cloudrdbmspackversion: '#{cloudrdbmspackversion}'"
+log "CloudRDBMS Show environment for playbook: '#{playbook}'"
+
+# if we do a deployment using multiple-clouds, this below will work, it will "see" all IP addresses
+string_of_ips = ""
+
+File.readlines("/app/listofHostsInCluster.log").each do |n|
+    sLoopHostname = n.strip!
+    sLoopIP = `nslookup #{sLoopHostname} | awk -F":" '{if($1 == "Address") print $2}' | tail -1`.strip!
+    # this is the SHORT hostname, not the FULL hostname:
+    Chef::Log.info("CloudRDBMS IP inside main loop, IP/HOST=" + sLoopIP)
+    if string_of_ips.length == 0
+        string_of_ips = "\"" + sLoopIP
+    else
+        string_of_ips = string_of_ips + "\",\"" + sLoopIP
+    end
 end
+string_of_ips = string_of_ips + "\""
+Chef::Log.info("CloudRDBMS IP addresses for the cluster:BEGIN")
+Chef::Log.info(string_of_ips)
+Chef::Log.info("CloudRDBMS IP addresses for the cluster:END")
+
+
+Chef::Log.info("CloudRDBMS IP addresses for this host:BEGIN")
+local_ip=`hostname -i`.strip!
+Chef::Log.info(local_ip)
+Chef::Log.info("CloudRDBMS IP addresses for this host:END")
+
+log "CloudRDBMS get concord script get_concord_status.sh"
+
+template "/app/get_concord_status.sh" do
+    source "get_concord_status.erb"
+    owner "app"
+    group "app"
+    mode "0755"
+end
+
+file '/app/#{playbook}.yml' do
+  action :delete
+end
+
+
+
+template_variables = {
+  :concordaddress         => concordaddress,
+  :managedserviceuser     => managedserviceuser,
+  :cloudrdbmspackversion  => cloudrdbmspackversion,
+  :clustername            => clustername,
+  :drclouds               => drclouds,
+  :cloudrdbmspackversion  => cloudrdbmspackversion,
+  :playbook               => playbook,
+  :string_of_ips          => string_of_ips,
+  :local_ip               => local_ip,
+  :current_node           => current_node
+}
+
+template "/app/#{playbook}.yml" do
+    variables     template_variables
+    source "#{playbook}.erb"
+    owner "app"
+    group "app"
+    mode "0755"
+end
+
+
+log "CloudRDBMS concord: start ansible job"
+### Start Concord Job for ansible ####
+bash 'start_ansible' do
+    cwd '/app'
+    user 'app'
+    code <<-EOF
+      # Set my needed qualities to call ansible
+      mv "#{playbook}.yml" _main.yml
+      curl  -u "#{managedserviceuser}:#{managedservicepass}" -F request=@_main.yml -F org="Default" -F project="cloudrdbms" -F repo="#{cloudrdbmspackversion}" -F entryPoint="ansibleFlow" http://#{concordaddress}/api/v1/process >./curl_#{playbook}.out
+      RC=$?
+      echo "running the command exited with return code ${RC}"
+    EOF
+end
+
+# END bash 'start_ansible'
+
+log "CloudRDBMS concord: Wait for job to exit concord job"
+# Wait for job to exit concord job
+ruby_block 'validate_complete' do
+    block do
+      curlAttempt=1
+      curlComplete=0
+      while (curlComplete == 0) && (curlAttempt < 360) do
+          begin
+            status=`export playbook="#{playbook}" concordaddress="#{concordaddress}" managedserviceuser="#{managedserviceuser}" managedservicepass="#{managedservicepass}" && /app/get_concord_status.sh`
+            return_code_curl = $?.exitstatus
+            instanceId=`awk -F'\"' '{if($2=="instanceId")print $4}' /app/status`
+            if return_code_curl != 0
+              puts "Exit status: $?.exitstatus"
+              raise RuntimeError, "Some error happened while trying to get the status"
+            elsif ( status == "RUNNING" ) || ( status == "ENQUEUED" ) || ( status == "STARTING" )
+              curlComplete = 0
+              curlAttempt += 1
+              Chef::Log.info("CloudRDBMS attempt #{curlAttempt} of 360 on instanceID(#{instanceId}), current status is #{status}.")
+              sleep(10)
+            elsif ( status == "FINISHED" )
+              Chef::Log.info("CloudRDBMS attempt #{curlAttempt} on instanceID(#{instanceId}) #{status}.")
+              curlComplete = 1
+            else
+              raise RuntimeError, "[CloudRDBMS] Error: Concord shows '#{status}' on instanceID(#{instanceId})!"
+            end
+          end
+        end
+      end
+    end
+# END bash 'validate_complete'

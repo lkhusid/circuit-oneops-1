@@ -184,5 +184,32 @@ module AzureNetwork
         OOLog.fatal("Gateway deleting error....: #{e.body}")
       end
     end
+
+    def get
+      begin
+        OOLog.info("Fetching application gateway '#{@ag_name}' from '#{@resource_group_name}' ")
+        start_time = Time.now.to_i
+        result = @application_gateway.gateways.get(@resource_group_name, @ag_name)
+        end_time = Time.now.to_i
+        duration = end_time - start_time
+      rescue Exception => e
+        OOLog.info("Error getting ApplicationGateway '#{@ag_name}' in ResourceGroup '#{@resource_group_name}' ")
+        OOLog.info("Error Message: #{e.message}")
+        return nil
+      end
+      OOLog.info("operation took #{duration} seconds")
+      result
+    end
+
+    def exists?
+      begin
+        OOLog.info('Checking application gateway exists')
+        result = @application_gateway.gateways.check_application_gateway_exists(@resource_group_name, @ag_name)
+      rescue Exception => e
+        OOLog.fatal("Error checking application gateway exists #{e.message}")
+      end
+
+      result
+    end
   end
 end

@@ -32,8 +32,8 @@ if cloud_service.nil?
   exit 1
 end
 
-if cloud_service[:ciClassName] !~ /netscaler/i
-  Chef::Log.info("lb cloud service is #{cloud_service} but this action is only supported for netscaler cloud service hence exiting...")
+if cloud_service[:ciClassName] !~ /netscaler|Azure_lb/i
+  Chef::Log.info("lb cloud service is #{cloud_service} but this action is only supported for netscaler/azure_lb cloud service hence exiting...")
   exit 0
 end
 
@@ -49,6 +49,8 @@ node.set["loadbalancers"] = lbs
 case cloud_service[:ciClassName]
 when /netscaler/i
   include_recipe "netscaler::get_lb_status"
+when /Azure_lb/i
+  include_recipe "azure_lb::get_lb_status"
 when /rackspace/i
 
 when /haproxy/i

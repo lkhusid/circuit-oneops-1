@@ -1,0 +1,169 @@
+#!/usr/bin/env ruby
+
+
+require 'rubygems'
+require 'logger'
+require 'net/http'
+require 'json'
+require 'fileutils'
+
+
+# This method return the map of leader ip & core_name
+# ex. {"ip1":"collection1_shard1_replica0","ip2":"collection1_shard2_replica0"}
+def get_shard_leader_ip_to_name_map(host,port,collection_name,logger)
+  uri = URI("http://#{host}:#{port}/solr/admin/collections?action=CLUSTERSTATUS&indexInfo=false&wt=json")
+  res = Net::HTTP.get_response(uri)
+  if !res.is_a?(Net::HTTPSuccess)
+    error = "Error while reading clusterstate : #{res.message}"
+    logger.error(error)
+    raise error
+  else
+    logger.debug("cluster status response : #{res.body}")
+  end
+
+  data = JSON.parse(res.body)
+  collections =  data['cluster']['collections']
+  if collections.empty? || !collections.has_key?(collection_name)
+    error = "No collection found : #{collection_name}"
+    logger.error(error)
+    raise error
+  end
+
+  shards =  collections[collection_name]['shards']
+  logger.debug("shards : #{shards}")
+
+  node_ip_to_replica_name_map = Hash.new()
+  shards.keys.each do |shard_name|
+    leaders = shards[shard_name]['replicas'].values.select { |replica| replica['leader'] == 'true'}
+    core_name = leaders[0]['core']
+    node_name = leaders[0]['node_name']
+    node_ip = node_name.split(':')[0]
+    node_ip_to_replica_name_map[node_ip] = core_name
+  end 
+  return node_ip_to_replica_name_map
+end
+
+ 
+def backup_core(host,port,location, core_name, backup_name, number_to_keep, logger)
+  uri = URI("http://#{host}:#{port}/solr/#{core_name}/replication?command=backup&location=#{location}&name=#{backup_name}&wt=json")
+  logger.debug("Backup url : #{uri}")
+  res = Net::HTTP.get_response(uri)
+  if !res.is_a?(Net::HTTPSuccess)
+    msg = "Error while creating backup : #{res.message}"
+    logger.error(msg)
+    raise msg
+  else
+    logger.debug("backup response : #{res.body}")
+  end
+end
+
+# This method will delete backups for which backup name starts with 'backup_name', keeping only latest 'backups_to_keep' no. of backups + current backup
+# This will not delete the current backup as generating backup is async and delete will happen immediately after submitting backup command
+# backup_name=>sams_list1_shard2_replica0_20171030_161724
+# backup_location=>/app/solr_backup
+# backups_to_keep=>2
+def delete_old_backups(backup_location, backup_name_prefix, backups_to_keep, logger)
+  logger.debug("backup_location : #{backup_location}")
+  logger.debug("backups_to_keep : #{backups_to_keep}")
+  if backups_to_keep == nil || backups_to_keep.to_i <= 0
+    logger.debug("No backups_to_keep value provided hence no backups will be deleted")
+    return
+  end
+  backups_to_keep = backups_to_keep.to_i
+  backup_dir_names = []
+  Dir.foreach(backup_location) do |backup_dir|
+    if backup_dir.start_with?(backup_name_prefix)
+      backup_dir_names.push backup_dir
+    end
+  end
+  if backup_dir_names.size <= backups_to_keep
+    logger.debug("No enough backups to delete. Backups present => #{backup_dir_names.size} Backups to keep => #{backups_to_keep}")
+    return
+  end
+  logger.debug("Backup files found = #{backup_dir_names.size}")
+  backup_dir_names.sort!
+  backup_dir_names.each do |backup_name|
+    logger.debug("backup_name = #{backup_name}")
+  end
+
+  backup_dir_names_to_delete = backup_dir_names.values_at(0..backup_dir_names.size-backups_to_keep-1)
+  #keep only 'backups_to_keep' no. of backups and delete others matching the core name
+  backup_dir_names_to_delete.each do |backup_dir_name|
+    abs_dir_name_to_delete = backup_location+'/'+backup_dir_name;
+    logger.debug("Deleting backup : #{abs_dir_name_to_delete}")
+    FileUtils.remove_dir(abs_dir_name_to_delete)
+  end
+end
+
+def upload_or_download_zk_config(upconfig_or_downconfig, solr_lib_path, zkHost, configname, to_dir, logger)
+  logger.debug("Zookeeper #{upconfig_or_downconfig} is in progress...")
+  command = "java -classpath .:#{solr_lib_path}/* org.apache.solr.cloud.ZkCLI -cmd #{upconfig_or_downconfig} -zkhost #{zkHost} -confdir #{to_dir} -confname #{configname}"
+
+  logger.debug("Executing command #{command}")
+  `#{command}`
+  if $? != 0
+    msg = "Error while #{upconfig_or_downconfig}"
+    logger.error(msg)
+    raise msg
+  end
+end
+
+time = Time.new
+#tims_s = time.strftime("%Y%m%d_%H%M%S")
+tims_s = time.strftime("%Y_%m_%d_%H_%M_%S")
+
+# Get input arguments to the script
+collection_name = ARGV[0]
+location = ARGV[1]
+backup_logfile = ARGV[2]
+
+# Below variables will be resolved while copying template
+backup_log_dir = '<%= @backup_log_dir %>'
+if backup_logfile == nil || backup_logfile.empty?
+  backup_logfile = "#{backup_log_dir}/backup_#{collection_name}.log"
+end
+
+solr_host = '<%= @solr_host %>'
+solr_port = '<%= @solr_port_no %>'
+number_to_keep = '<%= @number_to_keep %>'
+zk_host_fqdns = '<%= @zk_host_fqdns %>'
+config_name = '<%= @config_name %>'
+solr_lib_path = '<%= @solr_lib_path %>'
+
+zkHost = ""
+if zk_host_fqdns != nil
+  zkHost = zk_host_fqdns.split(',')[0]
+end
+
+logger = Logger.new(File.new(backup_logfile,'w'))
+logger.level = Logger::DEBUG
+
+logger.debug("Time : #{tims_s}")
+logger.debug("Collection : #{collection_name}")
+logger.debug("Solr host : #{solr_host}")
+logger.debug("Solr port : #{solr_port}")
+logger.debug("Number of backup to keep : #{number_to_keep}")
+logger.debug("Backup location : #{location}")
+
+begin
+  shard_leader_ip_to_name_map = get_shard_leader_ip_to_name_map(solr_host, solr_port, collection_name, logger)
+  if shard_leader_ip_to_name_map.has_key?solr_host
+    core_name = shard_leader_ip_to_name_map[solr_host]
+    logger.debug("#{solr_host} is a core leader for collection #{collection_name} and executing backup command for collection #{collection_name}")
+    backup_name = "#{core_name}_#{tims_s}"
+    backup_core(solr_host, solr_port, location, core_name, backup_name, number_to_keep, logger)
+    #Download config from zookeeper
+    destination = "#{location}/#{config_name}_#{tims_s}"
+    upload_or_download_zk_config('downconfig', solr_lib_path, zkHost, config_name, destination, logger)
+  else
+    logger.debug("#{solr_host} is not a core leader for collection #{collection_name} and hence no backup will be taken on this node for collection #{collection_name}")
+  end
+
+  #Delete old backups 
+  delete_old_backups(location, "snapshot.#{collection_name}_", number_to_keep, logger)
+  delete_old_backups(location, config_name, number_to_keep, logger)
+rescue Exception => msg
+  logger.error("error : #{msg}")
+  logger.error(msg.backtrace.inspect)
+end
+

@@ -23,5 +23,6 @@ if $storage_provider_class =~ /azuredatadisk/
   Dir["#{$circuit_path}/circuit-oneops-1/components/cookbooks/azure_base/libraries/*.rb"].each {|file| require file }
   Utils.set_proxy($node['workorder']['payLoad']['OO_CLOUD_VARS'])
   $resource_group_name = AzureBase::ResourceGroupManager.new($node).rg_name
+  $availability_set_name = AzureBase::AvailabilitySetManager.new($node).as_name
   $storage_service = $storage_provider.instance_variable_get('@storage_service')
 end

@@ -1,0 +1,42 @@
+handlers = 1catalina.org.apache.juli.AsyncFileHandler, 2localhost.org.apache.juli.AsyncFileHandler, 3manager.org.apache.juli.AsyncFileHandler, 4host-manager.org.apache.juli.AsyncFileHandler, org.apache.tomee.jul.formatter.AsyncConsoleHandler
+
+.handlers = 1catalina.org.apache.juli.AsyncFileHandler, org.apache.tomee.jul.formatter.AsyncConsoleHandler
+.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+############################################################
+# Handler specific properties.
+# Describes specific configuration info for Handlers.
+############################################################
+
+1catalina.org.apache.juli.AsyncFileHandler.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+1catalina.org.apache.juli.AsyncFileHandler.directory = <%= node['enterprise_server']['logs']['server_log_path'] %>/logs
+1catalina.org.apache.juli.AsyncFileHandler.prefix = catalina.
+
+2localhost.org.apache.juli.AsyncFileHandler.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+2localhost.org.apache.juli.AsyncFileHandler.directory = <%= node['enterprise_server']['logs']['server_log_path'] %>/logs
+2localhost.org.apache.juli.AsyncFileHandler.prefix = localhost.
+
+3manager.org.apache.juli.AsyncFileHandler.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+3manager.org.apache.juli.AsyncFileHandler.directory = <%= node['enterprise_server']['logs']['server_log_path'] %>/logs
+3manager.org.apache.juli.AsyncFileHandler.prefix = manager.
+
+4host-manager.org.apache.juli.AsyncFileHandler.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+4host-manager.org.apache.juli.AsyncFileHandler.directory = <%= node['enterprise_server']['logs']['server_log_path'] %>/logs
+4host-manager.org.apache.juli.AsyncFileHandler.prefix = host-manager.
+
+org.apache.tomee.jul.formatter.AsyncConsoleHandler.level = <%= node['enterprise_server']['logs']['server_log_level'] %>
+org.apache.tomee.jul.formatter.AsyncConsoleHandler.formatter = org.apache.juli.OneLineFormatter
+
+
+############################################################
+# Facility specific properties.
+# Provides extra control for each logger.
+############################################################
+
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].level = INFO
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].handlers = 2localhost.org.apache.juli.AsyncFileHandler
+
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].level = INFO
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/manager].handlers = 3manager.org.apache.juli.AsyncFileHandler
+
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].level = INFO
+org.apache.catalina.core.ContainerBase.[Catalina].[localhost].[/host-manager].handlers = 4host-manager.org.apache.juli.AsyncFileHandler

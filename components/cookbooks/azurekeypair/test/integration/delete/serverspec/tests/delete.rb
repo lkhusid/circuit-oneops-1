@@ -17,14 +17,22 @@ describe "delete Resource Group and availability set on azure" do
     @spec_utils = AzureSpecUtils.new($node)
   end
 
-  context "delete resource group" do
-    it "should not exist" do
-
+  context "check resource group" do
+    it "can or can't exist in new clouds depending on other resources in same group" do
       rg_svc = AzureBase::ResourceGroupManager.new($node)
+      is_new_cloud = rg_svc.is_new_cloud
 
+      if is_new_cloud
+        exists = rg_svc.exists?
+        if exists
+          resources = rg_svc.list_resources
+          resource_check = resources.nil? || resources.length == 0
+          expect(resource_check).to eq(false)
+        end
+      elsif
       exists = rg_svc.exists?
-
-      expect(exists).to eq(false)
+        expect(exists).to eq(false)
+      end
     end
   end
 

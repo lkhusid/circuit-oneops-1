@@ -41,7 +41,6 @@ attribute 'regionname',
             :order => 3
           }
 
-
 attribute 'authstrategy',
           :description => 'Auth Strategy',
           :encrypted => false,

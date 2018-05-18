@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#Set this boolean value to register the echo statements to a tmp log file
+log_statements=false
+
+log_echo () {
+  if [ "$log_statements" = true ]; then
+    echo $1
+  fi
+}
+
+zk_fqdn=<%= node["zk_host_fqdns"]%>
+log_echo "ZK FQDN is $zk_fqdn"
+
+
+zk_ip_list_string=$(dig +short $zk_fqdn)
+log_echo "IP List from zk_fqdn is $zk_ip_list_string"
+zk_list=($zk_ip_list_string)
+log_echo "Total number of available ZK nodes = ${#zk_list[@]}"
+
+ping_zk () {
+  zk=$1
+  (nc $1 2181 </dev/null)
+  ret=$?
+  return $ret
+}
+
+has_live_zk=0
+
+for zk in "${zk_list[@]}"
+do
+ if ping_zk "${zk}"; then
+ has_live_zk=$((has_live_zk+1))
+ fi
+done
+
+log_echo "Total number of live ZK nodes = $has_live_zk"
+
+# Get the ratio of live zookeeper nodes to total zk nodes extracted from FQDN. Bash won't support float operations.
+# sed 's/..$/.&/' - s command attempts to match the pattern space against the supplied regular expression in 's/regexp/replacement/flags'.
+# The given regexp will take two digits after the decimal point
+# https://www.gnu.org/software/sed/manual/html_node/The-_0022s_0022-Command.html
+zk_ratio=$(echo $(( 100 * $has_live_zk / ${#zk_list[@]} )) | sed 's/..$/.&/')
+log_echo "zk ratio of live ZK to total ZK nodes = $zk_ratio"
+
+# Get the percentage of live ZK nodes by multiplying the ratio with 100. Since bash doesn't support float operations, used bc
+# scale will tell you how many digits after the decimal point is needed
+zk_percentage=$(echo "scale=4; 100*$zk_ratio" | bc)
+log_echo "Percentage of live ZK = $zk_percentage"
+
+# If percentage of live nodes is greater than 1 display the percentage in monitors
+min=1.00
+if [ 1 -eq "$(echo "${zk_percentage} > ${min}" | bc)" ]; then
+ echo "Solr connected to ZooKeeper |up=$zk_percentage"
+else
+ echo "NO live ZooKeeper |up=0"
+fi
+

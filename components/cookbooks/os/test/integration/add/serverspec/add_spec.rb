@@ -1,12 +1,11 @@
-# unable to put this test in compute so it is going here. It tests adding gem proxy to oneops user when install_base.sh
-# adds them for root.
-require 'spec_helper'
+is_windows = ENV['OS'] == 'Windows_NT'
+$circuit_path = "#{is_windows ? 'C:/Cygwin64' : ''}/home/oneops"
+require "#{$circuit_path}/circuit-oneops-1/components/spec_helper.rb"
 
-root_gem_source = `gem source | grep -m 1 "http"`
-describe user("oneops") do
-  it { should exist }
-end
-
-describe command('su - oneops -c "gem source" | grep -m 1 "http"') do
-  its(:stdout) { should eq root_gem_source}
+ostype = $node['workorder']['rfcCi']['ciAttributes']['ostype']
+case ostype
+  when /centos-7/i, /redhat-7/i
+    require "/home/oneops/circuit-oneops-1/components/cookbooks/os/test/integration/add/serverspec/centos_redhat_7.rb"
+  else
+    puts "no tests for ostype #{ostype}"
 end

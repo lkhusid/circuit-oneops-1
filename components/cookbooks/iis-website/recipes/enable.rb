@@ -26,6 +26,20 @@ features = [
   'Web-AppInit'
 ]
 
+dotnetframework = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Dotnetframework/ }
+
+dotnetframework.each do | framework |
+  runtime = framework["ciAttributes"]
+  if runtime.has_key?("install_dotnetcore") && runtime.install_dotnetcore == "true"
+   features.delete('Web-Net-Ext')
+   features.delete('Web-Asp-Net')
+   features.delete('Net-Framework-Core')
+   node.set['workorder']['rfcCi']['ciAttributes']['install_dotnetcore'] = "true"
+  end
+end
+
+Chef::Log.info("WindowsFeatures: #{features}")
+
 powershell_script 'installing windows features' do
   code "Install-WindowsFeature #{features.join(',')}"
   not_if "if ((Get-WindowsFeature #{features.join(',')} | ?{ $_.Installed -match $true }).count -eq #{features.count}) { $true } else { $false }"

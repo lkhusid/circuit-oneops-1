@@ -65,26 +65,6 @@ resource "apache_cassandra",
              'ProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
            }
          },
-       'Log' => {:description => 'Log',
-                 :source => '',
-                 :chart => {'min' => 0, 'unit' => ''},
-                 :cmd => 'check_logfiles!logcassandra!#{cmd_options[:logfile]}!#{cmd_options[:warningpattern]}!#{cmd_options[:criticalpattern]}',
-                 :cmd_line => '/opt/nagios/libexec/check_logfiles   --noprotocol --tag=$ARG1$ --logfile=$ARG2$ --warningpattern="$ARG3$" --criticalpattern="$ARG4$"',
-                 :cmd_options => {
-                     'logfile' => '/opt/cassandra/logs/system.log',
-                     'warningpattern' => 'WARN',
-                     'criticalpattern' => 'ERROR'
-                 },
-                 :metrics => {
-                     'logcassandra_lines' => metric(:unit => 'lines', :description => 'Scanned Lines', :dstype => 'GAUGE'),
-                     'logcassandra_errors' => metric(:unit => 'errors', :description => 'Errors', :dstype => 'GAUGE'),
-                     'logcassandra_criticals' => metric(:unit => 'criticals', :description => 'Criticals', :dstype => 'GAUGE'),
-                     'logcassandra_unknowns' => metric(:unit => 'unknowns', :description => 'Unknowns', :dstype => 'GAUGE')
-                 },
-                 :thresholds => {
-                   'CriticalLogException' => threshold('1m', 'avg', 'criticals', trigger('>=', 10, 1, 1), reset('<', 10, 1, 1)),
-                 }
-       },
            'NodeStatus' => {
              :description => 'Nodetool Status',
              :source      => '',
@@ -98,97 +78,6 @@ resource "apache_cassandra",
              },
              :thresholds  => {
               'DownNodes' => threshold('1m', 'avg', 'downnodes', trigger('>=', 1, 1, 1), reset('<', 1, 1, 1)),
-             }
-           },
-           'PendingCompactions'  => {
-             :description => 'Pending Compactions',
-             :source      => '',
-             :chart       => {'min' => 0, 'unit' => 'Per Second'},
-             :cmd         => 'check_pending_tasks',
-             :cmd_line    => '/opt/nagios/libexec/check_jmx -U service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi -O org.apache.cassandra.metrics:type=Compaction,name=PendingTasks -A Value',
-             :metrics     => {
-               'Value' => metric(:unit => 'Per Second', :description => 'Pending Compactions', :dstype => 'GAUGE'),
-             },
-             :thresholds  => {
-              'Value' => threshold('5m', 'avg', 'Value', trigger('>=', 30, 5, 1), reset('<', 30, 5, 1)),
-             }
-           },
-           'CommitLogSize' => {
-             :description => 'CommitLogSize',
-             :source      => '',
-             :chart => {'min'=>0, 'max' => '100', 'unit' => 'Percent'},
-             :cmd         => 'commit_log_size',
-             :cmd_line    => '/opt/nagios/libexec/commit_log_size.pl',
-             :metrics     => {
-               'commitlogsize' => metric(:unit => '%', :description => 'Percent of commitlog_total_space used'),
-             },
-             :thresholds  => {
-               'UsageExceeded' => threshold('1m', 'avg', 'commitlogsize', trigger('>=', 90, 5, 2), reset('<', 85, 5, 1))
-             }
-           },
-           'CheckSSTCount' => {
-             :description => 'Check SSTable count',
-             :source      => '',
-             :chart => {'min'=>0},
-             :cmd         => 'check_sst_sum',
-             :cmd_line    => '/opt/nagios/libexec/check_sst_sum.pl',
-             :metrics     => {
-               'sst_table_count' => metric(:unit => 'sst_table_count', :description => 'Total Number of SSTables'),
-             },
-             :thresholds  => {
-              'sst_table_count' => threshold('5m', 'avg', 'sst_table_count', trigger('>=', 100, 100, 100), reset('<', 100, 100, 100)),
-             }
-           },
-           'ReadOperations'  => {
-             :description => 'Read Operations',
-             :source      => '',
-             :chart       => {'min' => 0, 'unit' => 'Per Second'},
-             :cmd         => 'check_cassandra_reads',
-             :cmd_line    => '/opt/nagios/libexec/check_jmx -U service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi -O org.apache.cassandra.metrics:type=ClientRequest,scope=Read,name=Latency -A OneMinuteRate',
-             :metrics     => {
-               'OneMinuteRate' => metric(:unit => 'Per Second', :description => 'Read Operations', :dstype => 'GAUGE'),
-             },
-             :thresholds  => {
-              'OneMinuteRate' => threshold('5m', 'avg', 'OneMinuteRate', trigger('>=', 10000, 1, 1), reset('<', 10000, 1, 1)),
-             }
-           },
-           'RecentReadLatency'  => {
-             :description => 'Recent Read Operations Latency',
-             :source      => '',
-             :chart       => {'min' => 0, 'unit' => 'Microseconds'},
-             :cmd         => 'check_cassandra_read_latency',
-             :cmd_line    => '/opt/nagios/libexec/check_jmx -U service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi -O org.apache.cassandra.metrics:type=ClientRequest,scope=Read,name=Latency -A 98thPercentile',
-             :metrics     => {
-               '98thPercentile' => metric(:unit => 'Microseconds', :description => 'Latency of All Read Operations', :dstype => 'GAUGE'),
-             },
-             :thresholds  => {
-              '98thPercentile' => threshold('5m', 'avg', '98thPercentile', trigger('>=', 1000000, 1, 1), reset('<', 1000000, 1, 1)),
-             }
-           },
-           'WriteOperations' => {
-             :description => 'Write Operations',
-             :source      => '',
-             :chart       => {'min' => 0, 'unit' => 'Per Second'},
-             :cmd         => 'check_cassandra_writes',
-             :cmd_line    => '/opt/nagios/libexec/check_jmx -U service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi -O org.apache.cassandra.metrics:type=ClientRequest,scope=Write,name=Latency -A OneMinuteRate',
-             :metrics     => {
-               'OneMinuteRate' => metric(:unit => 'Per Second', :description => 'Write Operations', :dstype => 'GAUGE'),
-             },
-             :thresholds  => {
-              'OneMinuteRate' => threshold('5m', 'avg', 'OneMinuteRate', trigger('>=', 10000, 1, 1), reset('<', 10000, 1, 1)),
-             }
-           },
-           'RecentWriteLatency' => {
-             :description => 'Recent Write Operations Latency',
-             :source      => '',
-             :chart       => {'min' => 0, 'unit' => 'Microseconds'},
-             :cmd         => 'check_cassandra_write_latency',
-             :cmd_line    => '/opt/nagios/libexec/check_jmx -U service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi -O org.apache.cassandra.metrics:type=ClientRequest,scope=Write,name=Latency -A 98thPercentile',
-             :metrics     => {
-               '98thPercentile' => metric(:unit => 'Microseconds', :description => 'Write Operations Latency', :dstype => 'GAUGE'),
-             },
-             :thresholds  => {
-              '98thPercentile' => threshold('5m', 'avg', '98thPercentile', trigger('>=', 1000000, 1, 1), reset('<', 1000000, 1, 1)),
              }
            }
   },
@@ -247,43 +136,6 @@ resource "apache_cassandra",
       }'
     },
    }
-
-  #  'clouds' => {
-  #   'description' => 'clouds',
-  #   'definition' => '{
-  #      "returnObject": false,
-  #      "returnRelation": false,
-  #      "relationName": "base.RealizedAs",
-  #      "direction": "to",
-  #      "targetClassName": "manifest.oneops.1.Apache_cassandra",
-  #      "relations": [
-  #        { "returnObject": false,
-  #          "returnRelation": false,
-  #          "relationName": "manifest.DependsOn",
-  #          "direction": "from",
-  #          "targetClassName": "manifest.oneops.1.Compute",
-  #          "relations": [
-  #             { "returnObject": false,
-  #               "returnRelation": false,
-  #               "relationName": "base.RealizedAs",
-  #               "direction": "from",
-  #               "targetClassName": "bom.oneops.1.Compute",
-  #               "relations": [
-  #                 { "returnObject": true,
-  #                   "returnRelation": false,
-  #                   "relationName": "base.DeployedTo",
-  #                   "direction": "from",
-  #                   "targetClassName": "account.Cloud"
-  #                 }
-  #               ]
-
-  #             }
-  #           ]
-
-  #        }
-  #      ]
-  #   }'
-  # }
 
 # overwrite volume from generic_ring to make them mandatory
 resource "volume",
@@ -598,7 +450,7 @@ procedure "nodetool_repair",
                     "relationName": "base.RealizedAs",
                     "execStrategy": "one-by-one",
                     "direction": "from",
-                    "targetClassName": "bom.walmartlabs.Apache_cassandra",
+                    "targetClassName": "bom.oneops.1.Apache_cassandra",
                     "actions": [
                         {
                             "actionName": "nodetool_repair",

@@ -36,7 +36,7 @@ relation "fqdn::depends_on_flex::compute",
   :relation_name => 'DependsOn',
   :from_resource => 'fqdn',
   :to_resource   => 'compute',
-  :attributes    => { "flex" => true, "min" => 2, "max" => 10 }
+  :attributes    => { "propagate_to" => 'both', "flex" => true, "min" => 2, "max" => 10 }
 
 
  # managed_via

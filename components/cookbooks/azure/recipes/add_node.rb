@@ -40,6 +40,9 @@ zone = {
 }
 puts "***RESULT:zone=" + JSON.dump(zone)
 puts "***RESULT:instance_id=" + vm.id
+puts "***RESULT:instance_osdisk_id=" + vm.os_disk_name
+puts "***RESULT:instance_nic_id=" + vm.network_interface_card_ids[0]
+node.set[:fast_image] = vm_manager.fast_image_flag
 
 # set the ip type
 node.set['ip_type'] = vm_manager.ip_type

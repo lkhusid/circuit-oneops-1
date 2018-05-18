@@ -32,7 +32,7 @@ http-server.https.keystore.key=<%= @keystore_password %>
 http-server.https.enabled=false
 <% end %>
 
-<% if @enable_ssl %>
+<% if @enable_ldap %>
 http-server.authentication.type=LDAP
 authentication.ldap.url=ldaps://<%= @ldap_server %>:636
 authentication.ldap.user-bind-pattern=${USER}@<%= @ldap_domain %>

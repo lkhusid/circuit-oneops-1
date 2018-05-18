@@ -1,4 +1,4 @@
-file '/etc/objectstore_creds.json' do
+file '/etc/objectstore_config.json' do
   mode '0600'
   action :delete
 end

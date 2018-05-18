@@ -5,7 +5,7 @@ def whyrun_supported?
 end
 
 def iis_available?
-  OO::IIS::Detection.aspnet_enabled? and OO::IIS::Detection.major_version >= 7
+  OO::IIS::Detection.major_version >= 7
 end
 private :iis_available?
 

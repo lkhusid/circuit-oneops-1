@@ -20,7 +20,7 @@ end
 private :resource_needs_change_for?
 
 def iis_available?
-  OO::IIS::Detection.aspnet_enabled? and OO::IIS::Detection.major_version >= 7
+  OO::IIS::Detection.major_version >= 7
 end
 private :iis_available?
 

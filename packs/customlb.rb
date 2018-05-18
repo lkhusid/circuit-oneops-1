@@ -17,7 +17,10 @@ resource 'hostname',
 resource "build",
          :cookbook => "oneops.1.build",
          :design => true,
-         :requires => {"constraint" => "0..*"},
+         :requires => {
+             :constraint => "0..*",
+             :services => "mirror"
+         },
          :attributes => {"repository" => "",
                          "remote" => 'origin',
                          "revision" => 'master',

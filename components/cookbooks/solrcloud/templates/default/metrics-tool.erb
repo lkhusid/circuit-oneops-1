@@ -1,0 +1,81 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require './solr_metrics_collector'
+
+medusa_log_file = '<%= @medusa_log_file %>'
+port_no = '<%= @port_no %>'
+rotate = 10
+log_size = 1024000
+
+# To enable the medusa metrics using the REST APIs
+enable_rest_metrics = '<%= @enable_medusa_metrics %>'
+
+solr_version = '<%= @solr_version %>'
+jmx_medusa_log_file = '<%= @jmx_medusa_log_file %>'
+metric_level = '<%= @metric_level %>'
+jolokia_port = '<%= @jolokia_port %>'
+solr_jmx_port = '<%= @solr_jmx_port %>'
+
+# To enable the medusa metrics using the JMX metrics
+enable_jmx_metrics = '<%= @enable_jmx_metrics %>'
+
+graphite_logfiles_path = '<%= @graphite_logfiles_path %>'
+admin_user = '<%= @admin_user %>'
+admin_password = '<%= @admin_password %>'
+graphite_servers = '<%= @graphite_servers %>'
+
+if(graphite_servers.length != 0)
+  graphite_servers = JSON.parse('<%= @graphite_servers %>')
+end
+
+graphite_prefix = '<%= @graphite_prefix %>'.gsub(/\.+$/, '').chomp
+
+# OneOps variables
+oo_org = '<%= @oo_org %>'.gsub(/\./, '-')
+oo_assembly = '<%= @oo_assembly %>'.gsub(/\./, '-')
+oo_env = '<%= @oo_env %>'.gsub(/\./, '-')
+oo_platform = '<%= @oo_platform %>'.gsub(/\./, '-')
+environment_name = '<%= @oo_environment_name %>'.gsub(/\./, '-')
+
+node_ip = '<%= @node_ip %>'.gsub(/\./, '-')
+
+# We don't have the cloud specific metrics. It will be at the collection level, so we just need the data center on which the nodes are hosted
+# We will get the Datacenter name from the environment variable.
+datacenter = `env | grep -i DATACENTER`
+oo_dc = datacenter.gsub('DATACENTER=', '')
+
+# Send to configured graphite servers
+if (graphite_servers != nil && graphite_servers.length > 0)
+
+  if (graphite_prefix.length == 0)
+    graphite_prefix = "#{oo_org}-#{oo_assembly}-#{oo_platform}-#{environment_name}"
+  end
+
+  solrcloud_monitor = SolrMetricsCollector.new('localhost', port_no, nil, false, solr_version, enable_rest_metrics,
+                      jmx_medusa_log_file, metric_level, jolokia_port, solr_jmx_port, enable_jmx_metrics, admin_user, admin_password,
+                      graphite_servers, graphite_prefix, oo_env, node_ip, environment_name, oo_dc, graphite_logfiles_path, rotate, log_size)
+
+  solrcloud_monitor.collect_all_stats
+end
+
+# Send metrics to DF graphite servers for prod profile solr clusters
+# if (oo_env =~ /(?i)prod/)
+#  name = "#{oo_org}-#{oo_assembly}-#{oo_platform}-#{environment_name}"
+
+#  df_graphite_prefix = "DF-UI.#{name}"
+#  df_graphite_servers =  node['solr_custom_params']['df_graphite_servers']
+
+#  df_solrcloud_monitor = SolrMetricsCollector.new('localhost', port_no, nil, false, solr_version, enable_rest_metrics,
+#                         jmx_medusa_log_file, metric_level, jolokia_port, solr_jmx_port, enable_jmx_metrics, admin_user, admin_password,
+#                         df_graphite_servers, df_graphite_prefix, oo_env, node_ip, environment_name, oo_dc, graphite_logfiles_path, rotate, log_size)
+
+#  df_solrcloud_monitor.collect_all_stats
+# end
+
+medusa_reporter = SolrMetricsCollector.new('localhost', port_no, medusa_log_file, true, solr_version, enable_rest_metrics,
+jmx_medusa_log_file, metric_level, jolokia_port, solr_jmx_port, enable_jmx_metrics, admin_user, admin_password, nil,
+nil, nil, nil, nil, nil, graphite_logfiles_path, rotate, log_size)
+
+medusa_reporter.collect_all_stats
+

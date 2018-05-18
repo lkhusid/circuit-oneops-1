@@ -4,24 +4,39 @@ require 'rubygems'
 require 'optparse'
 require 'json'
 
+# Segment limit and buffer size for Openstack file upload
+SEGMENT_LIMIT = 5 * 1024 * 1024 * 1024 - 1       # 5GB -1
+BUFFER_SIZE = 1024 * 1024                        # 1MB
+KEY_EXPIRE_ERROR_MESSAGE = 'Server failed to authenticate the request. Make sure the value of Authorization header is formed correctly including the signature'.freeze
+STATUS_CODES = {
+  :success => [200, 201, 202, 203, 204],
+  :failure => [400, 401, 402, 403, 404, 500, 501, 502, 503]
+}
+
 def list_directories_or_files(conn, options, argv)
   # check if need to list files or directories
   if argv.size > 1
     directory = conn.directories.get(argv[1])
     if directory.nil?
-      puts "dir does not exist: #{argv[1]}"
+      puts "Container does not exist: #{argv[1]}"
       exit 1
     end
     if options[:verbose]
-      puts directory.files.inspect
+      directory.files.each do |file|
+        puts file.inspect if file.key !~ %r/\/objstr-seg-[0-9]{5}/
+      end
     else
-      directory.files.each { |file| puts file.key }
+      directory.files.each do |file|
+        puts file.key if file.key !~ %r/\/objstr-seg-[0-9]{5}/
+      end
     end
   else
     if options[:verbose]
       puts conn.directories.inspect
     else
-      conn.directories.each { |directory| puts directory.key }
+      conn.directories.each do |directory_info|
+        puts directory_info.key
+      end
     end
   end
 end
@@ -30,62 +45,92 @@ def delete_directory_or_file(conn, argv)
   # Gets the name of the file or directory which we intent to delete
   remote_object = argv[1]
   if remote_object.include?('/')
-    remote_dir = remote_object.split('/').first
-    directory = conn.directories.get(remote_dir)
-    if directory.nil?
-      puts "cannot get remote dir: #{remote_dir}"
+    container = remote_object.split('/').first
+    remote_files = conn.directories.get(container)
+    if remote_files.nil?
+      puts "Cannot get container: #{container}"
       exit 1
     end
-    remote_parts = remote_object.split('/')
-    remote_parts.shift
-    remote_file = remote_parts.join('/')
-    file_to_delete = directory.files.get(remote_file)
-    if file_to_delete.nil?
-      puts "remote file does not exist: #{remote_file}"
-    else
-      puts "removing file: #{remote_file}"
-      file_to_delete.destroy
+    remote_file_parts = remote_object.split('/')
+    remote_file_parts.shift
+    remote_file = remote_file_parts.join('/')
+    remote_files.files.each do |file|
+      if file.key == remote_file || file.key.include?("#{remote_file}/objstr-seg-")
+        if file.key !~ %r/\/objstr-seg-[0-9]{5}/
+          puts "Removing file: #{file.key} from #{remote_object}"
+        end
+        file.destroy
+      else
+        next
+      end
     end
   else
-    directory = conn.directories.get(remote_object)
-    directory.files.each do |file|
-      puts "removing file: #{file.key} from #{remote_object}"
+    remote_files = conn.directories.get(remote_object)
+    remote_files.files.each do |file|
+      if file.key !~ %r/\/objstr-seg-[0-9]{5}/
+        puts "Removing file: #{file.key} from #{remote_object}"
+      end
       file.destroy
     end
-    puts "removing dir: #{remote_object}"
-    directory.destroy
+    puts "Removing container: #{remote_object}"
+    remote_files.destroy
   end
 end
 
-def upload_directory_or_file(conn, argv)
-  file_name = argv[1]
-  bucket_name = argv[2]
-  file_filter = argv[3] || '*'
+def upload_directory_or_file(conn, argv, provider)
+  source_file_or_dir = argv[1]
+  destination_directory = argv[2]
+  file_exclustion_filter = argv[3] || '*'
 
-  unless File.exist?(file_name)
-    puts "Given local file/dir not exists #{file_name}"
+  unless File.exist?(source_file_or_dir)
+    puts "Given local source file/directory not exists #{source_file_or_dir}"
     exit 1
   end
 
-  directory = conn.directories.get(bucket_name)
+  directory = conn.directories.get(destination_directory)
   if directory.nil?
-    puts "Creating the bucket: #{bucket_name}"
-    directory = conn.directories.create :key => bucket_name
+    puts "Creating new container: #{destination_directory}"
+    directory = conn.directories.create :key => destination_directory
   end
 
-  puts "Uploading local file/dir: #{file_name}, filter: #{file_filter} to bucket: #{bucket_name}"
-  files = if File.directory?(file_name)
-            Dir.chdir(file_name)
-            Dir.glob("**/#{file_filter}").reject { |path| File.directory?(path) }
+  puts "Uploading local source file/directory: #{source_file_or_dir}, filter: #{file_exclustion_filter} to container: #{destination_directory}"
+  files = if File.directory?(source_file_or_dir)
+            Dir.chdir(source_file_or_dir)
+            Dir.glob("**/#{file_exclustion_filter}").reject { |path| File.directory?(path) }
           else
-            [file_name]
+            [source_file_or_dir]
           end
 
   start_time = Time.now
   size = 0
   files.each_with_index do |file, idx|
-    puts "#{idx + 1}/#{files.size}) Upload: #{file} to bucket: #{bucket_name}"
-    directory.files.create(:key => file, :body => File.open(file))
+    puts "#{idx + 1}/#{files.size}) Upload: #{file} to container: #{destination_directory}"
+    case provider
+    when /OpenStack/
+      File.open(file) do |file_handler|
+        segment = 0
+        until file_handler.eof?
+          segment += 1
+          offset = 0
+
+          # upload segment to cloud files
+          segment_suffix = "objstr-seg-#{segment.to_s.rjust(5, '0')}"
+          conn.put_object(destination_directory, "#{file}/#{segment_suffix}", nil) do
+            if offset <= SEGMENT_LIMIT - BUFFER_SIZE
+              buf = file_handler.read(BUFFER_SIZE).to_s
+              offset += buf.size
+              buf
+            else
+              ''
+            end
+          end
+        end
+      end
+      # write manifest file
+      conn.put_object_manifest(destination_directory, file, 'X-Object-Manifest' => "#{destination_directory}/#{file}/")
+    when /Azure/
+      directory.files.create(:key => file, :body => File.open(file))
+    end
     size += File.size(file)
   end
   finish_time = Time.now
@@ -94,78 +139,135 @@ def upload_directory_or_file(conn, argv)
 end
 
 def download_directory_or_file(conn, options, argv)
-  parts = argv[1].split('/')
-  dir_name = parts.shift
-  file = ''
-  subdir = ''
-  unless parts.empty?
-    file = parts.join('/')
-    parts.pop
-    subdir = parts.join('/')
+  source_file_or_dir = argv[1].split('/')
+  container_name = source_file_or_dir.shift
+  source_file = ''
+  sub_dir = ''
+  unless source_file_or_dir.empty?
+    source_file = source_file_or_dir.join('/')
+    source_file_or_dir.pop
+    sub_dir = source_file_or_dir.join('/')
   end
-  directory = conn.directories.get(dir_name)
-  local_dir = argv[2]
+  container = conn.directories.get(container_name)
+  destination_dir = argv[2]
 
-  if local_dir[-1, 1] != '/'
-    local_dir += '/'
-  end
+  destination_dir += '/' if destination_dir[-1, 1] != '/'
 
-  mkdir_out = `mkdir -p #{local_dir}`
+  mkdir_out = `mkdir -p #{destination_dir}`
   unless $?.success?
-    puts "error creating local dir: #{local_dir} - #{mkdir_out}"
+    puts "Error creating local destination directory: #{destination_dir} - #{mkdir_out}"
     exit 1
   end
 
-  directory.files.each do |remote_file|
-    if options[:verbose]
-      puts "remote_file: #{remote_file.inspect}"
+  container.files.each do |remote_file|
+    if remote_file.key =~ %r/\/objstr-seg-[0-9]{5}/
+      next
     else
-      puts "remote_file: #{remote_file.key}"
-    end
-
-    if remote_file.content_type == 'application/directory'
-      new_dir = local_dir + remote_file.key
-      puts "creating dir: #{new_dir}"
-      mkdir_out = `mkdir -p #{new_dir}`
-
-      unless $?.success?
-        puts "error creating local dir: #{new_dir} - #{mkdir_out}"
-        exit 1
+      if options[:verbose]
+        puts "remote_file: #{remote_file.inspect}"
+      else
+        puts "remote_file: #{remote_file.key}"
       end
+      if remote_file.content_type == 'application/directory'
+        new_dir = destination_dir + remote_file.key
+        puts "Creating local sub directory: #{new_dir}"
+        mkdir_out = `mkdir -p #{new_dir}`
 
-    else
-      # Handling in case of sub directory
-      if remote_file.key.include?('/') &&
-          subdir.empty? ||
-          remote_file.key.include?(subdir)
-        dirs_list = remote_file.key.split('/')
-        dirs_list.pop
-        dirs = dirs_list.join('/')
-        puts "making dir: #{local_dir + dirs}"
-        `mkdir -p #{local_dir + dirs}`
         unless $?.success?
-          puts "error creating local dir: #{local_dir + dirs}"
+          puts "Error creating local sub directory: #{new_dir} - #{mkdir_out}"
           exit 1
         end
-      end
-
-      # if bucket is supplied file will be empty
-      puts "match on file: #{file} #{remote_file.key}"
-      if file.empty? || file == remote_file.key
-        File.open(local_dir + remote_file.key, 'wb') do |local_file|
-          start_time = Time.now
-          # Download files in chunks
-          directory.files.get(remote_file.key) do |chunk, remaining_bytes, total_bytes|
-            puts "\rDownloaded: #{total_bytes - remaining_bytes} of #{total_bytes}"
-            local_file.write(chunk)
+      else
+        # if bucket is supplied file will be empty
+        if source_file.empty? || source_file == remote_file.key
+          puts "Match on file: #{source_file} #{remote_file.key}"
+          # Handling in case of sub directory
+          if remote_file.key.include?('/') && sub_dir.empty? || remote_file.key.include?(sub_dir)
+            dirs_list = remote_file.key.split('/')
+            dirs_list.pop
+            dirs = dirs_list.join('/')
+            puts "Making local sub directory: #{destination_dir + dirs}"
+            `mkdir -p #{destination_dir + dirs}`
+            unless $?.success?
+              puts "Error creating local sub directory: #{destination_dir + dirs}"
+              exit 1
+            end
           end
-          finish_time = Time.now
-          time_taken = finish_time - start_time
-          puts "\nDownload is completed, total size: #{remote_file.content_length} took #{time_taken} sec."
+          File.open(destination_dir + remote_file.key, 'wb') do |local_file|
+            start_time = Time.now
+            size = 0
+            # Download files in chunks
+            container.files.get(remote_file.key) do |chunk, remaining_bytes, total_bytes|
+              print("\rDownloaded: #{total_bytes - remaining_bytes} of #{total_bytes}")
+              local_file.write(chunk)
+            end
+            size += File.size(local_file)
+            finish_time = Time.now
+            time_taken = finish_time - start_time
+            puts "\nDownload is completed, total size: #{format_size(size)} took #{time_taken} sec."
+          end
         end
       end
     end
   end
+end
+
+def get_status(response)
+  status_code = response.env.status
+  STATUS_CODES[:success].include? status_code
+end
+
+def get_storage_account_key(config)
+  require 'faraday'
+  client_secret = JSON.parse(File.read('/secrets/objectstore_creds'))
+  azure_base_management_uri = 'https://management.azure.com/'
+  app_id = config['client_id']
+  app_id_secret = client_secret['client_secret']
+  tenant_id = config['tenant_id']
+  login_url = "https://login.microsoftonline.com/#{tenant_id}/oauth2/token"
+
+  post_data = {
+    :client_id => app_id,
+    :client_secret => app_id_secret,
+    :resource => azure_base_management_uri,
+    :grant_type => 'client_credentials'
+  }
+
+  connection = Faraday.new
+  connection.proxy = config['proxy']
+  response = connection.send('post', login_url) do |request|
+    request.headers['Content-type'] = 'application/x-www-form-urlencoded'
+    request.body = post_data.nil? ? '{}' : post_data
+  end
+
+  response_status = get_status(response)
+  raise 'Unable to fetch access token. Please retry' unless response_status
+  token = JSON.parse(response.body)['access_token']
+  storage_account_uri = "#{azure_base_management_uri}#{config['storage_account_id']}/listKeys?api-version=2017-06-01"
+  connection = Faraday.new
+  connection.proxy = config['proxy']
+  response = connection.send('post', storage_account_uri) do |request|
+    request.headers['Content-type'] = 'application/json'
+    request.headers['Authorization'] = "Bearer #{token}"
+  end
+  response_status = get_status(response)
+  raise 'Unable to get storage account access key' unless response_status
+  JSON.parse(response.body)['keys'][0]['value']
+end
+
+def save_key(key)
+  key_hash = {
+    'key' => key
+  }
+  File.open(ENV['HOME'] + '/.key', 'w+') do |f|
+    f.write(key_hash.to_json)
+  end
+end
+
+def get_new_key_in_case_of_exception(config)
+  puts 'Invalid key. Trying to get a new one. Please try again once the process is finished'
+  key = get_storage_account_key(config)
+  save_key(key)
 end
 
 # Pretty format size.
@@ -174,17 +276,13 @@ def format_size(size)
   conv = %w[B KB MB GB TB PB EB]
   scale = 1024
   ndx = 1
-  if size < 2 * (scale**ndx)
-    return "#{size}#{conv[ndx - 1]}"
-  end
+  return "#{size}#{conv[ndx - 1]}" if size < 2 * (scale**ndx)
   size = size.to_f
   [2, 3, 4, 5, 6, 7].each do |i|
-    if size < 2 * (scale**i)
-      return "#{'%.3f' % (size / (scale**(i - 1)))}#{conv[i - 1]}"
-    end
+    return format('%.3f %s', (size / (scale**(i - 1))), conv[i - 1]) if size < 2 * (scale**i)
   end
   ndx = 7
-  "#{'%.3f' % (size / (scale**(ndx - 1)))}#{conv[ndx - 1]}"
+  format('%.3f %s', (size / (scale**(ndx - 1))), conv[ndx - 1])
 end
 
 # Execution starting point
@@ -199,57 +297,101 @@ end.parse!
 
 action = ARGV[0]
 if action.nil?
-  usage
   puts 'usage: '
   puts 'objectstore list <container>'
-  puts 'objectstore upload <local upload dir|file> <container>'
-  puts 'objectstore download <container/blob> <local download path>'
-  puts 'objectstore delete <container>|<blob>'
+  puts 'objectstore upload <container/file> <container>'
+  puts 'objectstore download <container/file> <local-path>'
+  puts 'objectstore delete <container>/<file>'
   exit 1
 end
 
 # Get creds from openrc s3, cloudfiles, etc will use
-creds = JSON.parse(File.read('/etc/objectstore_creds.json'))
+config = JSON.parse(File.read('/etc/objectstore_config.json'))
+config_sym = Hash[config.map { |(k, v)| [k.to_sym, v] }]
 conn = nil
-
-case creds['provider']
-when /OpenStack/
-  require 'fog'
-  puts "Connecting to #{creds['endpoint']} as #{creds['username']}..."
-  conn = Fog::Storage.new(creds)
-when /Azure/
-  require 'fog/azurerm'
-  puts "Connecting to #{creds['azure_storage_account_name']}..."
-  conn = Fog::Storage::AzureRM.new(creds)
-else
-  puts "Provider #{creds['provider']} not supported!"
-  exit 1
+provider = config['provider']
+begin
+  case provider
+  when /OpenStack/
+    require 'fog'
+    puts "Connecting to #{config['openstack_auth_url']} as #{config['openstack_username']}..."
+    conn = Fog::Storage.new(config_sym)
+  when /Azure/
+    require 'fog/azurerm'
+    storage_account_name = config['storage_account_id'].split('/')[8]
+    puts "Connecting to #{storage_account_name}..."
+    key_file_content = File.file?(ENV['HOME'] + '/.key') ? JSON.parse(File.read(ENV['HOME'] + '/.key')) : nil
+    if key_file_content.nil?
+      key = get_storage_account_key(config)
+      save_key(key)
+    else
+      key = key_file_content['key']
+    end
+    conn = Fog::Storage::AzureRM.new(
+      :azure_storage_account_name => storage_account_name,
+      :azure_storage_access_key => key
+    )
+  else
+    puts "Provider #{provider} not supported!"
+    exit 1
+  end
+rescue => ex
+  if ex.to_s.include? 'invalid base64'
+    puts 'The key has been tampered. The objectstore will not work.'
+    exit 1
+  else
+    raise ex
+  end
 end
 
 case action
 when 'list'
-  list_directories_or_files(conn, options, ARGV)
+  begin
+    list_directories_or_files(conn, options, ARGV)
+  rescue RuntimeError => ex
+    if ex.to_s.include?(KEY_EXPIRE_ERROR_MESSAGE) && provider.eql?('Azure')
+      get_new_key_in_case_of_exception(config)
+    end
+  end
 
 when 'delete'
   if ARGV.size < 2
-    puts 'Usage: objectstore delete <container>|<blob>'
+    puts 'Usage: objectstore delete <container>/<blob>'
     exit 1
   end
-  delete_directory_or_file(conn, ARGV)
+  begin
+    delete_directory_or_file(conn, ARGV)
+  rescue RuntimeError => ex
+    if ex.to_s.include?(KEY_EXPIRE_ERROR_MESSAGE) && provider.eql?('Azure')
+      get_new_key_in_case_of_exception(config)
+    end
+  end
 
 when 'upload'
   if ARGV.size < 3
-    puts 'Usage: objectstore upload (local_dir|file) <container> [file_filter]'
+    puts 'Usage: upload <directory/file> <container>'
     exit 1
   end
-  upload_directory_or_file(conn, ARGV)
+  begin
+    upload_directory_or_file(conn, ARGV, provider)
+  rescue RuntimeError => ex
+    if ex.to_s.include?(KEY_EXPIRE_ERROR_MESSAGE) && provider.eql?('Azure')
+      get_new_key_in_case_of_exception(config)
+    end
+  end
 
 when 'download'
   if ARGV.size < 3
-    puts 'Usage: objectstore download <container> local_dir'
+    puts 'Usage: objectstore download <container/blob> <local-path>'
     exit 1
   end
-  download_directory_or_file(conn, options, ARGV)
+  begin
+    download_directory_or_file(conn, options, ARGV)
+  rescue RuntimeError => ex
+    if ex.to_s.include?(KEY_EXPIRE_ERROR_MESSAGE) && provider.eql?('Azure')
+      get_new_key_in_case_of_exception(config)
+    end
+  end
 else
   puts "Action #{action} not supported!"
   exit 1

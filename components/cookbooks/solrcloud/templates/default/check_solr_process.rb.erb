@@ -1,0 +1,88 @@
+#!/usr/bin/env ruby
+
+# This recipe contains Solr Process monitor.
+
+require 'rubygems'
+require 'json'
+require 'logger'
+require 'date'
+require '/opt/nagios/libexec/solr_util.rb'
+require '/opt/solr/solrmonitor/rest_client.rb'
+
+logger = Logger.new('/tmp/check_solr_process.log', 10, 1024*1024)
+logger.info ""
+logger.info ""
+logger.info ""
+logger.info "-----------------------------------------------------------"
+logger.info "Beginning solr process check at #{DateTime.now}"
+logger.info "-----------------------------------------------------------"
+
+port_no = ARGV[0]
+
+begin
+
+  solr_down = "solrcloud is down |up=0"
+  solr_up = "solrcloud is up |up=100"
+
+  host_ip = `hostname -i`.strip
+  # Get the solr processes running in the system by grepping for "sol[r]", the [] is a useful trick to avoid matching the ps -ef command itself.
+  # For more info - https://unix.stackexchange.com/questions/74185/how-can-i-prevent-grep-from-showing-up-in-ps-results
+  solr_process=`ps aux | grep "sol[r]"`
+
+  # It is possible that there can be any other process with name solr.
+  # Then ps aux | grep "sol[r]" will not return "" even though the solr service is down.
+  # Solr process starting from Oneops will always have -DzkHost.
+  # To run in solrcloud mode solr has to be started with either DzkHost or zkRun.
+  if !solr_process.include? "-DzkHost="
+    logger.info "solr_process = #{solr_process}"
+    logger.info "solr_process without -DzkHost command line argument cannot work in cloud mode. Hence declaring it down"
+    puts solr_down
+  else
+
+    logger.info "Checking cores for ip=#{host_ip}, port=#{port_no}"
+    all_cores_on_this_node, down_cores = check_solr_process_status_based_on_core_health(host_ip, port_no)
+    logger.info "all_cores_on_this_node = #{all_cores_on_this_node.join(', ')}"
+    logger.info "down_cores = #{down_cores.join(', ')}"
+
+    # Get the active/ recovering cores alone from the available cores. => Remove just the down cores and apply ping on them
+    not_down_cores = all_cores_on_this_node - down_cores
+
+    if down_cores.length != 0
+      logger.info "Found down_cores, declaring solr process down"
+      puts solr_down
+    else
+      if (!not_down_cores.empty? && not_down_cores.length != 0)
+
+        ping_ok = 0
+
+        not_down_cores.each do |core|
+
+          ping_url = "/solr/#{core}/admin/ping?qi=internal_admin&wt=json"
+	        ping_result = solr_rest_api(host_ip, port_no, ping_url)
+          ping_status =  ping_result["status"]
+          puts "Ping Status - #{ping_status}"
+          logger.info "Ping status for #{core} - #{ping_status}"
+          if (ping_status == "OK")
+            ping_ok += 1
+          end
+        end
+
+        if (not_down_cores.length == ping_ok)
+          logger.info "Solr is up, all cores ok"
+          puts solr_up
+        else
+          logger.info "Did not receive ping=OK for all the up cores, declaring solr process down"
+          puts solr_down
+        end
+      end
+    end
+  end
+  logger.close
+
+rescue Errno::ECONNREFUSED
+  logger.info "Exception occured, declaring solr process down"
+  logger.close
+  puts "Solr process is down. #{solr_down}"
+end
+
+

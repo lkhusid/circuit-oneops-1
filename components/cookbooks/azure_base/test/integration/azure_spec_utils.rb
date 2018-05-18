@@ -1,8 +1,14 @@
-require '/opt/oneops/inductor/circuit-oneops-1/components/cookbooks/azure_base/test/integration/spec_utils'
+COOKBOOKS_PATH ||= "/opt/oneops/inductor/circuit-oneops-1/components/cookbooks"
+
+require "#{COOKBOOKS_PATH}/azure_base/test/integration/spec_utils"
+require "#{COOKBOOKS_PATH}/azure_base/libraries/utils"
+require "#{COOKBOOKS_PATH}/azure_base/libraries/resource_group_manager"
 
 class AzureSpecUtils < SpecUtils
   def initialize(node)
     @node = node
+    #set the proxy if it exists as a cloud var
+    Utils.set_proxy(node['workorder']['payLoad']['OO_CLOUD_VARS'])
   end
 
   def get_azure_creds
@@ -20,20 +26,15 @@ class AzureSpecUtils < SpecUtils
     credentials
   end
   def get_resource_group_name
-    nsPathParts = get_ns_path_parts
-    org = nsPathParts[1]
-    assembly = nsPathParts[2]
-    environment = nsPathParts[3]
-
-    svc = get_service
-    location = svc['location']
-
-    resource_group_name = org[0..15] + '-' + assembly[0..15] + '-' + @node['workorder']['box']['ciId'].to_s + '-' + environment[0..15] + '-' + Utils.abbreviate_location(location)
+    rg_svc = AzureBase::ResourceGroupManager.new($node)
+    resource_group_name = rg_svc.rg_name
     resource_group_name
+
   end
   def set_attributes_on_node_required_for_vm_manager
     @node.set['image_id'] = get_image_id
     @node.set['platform-resource-group'] = get_resource_group_name
+    @node.set['platform-availability-set'] = get_availability_set_name
   end
   def is_express_route_enabled
     svc = get_service
@@ -106,6 +107,22 @@ class AzureSpecUtils < SpecUtils
     ttl
   end
 
+  def get_application_gateway_name
+    "ag-#{@node['workorder']['box']['ciName'].gsub(/-/, '').downcase}"
+  end
+
+  def get_vm_count
+    @node['workorder']['payLoad']['DependsOn'].count
+  end
+
+  def get_vm_private_ip_addresses
+    ip_addresses = []
+    @node['workorder']['payLoad']['DependsOn'].each do |vm_data|
+      ip_addresses << vm_data['ciAttributes']['private_ip']
+    end
+    ip_addresses
+  end
+
   # Converts the hash given by the node according to the new syntax
   def get_dns_attributes
     cloud_name = get_cloud_name
@@ -141,7 +158,6 @@ class AzureSpecUtils < SpecUtils
     @node['workorder']['payLoad']['RequiresComputes'].each do |vm_data|
       ip_addresses << vm_data['ciAttributes']['public_ip']
     end
-
     ip_addresses
   end
 
@@ -161,7 +177,6 @@ class AzureSpecUtils < SpecUtils
   end
 
   def is_imagetypecustom
-
     cloud_name = @node[:workorder][:cloud][:ciName]
     cloud = @node[:workorder][:services][:compute][cloud_name][:ciAttributes]
     os = nil
@@ -185,6 +200,68 @@ class AzureSpecUtils < SpecUtils
 
     imagidcustom = image_id.split(':')
     imagidcustom.eql? 'Custom'
+  end
 
+  def is_unmanaged_vm
+    compute_service = Fog::Compute::AzureRM.new(get_azure_creds)
+    availability_set = compute_service.availability_sets.get(get_resource_group_name, get_availability_set_name)
+
+    availability_set.sku_name.eql? 'Classic'
+  end
+
+  def get_availability_set_name
+       avg_mgr = AzureBase::AvailabilitySetManager.new($node)
+       availability_set_name = avg_mgr.as_name
+       availability_set_name
+
+  end
+
+  def get_os_disk_name
+    "#{get_server_name}_os_disk"
+  end
+
+  def get_nsg_rg_location
+    cloud_name = get_cloud_name
+    @node['workorder']['services']['compute'][cloud_name]['ciAttributes']['location']
+  end
+
+  def is_fast_image
+    cloud_name                 = @node[:workorder][:cloud][:ciName]
+    cloud                      = @node[:workorder][:services][:compute][cloud_name][:ciAttributes]
+    customimage_resource_group = @node[:workorder][:services][:compute][cloud_name][:ciAttributes][:resource_group].sub("mrg","img")
+    image                      = nil
+
+    if @node[:workorder].has_key?('config') && @node[:workorder][:config].has_key?('FAST_IMAGE')
+      fast_image_flag = (@node[:workorder][:config][:FAST_IMAGE].to_s.downcase == "true")
+    end
+    if @node[:workorder].has_key?('config') && @node[:workorder][:config].has_key?('TESTING_MODE')
+      testing_mode_flag  = (@node[:workorder][:config][:TESTING_MODE].to_s.downcase == "true")
+    end
+
+    # get ostype
+    ostype = "default-cloud"
+    if @node[:workorder][:payLoad].has_key?("os")
+      os = @node[:workorder][:payLoad][:os].first
+      ostype = os[:ciAttributes][:ostype]
+    else
+      if ostype == "default-cloud"
+        ostype = cloud[:ostype]
+      end
+    end
+
+    if fast_image_flag
+      # connection
+      creds = get_azure_creds
+      token_provider = MsRestAzure::ApplicationTokenProvider.new(creds[:tenant_id], creds[:client_id], creds[:client_secret])
+      credentials = MsRest::TokenCredentials.new(token_provider)
+      client = Azure::ARM::Resources::ResourceManagementClient.new(credentials)
+      client.subscription_id = creds[:subscription_id]
+
+      # get image list
+      images = client.resource_groups.list_resources(customimage_resource_group)
+      image = get_image(images, nil, fast_image_flag, testing_mode_flag, nil, false, ostype)
+    end
+
+    return !image.nil?
   end
 end

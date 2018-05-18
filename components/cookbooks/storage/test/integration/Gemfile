@@ -11,6 +11,7 @@ end
 
 gem 'chefspec', '<=4.7.0'
 gem 'fauxhai', '~>3.6.0'
+gem 'mixlib-config', '2.2.4'
 gem 'chef', '11.18.12'
 gem 'fog', '1.29.0'
 gem 'aws-s3', '0.6.3'

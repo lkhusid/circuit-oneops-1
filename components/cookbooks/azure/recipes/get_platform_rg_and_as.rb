@@ -4,17 +4,6 @@ require 'fog/azurerm'
 require File.expand_path('../../../azure_base/libraries/logger.rb', __FILE__)
 require File.expand_path('../../../azure_base/libraries/utils.rb', __FILE__)
 
-def generate_rg_name(org, assembly, platform, environment, location)
-  OOLog.info("Resource Group org: #{org}")
-  OOLog.info("Resource Group assembly: #{assembly}")
-  OOLog.info("Resource Group Platform: #{platform}")
-  OOLog.info("Resource Group Environment: #{environment}")
-  OOLog.info("Resource Group location: #{location}")
-  resource_group_name = org[0..15] + '-' + assembly[0..15] + '-' + node['workorder']['box']['ciId'].to_s + '-' + environment[0..15] + '-' + Utils.abbreviate_location(location)
-  OOLog.info("platform-resource-group is: #{resource_group_name}")
-  OOLog.info("Resource Group Name Length = #{resource_group_name.length}")
-  resource_group_name
-end
 
 OOLog.info('get_platform_rg_and_as.rb called from')
 OOLog.info(node.run_list[0])
@@ -61,11 +50,14 @@ OOLog.fatal('Azure location/region not found') if location.nil?
 
 keypair = node['workorder']['rfcCi']
 nsPathParts = keypair['nsPath'].split('/')
-org = nsPathParts[1]
-assembly = nsPathParts[2]
-environment = nsPathParts[3]
+
 platform = nsPathParts[5]
-resource_group_name = generate_rg_name(org,assembly,platform,environment,location)
-node.set['platform-resource-group'] = resource_group_name
-node.set['platform-availability-set'] = resource_group_name
+
+
+rg_manager = AzureBase::ResourceGroupManager.new(node)
+as_manager = AzureBase::AvailabilitySetManager.new(node)
+
+
+node.set['platform-resource-group'] = rg_manager.rg_name
+node.set['platform-availability-set'] = as_manager.as_name
 node.set['platform'] = platform

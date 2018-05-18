@@ -1,18 +1,30 @@
+
+<% if node['kafka']['enable_sasl_plain'].eql?('true') %>
+
 KafkaServer {
-   org.apache.kafka.common.security.plain.PlainLoginModule required
-   username="admin"
-   password="<%= node['kafka']['sasl_admin_pwd'] %>"
-   user_admin="<%= node['kafka']['sasl_admin_pwd'] %>"
+  org.apache.kafka.common.security.plain.PlainLoginModule required
+  username="admin"
+  password="<%= node['kafka']['sasl_admin_pwd'] %>"
+  user_admin="<%= node['kafka']['sasl_admin_pwd'] %>"
 <% if node['kafka']['sasl_user_pwds'] && !node['kafka']['sasl_user_pwds'].empty? %>
-  <% counter = 0 %>
   <% namepwds = JSON.parse(node['kafka']['sasl_user_pwds']) %>
   <% namepwds.each { |name, pwd| %>
-    <% counter = counter + 1 %>
-    <% if counter == namepwds.length %>
-   user_<%= name %>="<%= pwd %>";
-    <% else %>
-   user_<%= name %>="<%= pwd %>"
-    <% end %>
+  user_<%= name %>="<%= pwd %>"
   <% } %>
 <% end %>
+;};
+
+<% end %>
+
+
+<% if node['kafka']['is_zk_secured'].eql?('true') %>
+
+Client {
+  org.apache.kafka.common.security.plain.PlainLoginModule required
+  username="admin"
+  password="<%= node['kafka']['zk_sasl_admin_password'] %>";
 };
+
+<% end %>
+
+

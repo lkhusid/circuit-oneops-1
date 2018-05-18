@@ -19,7 +19,7 @@ module AzureLb
 
     def load_distribution
       load_distribution = ''
-      ci_attribs = @node['workorder']['rfcCi']['ciAttributes']
+      ci_attribs = @node['workorder'].has_key?('rfcCi') ? @node['workorder']['rfcCi']['ciAttributes'] : @node['workorder']['ci']['ciAttributes']
       lb_method = ci_attribs['lbmethod']
       stickiness = ci_attribs['stickiness']
       persistence_type = ci_attribs['persistence_type']
@@ -211,6 +211,85 @@ module AzureLb
           OOLog.fatal("Bad LB configuration! #{persistence_type} is not supported on azure. please look at #{help_doc_link} for supported load distribution methods on azure")
         end
       end
+    end
+
+    def get_lb_name
+      platform_name = @node['workorder']['box']['ciName']
+      plat_name = platform_name.gsub(/-/, '').downcase
+      lb_name = "lb-#{plat_name}"
+
+      lb_name
+    end
+
+    def get_azure_creds
+      cloud_name = get_cloud_name
+      app_type = get_app_type
+      svc = get_service
+
+      credentials = {
+          tenant_id: svc['tenant_id'],
+          client_secret: svc['client_secret'],
+          client_id: svc['client_id'],
+          subscription_id: svc['subscription']
+      }
+      credentials
+    end
+
+
+    def get_service
+      cloud_name = get_cloud_name
+      app_type = get_app_type
+      svc = case app_type
+              when 'lb'
+                @node['workorder']['services']['lb'][cloud_name]['ciAttributes']
+              when 'fqdn'
+                @node['workorder']['services']['dns'][cloud_name]['ciAttributes']
+              when 'storage'
+                @node['workorder']['services']['storage'][cloud_name]['ciAttributes']
+              else
+                @node['workorder']['services']['compute'][cloud_name]['ciAttributes']
+            end
+    end
+
+    def get_cloud_name
+      cloud_name = @node['workorder']['cloud']['ciName']
+    end
+
+    def get_app_type
+      @node['app_name']
+    end
+
+    def get_resource_group_name
+      nsPathParts = get_ns_path_parts
+      org = nsPathParts[1]
+      assembly = nsPathParts[2]
+      environment = nsPathParts[3]
+
+      svc = get_service
+      location = svc['location']
+
+      new_cloud = Utils.is_new_cloud(@node)
+
+      if new_cloud
+        environment_ci_id = @node['workorder']['payLoad']['Environment'][0]['ciId']
+        resource_group_name = org[0..15] + '-' + assembly[0..15] + '-' + environment_ci_id.to_s + '-' + environment[0..15] + '-' + Utils.abbreviate_location(location)
+      else
+        platform_ci_id = @node['workorder']['box']['ciId']
+        resource_group_name = org[0..15] + '-' + assembly[0..15] + '-' + platform_ci_id.to_s + '-' + environment[0..15] + '-' + Utils.abbreviate_location(location)
+      end
+
+      resource_group_name
+    end
+
+    def get_ns_path_parts
+      ci = get_ci
+      nsPathParts = ci['nsPath'].split("/")
+      nsPathParts
+    end
+
+    def get_ci
+      rfcCi = @node['workorder']['ci']
+      rfcCi
     end
 
     private :get_ecvs_from_wo, :get_listeners_from_wo, :get_compute_nodes_from_wo, :get_allow_rule_port, :validate_ecvs_and_listeners_config, :validate_load_distribution_config

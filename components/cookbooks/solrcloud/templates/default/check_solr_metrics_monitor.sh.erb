@@ -1,0 +1,135 @@
+#!/bin/bash
+
+#Set this boolean value to register the echo statements to a tmp log file
+log_statements=false
+
+log_echo () {
+  if [ "$log_statements" = true ]; then
+    echo $1
+  fi
+}
+
+# Check if the log files are populated.
+# Check if the number of metrics are as expected
+# Check if the format in which the metrics are being written is correct
+# Check the modified dates of files with the system date to make sure the file got updated recently
+
+node_status_log_file="/opt/solr/log/medusa_stats.log"
+jmx_log_file="/opt/solr/log/jmx_medusa_stats.log"
+
+jmx_log_file_modified_time=$(date -r $jmx_log_file)
+node_status_log_file_modified_time=$(date -r $node_status_log_file)
+
+now_sys_date=$(date)
+
+time_between_jmx_log_sys_date=$(($(date -d "$jmx_log_file_modified_time" '+%s') - $(date -d "$now_sys_date" '+%s')))
+time_between_node_status_log_sys_date=$(($(date -d "$node_status_log_file_modified_time" '+%s') - $(date -d "$now_sys_date" '+%s')))
+
+# comparing the modified time stamp of metric log files with current time in the monitoring script.
+# if modified time stamp is <= current time stamp then execute the validation scripts otherwise skip the script
+if [ "$time_between_jmx_log_sys_date" -gt 0 ] ; then
+  return 0
+fi
+
+if [ "$time_between_node_status_log_sys_date" -gt 0 ] ; then
+  return 0
+fi
+
+solrmonitor_down="solr-monitor is down |up=0"
+solrmonitor_up="solr-monitor is up |up=100"
+
+solrmonitor_down_count=0
+
+jolokia_process=$(ps aux | grep "joloki[a]")
+
+# Check if Jolokia is up and running
+if [[ $jolokia_process =~ "-Djetty.base=" ]] ; then
+
+  # Check if log files are not empty
+  if [[ ! -s $node_status_log_file ]] ; then
+    echo "$node_status_log_file is empty"
+    solrmonitor_down_count=$((solrmonitor_down_count+1))
+  fi
+
+  if [[ ! -s $jmx_log_file ]] ; then
+    echo "$jmx_log_file is empty"
+    solrmonitor_down_count=$((solrmonitor_down_count+1))
+  fi
+
+  # Check if the number of metrics are as expected
+  node_status_metrics_number=$(wc -l $node_status_log_file | cut -d ' ' -f 1)
+
+  jmx_metrics_number=$(wc -l $jmx_log_file | cut -d ' ' -f 1)
+
+  # If there is atleast one collection, the minimum number of node status metrics would be 7.
+  # The node-status metric file always populates the following 7 metrics for each collection:
+  # total.cores.down=0
+  # r2d2 total.cores.active=12
+  # r2d2 total.cores.recovering=0
+  # r2d2 total.active.shards.count=4
+  # r2d2 total.active.replicas.count=12
+  # r2d2 total.cores.recovery.failed=0
+  # solr_cluster_summary total.nodes.live=15
+  # Hence even if one collection is present, we expect a minimum of 7 metrics
+  if [ ${node_status_metrics_number} -lt 7 ] ; then
+    echo "The minimum number of node status metrics would be 7, but its not"
+    solrmonitor_down_count=$((solrmonitor_down_count+1))
+  fi
+
+  # If there is atleast one collection, the minimum number of JMX metrics that we are exposing would be 40 on 6.4 version of solr.
+  # The jmx metric file always populates the following minimum 40 metrics for each collection: (depends on solr version we added more metrics)
+  # r2d2 get.requestTimes.OneMinuteRate=0.0
+  # r2d2 get.requestTimes.Count=0
+  # r2d2 get.requestTimes.FifteenMinuteRate=0.0
+  # r2d2 get.requestTimes.FiveMinuteRate=0.0
+  # ...
+  # r2d2 update.requestTimes.95thPercentile=0.0
+  # r2d2 update.requestTimes.99thPercentile=0.0
+  # Hence even if one collection is present, we expect a minimum of 40 metrics
+  if [ ${jmx_metrics_number} -lt 40 ] ; then
+    echo "The minimum number of JMX metrics would be 40, but its not"
+    solrmonitor_down_count=$((solrmonitor_down_count+1))
+  fi
+
+  # Check if the format in which the metrics are written is in influxdb format
+  while IFS='' read -r line || [[ -n "$line" ]]; do
+    IFS=' ' read -r -a array <<< "$line"
+    array_len=${#array[@]}
+    if [ ${array_len} -ne 2 ] ; then
+       echo "The format in which metrics are being written is wrong"
+       solrmonitor_down_count=$((solrmonitor_down_count+1))
+    fi
+  done < "$jmx_log_file"
+
+  # Check if the logs are not updated long back
+  if [ "$time_between_jmx_log_sys_date" -lt 0 ] ; then
+    time_between_jmx_log_sys_date=${time_between_jmx_log_sys_date#-}
+  fi
+  echo "$time_between_jmx_log_sys_date"
+
+  if [ "$time_between_node_status_log_sys_date" -lt 0 ] ; then
+    time_between_node_status_log_sys_date=${time_between_node_status_log_sys_date#-}
+  fi
+  echo "$time_between_node_status_log_sys_date"
+
+  # the command "$(($(date -d 'Thu May  3 15:56:01 UTC 2018' '+%s') - $(date -d 'Thu May  3 15:57:24 UTC 2018' '+%s')))" gives the result -83 (83 sec difference)
+  # We are checking if the log files have not been updated in the past 280 sec (~ 5 minutes),
+  # then we assume the solrmonitor scripts didn't generate the metrics during this time. So its down.
+  if [[ ("$time_between_jmx_log_sys_date" -gt 280) || ("$time_between_node_status_log_sys_date" -gt 280) ]] ; then
+    echo "The metric log files are not updated for the past 5 minutes"
+    solrmonitor_down_count=$((solrmonitor_down_count+1))
+  fi
+
+  if [[ "$solrmonitor_down_count" -eq 0 ]]; then
+    echo $solrmonitor_up
+  else
+    echo $solrmonitor_down
+  fi
+
+else
+  echo "Jolokia Proxy is down |up=0"
+fi
+
+
+
+

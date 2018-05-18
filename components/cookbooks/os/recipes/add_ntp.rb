@@ -1,5 +1,5 @@
 
-if node.cloud_provider =~ /azure/
+if node.cloud_provider =~ /azure/ && !node['fast_image']
   package "ntp" do
     action :install
   end

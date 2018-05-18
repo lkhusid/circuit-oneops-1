@@ -102,6 +102,26 @@ template "/opt/nagios/libexec/check_kafka_zk_conn.sh" do
     mode  '0755'
 end
 
+# create "kafka_logerrs.sh" script for nagios/telegraf
+ template "/usr/local/kafka/bin/kafka_logerrs.sh" do
+     source "kafka_logerrs.sh.erb"
+     owner "root"
+     group "root"
+     mode  '0777'
+ end
+ 
+ # adding permissions so that kafka_logerrs.sh will be executed without erros
+ bash "add permissions to kafka_logerrs.sh" do
+   user "root"
+   code <<-EOF
+     sudo chmod 777 /usr/local/kafka/bin/kafka_logerrs.sh
+     sudo mkdir -p /var/tmp/check_logfiles 
+     sudo touch /var/tmp/check_logfiles/check_logfiles._var_log_kafka_server.log.kafka_errlog
+     sudo chmod -R 777 /var/tmp/check_logfiles
+   EOF
+ end
+ 
+ 
 # broker log cleanup cron
 template "/etc/cron.d/delete_broker_logs" do
     source "delete_broker_logs.erb"
@@ -180,6 +200,15 @@ template "/etc/kafka/log4j.properties" do
     mode  '0755'
 end
 
+# Validatiion of Zookeeper "admin" user password for SASL
+if (node['kafka']['is_zk_secured'] == "true" && node['kafka']['zk_sasl_admin_password'].strip.empty?)
+  nozksasladminpass = "The password for SASL 'admin' user in External Zookeeper section can't be empty."
+  Chef::Log.error("FATAL: #{nozksasladminpass}")
+  puts "***FAULT:FATAL= #{nozksasladminpass}"
+  Chef::Application.fatal!(nozksasladminpass)
+end
+
+
 # jaas conf file
 template "/etc/kafka/kafka_server_jaas.conf" do
   source "kafka_server_jaas.conf.erb"
@@ -216,9 +245,9 @@ if node.workorder.rfcCi.ciAttributes.restart_flavor.eql?("rolling")
   include_recipe "kafka::coordinate_kafka_start"
 else
   service "kafka" do
-    provider Chef::Provider::Service::Systemd
-    action [:restart, :enable]
-    supports :status => true, :restart => true,:stop => true, :start => true
+    provider Chef::Provider::Service::Init
+    supports  :restart => true, :status => true, :stop => true, :start => true
+    action :start
     only_if { node.workorder.rfcCi.rfcAction == "add" || node.workorder.rfcCi.rfcAction == "replace" } 
   end
 end

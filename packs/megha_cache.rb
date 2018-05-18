@@ -18,7 +18,7 @@ resource 'compute',
 
 resource "os",
   :cookbook => "oneops.1.os",
-  :attributes => { "ostype"  => "centos-7.2" }
+  :attributes => { "ostype"  => "centos-7.2", "dhclient" => 'true' }
 
 resource 'user-app',
          :cookbook => 'oneops.1.user',

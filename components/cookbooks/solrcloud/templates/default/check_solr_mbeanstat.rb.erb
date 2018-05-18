@@ -1,0 +1,146 @@
+#!/usr/bin/env ruby
+
+# This recipe contains cluster level monitors. They are:
+#   MemoryStats - Monitors the system (ex: free,total, and percentageUsed) memory metrics.
+#   ReplicaStatus - Monitors the percentage of cores in (active,recovering and down) state on that particular host.
+#   JVMThreadCount - Monitors the JVM Threadcount.
+#   HeapMemoryUsage - Monitors the HeapMemory (used and percentage used).
+
+
+require 'net/http'
+require 'rubygems'
+require 'xmlsimple'
+require 'json'
+require 'excon'
+require 'open-uri'
+require '/opt/nagios/libexec/solr_util.rb'
+require '/opt/solr/solrmonitor/rest_client.rb'
+require '/opt/solr/solrmonitor/auth_helper.rb'
+
+include Solr::AuthHelper
+include Solr::RestClient
+
+monitor = ARGV[0]
+port_no = ARGV[1]
+solr_jmx_port = '<%= @solr_jmx_port %>'
+
+if auth_enabled?
+  admin_creds = get_solr_admin_credentials()
+  username = admin_creds["username"]
+  password = admin_creds["password"]
+end
+
+if monitor == "MemoryStats"
+
+  if auth_enabled?
+    puts "curl --user #{username}:***** -s http://127.0.0.1:#{port_no}/solr/admin/collections?action=LIST&wt=json"
+    coll_list = `curl --user #{username}:#{password} -s "http://127.0.0.1:#{port_no}/solr/admin/collections?action=LIST&wt=json"`
+  else
+    puts "curl -s http://127.0.0.1:#{port_no}/solr/admin/collections?action=LIST&wt=json"
+    coll_list = `curl -s "http://127.0.0.1:#{port_no}/solr/admin/collections?action=LIST&wt=json"`
+  end
+
+
+  memory_free = 0
+  memory_total = 0
+  percentUsed = 0
+
+  perf = nil
+
+  if coll_list != nil then
+    parsed_coll_list = JSON.parse(coll_list)
+    collections =  parsed_coll_list["collections"]
+
+    if !collections.empty?
+
+      if (auth_enabled?)
+        system_stats = `curl --user  #{username}:#{password}  -s "http://127.0.0.1:#{port_no}/solr/#{collections[0]}/admin/system?stats=true&wt=json"`
+        puts "curl --user #{username}:****** -s http://127.0.0.1:#{port_no}/solr/#{collections[0]}/admin/system?stats=true&wt=json"
+      else
+        system_stats = `curl -s "http://127.0.0.1:#{port_no}/solr/#{collections[0]}/admin/system?stats=true&wt=json"`
+        puts "curl -s http://127.0.0.1:#{port_no}/solr/#{collections[0]}/admin/system?stats=true&wt=json"
+      end
+
+      parsed_system_stats = JSON.parse(system_stats)
+
+      memory_free = parsed_system_stats['system']['freePhysicalMemorySize'].to_i
+      memory_total = parsed_system_stats['system']['totalPhysicalMemorySize'].to_i
+
+      used = memory_total.to_i - memory_free.to_i
+      percentUsed = used.to_f / memory_total.to_f * 100
+
+      perf = "freeMemory=#{memory_free} totalMemory=#{memory_total} percentUsed=#{percentUsed}"
+      puts perf + "|" + perf
+    end
+  end
+
+elsif monitor == "ReplicaStatus"
+  begin
+    pctgActiveReplicas, pctgRecoveringReplicas, pctgDownReplicas, pctgFailedReplicas = checkSolrNodeStatus(port_no)
+    perf = "pctgActiveReplicas=#{pctgActiveReplicas} pctgRecoveringReplicas=#{pctgRecoveringReplicas} pctgDownReplicas=#{pctgDownReplicas} pctgFailedReplicas=#{pctgFailedReplicas}"
+    puts perf + "|" + perf
+  rescue Errno::ECONNREFUSED
+    puts "Solr process is down."
+  end
+elsif monitor == "JVMThreadCount"
+  mbean_name = "java.lang:type=Threading"
+  mbean_attributes = ["ThreadCount,TotalStartedThreadCount"]
+  solr_jmx_mbean_map_obj = {
+    "type" => "read",
+    "mbean" => "#{mbean_name}",
+    "attribute" => "#{mbean_attributes}",
+    "target" => {
+      "url" => "service:jmx:rmi:///jndi/rmi://127.0.0.1:#{solr_jmx_port}/jmxrmi"
+    }
+  }
+  jmx_mbean_read_request = solr_jmx_mbean_map_obj.to_json
+
+  begin
+    solr_mbean_json_resp_obj = post_no_auth("localhost", port_no, '/jolokia/', jmx_mbean_read_request)
+    threadCount = 0
+    mbean_metrics = solr_mbean_json_resp_obj["value"]
+    if mbean_metrics != nil
+      mbean_metrics.each do |metric_key, metric_value|
+        if metric_key == "ThreadCount"
+          threadCount = metric_value
+          perf = "threadCount=#{threadCount}"
+          puts perf + "|" + perf
+        end
+      end
+    end
+  rescue Errno::ECONNREFUSED
+    puts "Jolokia process is down."
+  end
+elsif monitor == "HeapMemoryUsage"
+  mbean_name = "java.lang:type=Memory"
+  mbean_attributes = ["HeapMemoryUsage,NonHeapMemoryUsage"]
+  solr_jmx_mbean_map_obj = {
+    "type" => "read",
+    "mbean" => "#{mbean_name}",
+    "attribute" => "#{mbean_attributes}",
+    "target" => {
+      "url" => "service:jmx:rmi:///jndi/rmi://127.0.0.1:#{solr_jmx_port}/jmxrmi"
+    }
+  }
+  jmx_mbean_read_request = solr_jmx_mbean_map_obj.to_json
+
+  begin
+    solr_mbean_json_resp_obj = post_no_auth("localhost", port_no, '/jolokia/', jmx_mbean_read_request)
+    heap_memory_used = 0
+    percentUsed = 0
+    mbean_metrics = solr_mbean_json_resp_obj["value"]
+    if mbean_metrics != nil
+      mbean_metrics.each do |metric_key, metric_value|
+        if metric_key == "HeapMemoryUsage"
+          heap_memory_used = mbean_metrics["HeapMemoryUsage"]["used"]
+          heap_memory_committed = mbean_metrics["HeapMemoryUsage"]["committed"]
+          percentUsed = heap_memory_used.to_f / heap_memory_committed.to_f * 100
+          perf = "heapMemoryUsed=#{heap_memory_used} percentUsed=#{percentUsed}"
+          puts perf + "|" + perf
+        end
+      end
+    end
+  rescue Errno::ECONNREFUSED
+    puts "Jolokia process is down."
+  end
+end

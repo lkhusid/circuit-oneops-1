@@ -25,6 +25,20 @@
 # Comment out SOLR_HEAP if you are using this though, that takes precedence
 #SOLR_JAVA_MEM="-Xms512m -Xmx512m"
 
+# The below parameter is valid only for Solr 7.x only
+# Settings for authentication
+# Please configure only one of SOLR_AUTHENTICATION_CLIENT_BUILDER or SOLR_AUTH_TYPE parameters
+# SOLR_AUTHENTICATION_CLIENT_BUILDER="org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory"
+# The above parameter is valid only for Solr 7.x only
+
+<% if node["enable_authentication"] != nil && node["enable_authentication"] == "true" %>
+SOLR_AUTH_TYPE="basic"
+SOLR_AUTHENTICATION_OPTS="-Dsolr.httpclient.config=<%= node['data_dir_path'] %>/http_client.properties"
+SOLR_ZK_CREDS_AND_ACLS="-DzkACLProvider=org.apache.solr.common.cloud.VMParamsAllAndReadonlyDigestZkACLProvider -DzkCredentialsProvider=org.apache.solr.common.cloud.VMParamsSingleSetCredentialsDigestZkCredentialsProvider -DzkDigestUsername=<%= node["solr_admin_username"] %> -DzkDigestPassword=<%= node["solr_admin_password"] %> -DzkDigestReadonlyUsername=<%= node["solr_user_name"] %> -DzkDigestReadonlyPassword=<%= node["solr_user_password"] %>"
+SOLR_OPTS="$SOLR_OPTS $SOLR_ZK_CREDS_AND_ACLS"
+<% end %>
+
+
 <% if node["solr_mem_max"] != nil || node["solr_mem_min"] != nil %>
 SOLR_JAVA_MEM="<%= node["solr_mem_max"] %> <%= node["solr_mem_min"] %>"
 <% end %>
@@ -32,8 +46,12 @@ SOLR_JAVA_MEM="<%= node["solr_mem_max"] %> <%= node["solr_mem_min"] %>"
 # Enable verbose GC logging
 
 
-<% if node["solrcloud"]["gc_log_params"] != nil %>
-<% GC_LOG_opts = JSON.parse(node["solrcloud"]["gc_log_params"]).map{ |v| " #{v}" } %>
+<% if node["solrcloud"]["gc_log_params"] != nil && node["solrcloud"]["gc_log_params"] != '' %>
+<% GC_LOG_opts = ""
+JSON.parse(node["solrcloud"]["gc_log_params"]).each do |v|
+  GC_LOG_opts = "#{GC_LOG_opts} #{v}"
+end
+%>
 GC_LOG_OPTS="${GC_LOG_OPTS} <%= GC_LOG_opts %>"
 <% end %>
 
@@ -41,9 +59,13 @@ GC_LOG_OPTS="${GC_LOG_OPTS} <%= GC_LOG_opts %>"
 # These GC settings have shown to work well for a number of common Solr workloads
 
 
-<% if node["solrcloud"]["gc_tune_params"] != nil %>
-<% GC_TUNE_opts = JSON.parse(node["solrcloud"]["gc_tune_params"]).map{ |v| " -XX:#{v}" } %>
-GC_TUNE_OPTS="${GC_TUNE_OPTS} <%= GC_TUNE_opts %> "
+<% if node["gc_tune_params"] != nil && node["gc_tune_params"] != '' %>
+<% GC_TUNE_opts = ""
+node["gc_tune_params"].each do |v|
+  GC_TUNE_opts = "#{GC_TUNE_opts} -XX:#{v}"
+end
+%>
+GC_TUNE="${GC_TUNE} <%= GC_TUNE_opts %> "
 <% end %>
 
 
@@ -53,7 +75,7 @@ GC_TUNE_OPTS="${GC_TUNE_OPTS} <%= GC_TUNE_opts %> "
 #ZK_HOST=""
 
 # Set the ZooKeeper client timeout (for SolrCloud mode)
-#ZK_CLIENT_TIMEOUT="15000"
+ZK_CLIENT_TIMEOUT="<%= node.workorder.rfcCi.ciAttributes.zk_client_timeout %>"
 
 # By default the start script uses "localhost"; override the hostname here
 # for production SolrCloud environments to control the hostname exposed to cluster state
@@ -67,7 +89,7 @@ GC_TUNE_OPTS="${GC_TUNE_OPTS} <%= GC_TUNE_opts %> "
 # (false is recommended in production environments)
 ENABLE_REMOTE_JMX_OPTS="false"
 
-# The script will use SOLR_PORT+10000 for the RMI_PORT or you can set it here
+# The script will use port_no+10000 for the RMI_PORT or you can set it here
 # RMI_PORT=18983
 
 # Set the thread stack size
@@ -81,10 +103,17 @@ ENABLE_REMOTE_JMX_OPTS="false"
 #SOLR_OPTS="$SOLR_OPTS -Dsolr.clustering.enabled=true"
 
 <% if node["solrcloud"]["solr_opts_params"] != nil %>
-<% SOLR_opts = JSON.parse(node["solrcloud"]["solr_opts_params"]).map{ |v| " -D#{v}" } %>
-SOLR_OPTS="${SOLR_OPTS} <%= SOLR_opts %> "
+<% SOLR_opts = ""
+JSON.parse(node["solrcloud"]["solr_opts_params"]).each do |v|
+  SOLR_opts = "#{SOLR_opts} -D#{v}"
+end
+%>
+SOLR_OPTS="${SOLR_OPTS} <%= SOLR_opts %>"
 <% end %>
 
+<% if not node["solrcloud"]["jmx_port"].empty? %>
+SOLR_OPTS="${SOLR_OPTS} -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=<%= node["solrcloud"]["jmx_port"] %> -Dcom.sun.management.jmxremote.rmi.port=<%= node["solrcloud"]["jmx_port"] %>"
+<% end %>
 
 # Location where the bin/solr script will save PID files for running instances
 # If not set, the script will create PID files in $SOLR_TIP/bin
@@ -93,6 +122,11 @@ SOLR_PID_DIR="<%= node["data_dir_path"] %>"
 # Path to a directory for Solr to store cores and their data. By default, Solr will use server/solr
 # If solr.xml is not stored in ZooKeeper, this directory needs to contain solr.xml
 SOLR_HOME="<%= node["data_dir_path"] %>/data"
+
+# The below environment variable is only valid for Solr 7.x, we can uncomment it in case we want to use it in future
+# Path to a directory that Solr will use as root for data folders for each core.
+# If not set, defaults to <instance_dir>/data. Overridable per core through 'dataDir' core property
+#SOLR_DATA_HOME=
 
 # Solr provides a default Log4J configuration properties file in server/resources
 # however, you may want to customize the log settings and file appender location
@@ -104,7 +138,14 @@ LOG4J_PROPS="<%= node["data_dir_path"] %>/log4j.properties"
 SOLR_LOGS_DIR="<%= node["data_dir_path"] %>/logs"
 
 # Sets the port Solr binds to, default is 8983
-SOLR_PORT="<%= node["port_no"] %>"
+port_no="<%= node["port_no"] %>"
+
+
+
+# The below environment variable is only valid for Solr 7.x, we can uncomment it in case we want to use it in future
+# Enables HTTPS. It is implictly true if you set SOLR_SSL_KEY_STORE. Use this config
+# to enable https module with custom jetty configuration.
+#SOLR_SSL_ENABLED=true
 
 # Uncomment to set SSL-related system properties
 # Be sure to update the paths to the correct keystore for your environment

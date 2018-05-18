@@ -1,0 +1,33 @@
+#!/bin/bash
+
+start() {
+  echo "Starting enterprise-server"
+  systemctl start enterprise-server
+}
+
+stop() {
+  echo "Stopping enterprise-server"
+  systemctl stop enterprise-server
+}
+
+restart() {
+  echo "Restarting enterprise-server"
+  stop
+  start
+}
+
+status() {
+  echo "Checking status of enterprise-server"
+  systemctl status enterprise-server
+}
+
+case "$1" in
+  start)   start;;
+  stop)    stop;;
+  restart) restart;;
+  status)  status;;
+  *)       echo "Usage: $0 {start|stop|restart}"
+          exit 1;;
+esac
+
+exit 0

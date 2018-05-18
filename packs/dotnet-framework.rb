@@ -72,7 +72,8 @@ resource "chocopackage",
   :design        => true,
   :requires      => {
     :constraint  => "0..1",
-    :help        => "Installs chocolatey package"
+    :help        => "Installs chocolatey package",
+    :services    => '*mirror'
   },
   :attributes       => {
     "chocolatey_package_source" => 'https://chocolatey.org/api/v2/'

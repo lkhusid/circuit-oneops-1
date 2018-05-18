@@ -1,0 +1,130 @@
+#!/usr/bin/env ruby
+
+require "pty"
+require "timeout"
+require "/opt/meghacache/lib/graphite_writer"
+require "/opt/meghacache/lib/telegraf_writer"
+
+## Initialization and Globals
+
+@oo_org = '<%= @oo_org %>'.gsub(/\./, '-')
+@oo_assembly = '<%= @oo_assembly %>'.gsub(/\./, '-')
+@oo_env = '<%= @oo_env %>'.gsub(/\./, '-')
+@oo_platform = '<%= @oo_platform %>'.gsub(/\./, '-')
+@oo_cloud = '<%= @oo_cloud %>'.gsub(/\./, '-')
+
+@graphite_prefix = "<%= @graphite_prefix %>.#{@oo_org}-#{@oo_assembly}-#{@oo_platform}"
+@logfiles_path = '<%= @graphite_logfiles_path %>'
+@graphite_servers = JSON.parse('<%= @graphite_servers %>')
+
+@gw = GraphiteWriter.new( @graphite_prefix, @graphite_servers, @oo_env, @oo_cloud, @logfiles_path, "tko_" ) # GraphiteWriter class from graphite_writer lib
+@tw = TelegrafWriter.new('mcrouter', @logfiles_path, nil, nil, TelegrafWriter::DEFAULT_LOGMCROUTER_PATH)
+
+LINE_REGEX = /\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):[0-9]+\s+\((.*)\).*hard TKOs:\s+([0-9]+).*soft TKOs:\s+([0-9]+).*Reply:\s+(\S+)/
+
+# Current metrics to report on
+# (we want to report not the latest but rather the highest values detected during reporting period)
+@tko_hard_current = {}
+@tko_soft_current = {}
+
+# Metrics to reset the current hash to after reporting (latest values)
+@tko_hard_postprocess = {}
+@tko_soft_postprocess = {}
+
+# Flags the new TKO changes detected during reporting period
+@tko_changes_detected = false
+
+## Helpers
+
+def log( str )
+  puts str
+end
+
+def send_to_graphite(stat_hash)
+  begin
+    unless @graphite_servers.nil? or @graphite_servers.length == 0
+      @gw.open_tcp_sockets
+      @gw.write_to_graphite(stat_hash)
+      @gw.close_tcp_sockets
+    end
+  rescue => e
+    log e.message
+  end
+end
+
+def send_to_telegraf(stat_hash)
+  begin
+    @tw.write_influx(stat_hash)
+  rescue => e
+    log e.message
+  end
+end
+
+def send_tko()
+
+  ## Preprocessing
+  hard_total = (@tko_hard_current.has_key? :total) ? @tko_hard_current[:total] : 0
+  soft_total = (@tko_soft_current.has_key? :total) ? @tko_soft_current[:total] : 0
+  stat_hash = {"stats"=>{"hard_total"=>hard_total.to_s,"soft_total"=>soft_total.to_s},"delta"=>{"time"=>60}}
+
+  ## Sending to Graphite
+  send_to_graphite(stat_hash)
+
+  ## Sending to Telegraf
+  send_to_telegraf(stat_hash)
+
+  # Postprocessing
+  @tko_hard_postprocess.each { |k,v| @tko_hard_current[k] = v } # This does not reset items in current hash
+  @tko_soft_postprocess.each { |k,v| @tko_soft_current[k] = v } # that do not have counterpart in postprocess hash
+  @tko_hard_postprocess = {}
+  @tko_soft_postprocess = {}
+  @tko_changes_detected = false
+end
+
+def process_line( line )
+  m = LINE_REGEX.match( line )
+  if m
+    log line
+    log "TKO status change: Addr=" + m.captures[0] + " Cloud=" + m.captures[1] \
+        + " tko_hard_total=" + m.captures[2] + " tko_soft_total=" + m.captures[3] + " Status=" + m.captures[4]
+    hard_total = m.captures[2].to_i
+    soft_total = m.captures[3].to_i
+    if not @tko_changes_detected # Set latest values for the first change detected during reporting period
+      @tko_hard_current[:total] = hard_total
+      @tko_soft_current[:total] = soft_total
+      @tko_changes_detected = true
+    else # Set highest values if there were multiple changes detected during reporting period
+      @tko_hard_current[:total] = hard_total if hard_total > @tko_hard_current[:total]
+      @tko_soft_current[:total] = soft_total if soft_total > @tko_soft_current[:total]
+    end # if tko changes detected
+    @tko_hard_postprocess[:total] = hard_total
+    @tko_soft_postprocess[:total] = soft_total
+  end # if m
+end
+
+## Main
+
+if __FILE__ == $0 # main
+
+  PTY.spawn( "journalctl -u mcrouter -f -n 0" ) do |output, input, pid|
+
+    line = nil # Storage for input line in case we get timeout interruption while processing input
+  
+    begin
+    Timeout::timeout(60) do
+      output.each_line do |line|
+        process_line( line )
+        line = nil
+      end # each_line
+    end # timeout do
+    rescue Timeout::Error
+      if line # If we were in the middle of processing the line, let's re-process it before sending to graphite
+        process_line( line )
+        line = nil
+      end
+      send_tko()
+      retry # Restart timeout and continue reading from input
+    end # begin-rescue
+
+  end # spawn()
+end # if main

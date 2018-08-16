@@ -14,7 +14,9 @@ module AzureCompute
         virtual_machines = @compute_service.servers(resource_group: resource_group_name)
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to get virtual machines #{vm_name} from resource group: #{resource_group_name}\n\r Exception is: #{e.body}")
+      rescue => e
         OOLog.fatal("Error getting VMs in resource group: #{resource_group_name}. Error Message: #{e.message}")
       end
 
@@ -29,10 +31,10 @@ module AzureCompute
         virtual_machine = @compute_service.servers.get(resource_group_name, vm_name)
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error fetching VM: #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to get virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to get virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error fetching VM: #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")
@@ -43,7 +45,9 @@ module AzureCompute
       begin
         exists = @compute_service.servers.check_vm_exists(resource_group_name, vm_name)
       rescue MsRestAzure::AzureOperationError => e
-        OOLog.fatal("Error Body: #{e.body}")
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to check VM: #{vm_params[:name]} existence. Exception is: #{e.body}")
+      rescue => e
+        OOLog.fatal("Error checking VM: #{vm_params[:name]} existence. Error Message: #{e.message}")
       end
       OOLog.debug("VM Exists?: #{exists}")
       exists
@@ -56,10 +60,10 @@ module AzureCompute
         virtual_machine = @compute_service.servers.create(vm_params)
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error creating/updating VM: #{vm_params[:name]}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to create/update virtual machine #{vm_params[:name]} from resource group: #{vm_params[:resource_group]}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to create/update virtual machine #{vm_params[:name]} from resource group: #{vm_params[:resource_group]}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error creating/updating VM: #{vm_params[:name]}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")
@@ -78,10 +82,10 @@ module AzureCompute
         end
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error deleting VM: #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to delete virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to delete virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error deleting VM: #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")
@@ -96,10 +100,10 @@ module AzureCompute
         response = virtual_machine.start
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error starting VM. #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to start virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to start virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error starting VM. #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("VM started in #{duration} seconds")
@@ -114,10 +118,10 @@ module AzureCompute
         response = virtual_machine.restart
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error restarting VM. #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to restart virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to restart virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error restarting VM. #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")
@@ -132,10 +136,10 @@ module AzureCompute
         response = virtual_machine.power_off
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error powering off VM. #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to Power Off virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to Power Off virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error powering off VM. #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")
@@ -150,10 +154,10 @@ module AzureCompute
         response = virtual_machine.redeploy
         end_time = Time.now.to_i
         duration = end_time - start_time
-      rescue RuntimeError => e
-        OOLog.fatal("Error redeploying VM. #{vm_name}. Error Message: #{e.message}")
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Azure::Virtual Machine - Exception trying to redeploy virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.body}")
       rescue => e
-        OOLog.fatal("Azure::Virtual Machine - Exception trying to redeploy virtual machine #{vm_name} from resource group: #{resource_group_name}\n\rAzure::Virtual Machine - Exception is: #{e.message}")
+        OOLog.fatal("Error redeploying VM. #{vm_name}. Error Message: #{e.message}")
       end
 
       OOLog.info("operation took #{duration} seconds")

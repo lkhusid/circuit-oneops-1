@@ -235,7 +235,24 @@ describe "azure node::create" do
       tags_from_work_order.each do |key, value|
         expect(nic.tags).to include(key => value)
       end
+    end
 
+    it 'has accelerated networking' do
+      accelerated_networking = if (defined?($node['workorder']['rfcCi']['ciAttributes']['accelerated_flag']))
+        $node['workorder']['rfcCi']['ciAttributes']['accelerated_flag']
+      else
+        false
+      end
+
+      nic_svc = AzureNetwork::NetworkInterfaceCard.new(@spec_utils.get_azure_creds)
+      nic_svc.ci_id = $node['workorder']['rfcCi']['ciId']
+      nic_svc.platform_ci_id = $node['workorder']['box']['ciId'] if Utils.is_new_cloud($node)
+      rg_svc = AzureBase::ResourceGroupManager.new($node)
+      nic_svc.rg_name = rg_svc.rg_name
+      nic_name = Utils.get_component_name('nic', nic_svc.ci_id, nic_svc.platform_ci_id)
+      nic = nic_svc.get(nic_name)
+
+      expect(nic.enable_accelerated_networking.to_s).to eq(accelerated_networking)
     end
   end
 

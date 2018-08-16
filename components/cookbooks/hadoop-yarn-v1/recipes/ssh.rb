@@ -52,7 +52,15 @@ bash "generate ssh_known_hosts" do
     user "root"
     cwd "/etc/ssh"
     code <<-EOF
-        /usr/bin/ssh-keyscan #{fqdns_joined} > /etc/ssh/ssh_known_hosts
+        #/usr/bin/ssh-keyscan #{fqdns_joined} > /etc/ssh/ssh_known_hosts
+        echo "" > /etc/ssh/ssh_known_hosts
+        for fqdn in "#{fqdns_joined}"; do
+            getent hosts $fqdn >dev/null 2>/dev/null
+            # Scan the key if this is a valid FQDN
+            if [[ "$?" == "0" ]]; then
+                ssh-keyscan $fqdn >> /etc/ssh/ssh_known_hosts
+            fi
+        done
     EOF
 end
 

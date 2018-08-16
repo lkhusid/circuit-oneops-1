@@ -10,8 +10,6 @@ require File.expand_path('../../../azure_base/libraries/utils.rb', __FILE__)
 #set the proxy if it exists as a cloud var
 Utils.set_proxy(node.workorder.payLoad.OO_CLOUD_VARS)
 
-include_recipe 'azuredns::get_azure_token'
-
 cloud_name = node['workorder']['cloud']['ciName']
 dns_attributes = node['workorder']['services']['dns'][cloud_name]['ciAttributes']
 
@@ -27,7 +25,7 @@ if node.workorder.rfcCi.ciAttributes.has_key?('ptr_enabled') && node.workorder.r
   OOLog.info('azuredns:set_dns_records.rb - PTR Records are configured automatically in Azure DNS, ignoring')
 end
 
-dns = AzureDns::DNS.new(node['platform-resource-group'], node['azure_rest_token'], dns_attributes)
+dns = AzureDns::DNS.new(node['platform-resource-group'], dns_attributes)
 
 # check to see if the zone exists in Azure
 # if it doesn't create it

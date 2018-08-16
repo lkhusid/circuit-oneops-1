@@ -1,0 +1,3 @@
+sudo rm -rf /etc/zookeeper/unlock_zk.sh
+
+CLIENT_JVMFLAGS="-Djava.security.auth.login.config=/etc/zookeeper/zookeeper_client_jaas.conf" /usr/lib/zookeeper/zookeeper-<%= @zkVersion %>/bin/zkCli.sh -server localhost:2181 setAcl /brokers/topics sasl:admin:cdrwa,world:anyone:r

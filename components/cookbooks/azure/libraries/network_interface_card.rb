@@ -42,7 +42,7 @@ module AzureNetwork
     end
 
     # define the NIC object
-    def define_network_interface(nic_ip_config)
+    def define_network_interface(nic_ip_config, enable_accelerated_networking)
       network_interface = Fog::Network::AzureRM::NetworkInterface.new
       network_interface.location = @location
       network_interface.name = Utils.get_component_name('nic', @ci_id, @platform_ci_id)
@@ -51,6 +51,7 @@ module AzureNetwork
       network_interface.subnet_id = nic_ip_config.subnet_id
       network_interface.public_ip_address_id = nic_ip_config.public_ipaddress_id
       network_interface.tags = @tags
+      network_interface.enable_accelerated_networking = enable_accelerated_networking
 
       OOLog.info("Network Interface name is: #{network_interface.name}")
       network_interface
@@ -91,7 +92,8 @@ module AzureNetwork
                                                                private_ip_allocation_method: network_interface.private_ip_allocation_method,
                                                                load_balancer_backend_address_pools_ids: network_interface.load_balancer_backend_address_pools_ids,
                                                                load_balancer_inbound_nat_rules_ids: network_interface.load_balancer_inbound_nat_rules_ids,
-                                                               tags: network_interface.tags)
+                                                               tags: network_interface.tags,
+                                                               enable_accelerated_networking: network_interface.enable_accelerated_networking)
         end
 
         end_time = Time.now.to_i
@@ -127,7 +129,7 @@ module AzureNetwork
 
     # this manages building the network profile in preparation of creating
     # the vm.
-    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_id)
+    def build_network_profile(express_route_enabled, master_rg, pre_vnet, network_address, subnet_address_list, dns_list, ip_type, security_group_id, enable_accelerated_networking)
       # get the objects needed to build the profile
       @virtual_network.location = @location
 
@@ -182,7 +184,7 @@ module AzureNetwork
         nic_ip_config = define_nic_ip_config(ip_type, subnet)
 
         # define the nic
-        network_interface = define_network_interface(nic_ip_config)
+        network_interface = define_network_interface(nic_ip_config, enable_accelerated_networking)
 
         # include the network securtiry group to the network interface
         network_interface.network_security_group_id = security_group_id unless security_group_id.nil?

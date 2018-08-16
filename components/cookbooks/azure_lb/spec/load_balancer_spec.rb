@@ -131,13 +131,6 @@ describe AzureNetwork::LoadBalancer do
     end
   end
 
-  describe '#create_probe' do
-    it 'creates probe successfully' do
-      probe = AzureNetwork::LoadBalancer.create_probe('Test-probe', 'Tcp', 8080, 5, 16, 'myprobeapp1/myprobe1.svc')
-      expect(probe[:name]).to eq('Test-probe')
-    end
-  end
-
   describe '#create_lb_rule' do
     it 'creates lb rule successfully' do
       probe_id = '/subscriptions/{guid}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/myLB1/probes/Test-Probe'
@@ -158,7 +151,7 @@ describe AzureNetwork::LoadBalancer do
 
   describe '#get_lb' do
     it 'gets load balancer hash successfully' do
-      lb = AzureNetwork::LoadBalancer.get_lb('Test-LB-RG', 'Test-LB', 'eastus', 'frontend_ip_configs', 'backend_address_pools', 'lb_rules', 'nat_rules', 'probes')
+      lb = AzureNetwork::LoadBalancer.get_lb('Test-LB-RG', 'Test-LB', 'eastus', 'frontend_ip_configs', 'backend_address_pools', 'lb_rules', 'nat_rules', 'probes', 'tags')
       expect(lb[:name]).to eq('Test-LB')
     end
   end

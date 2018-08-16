@@ -21,7 +21,7 @@ attribute 'solr_version',
     :category => '1.SolrCloud',
     :form => {'field' => 'select', 'options_for_select' => [
        ['6.4.2 (Deprecated)', '6.4.2'], ['6.6.0 (Deprecated)', '6.6.0'],
-       ['7.2.1', '7.2.1'], ['7.3.0 (Not tested yet)', '7.3.0']
+       ['7.2.1', '7.2.1'], ['7.3.1 (Not tested yet)', '7.3.1']
     ]},
     :order => 4
   }
@@ -286,7 +286,7 @@ attribute 'solr_custom_component_version',
 # Solr Monitor Specific Attributes
 attribute 'solr_monitor_version',
           :description => 'Version of jar file with Solr Metrics',
-          :default => '1.0.3',
+          :default => '1.0.5',
           :required => 'required',
           :format => {
               :help => 'Expects a version of a jar file whose artifact is com.walmart.strati.af.df.managed_solr.solrmonitor:solrcloud-oneops-metrics. Example: 0.0.1, 1.0.2 etc',
@@ -327,6 +327,25 @@ attribute 'node_solr_portnum',
       :help => 'Port number on which the solr is currently running',
       :category => '4.Other',
       :order => 24
+  }
+
+
+attribute 'fault_domain',
+  :description => 'Fault Domain',
+  :grouping => 'bom',
+  :format => {
+    :important => true,
+    :category => '4.Other',
+    :order => 25
+  }
+
+attribute 'update_domain',
+  :description => 'Update Domain',
+  :grouping => 'bom',
+  :format => {
+    :important => true,
+    :category => '4.Other',
+    :order => 26
   }
 
 attribute 'url_max_requests_per_sec_map',

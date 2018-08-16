@@ -10,7 +10,7 @@ containsElement () {
 pingZK () {
   zk=$1
   zkSplit=(${zk//:/ })
-  (nc -z ${zkSplit[0]} ${zkSplit[1]})
+  (nc -w 30 ${zkSplit[0]} ${zkSplit[1]} < /dev/null)
   ret=$?
   return $ret
 }

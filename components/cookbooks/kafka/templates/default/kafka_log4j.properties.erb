@@ -12,3 +12,56 @@ log4j.appender.kafkaAppender.layout=org.apache.log4j.PatternLayout
 log4j.appender.kafkaAppender.layout.ConversionPattern=%d [%t] %-5p (%F:%L) - %m%n
 log4j.appender.kafkaAppender.MaxBackupIndex=<%= (node['kafka']['kafka_server_log_retention_bytes'].to_i/10).ceil %>
 log4j.appender.kafkaAppender.MaxFileSize=10MB
+
+###### with rootLogger takes care of all levels of loggings, we want to have a separate log files for each different
+###### components which are of interest to us, so we do not have to search different components info from
+###### a big file server.log*
+###### Make sure we use a small MaxBackupIndex below for each components so we can have a limited
+###### impact of disk space. 
+log4j.appender.stateChangeAppender=org.apache.log4j.RollingFileAppender
+#--- DatePattern is an invalid option for RollingFileAppender
+#log4j.appender.stateChangeAppender.DatePattern='.'yyyy-MM-dd-HH
+log4j.appender.stateChangeAppender.File=<%= node['kafka']['syslog_dir'] %>/state-change.log
+log4j.appender.stateChangeAppender.layout=org.apache.log4j.PatternLayout
+log4j.appender.stateChangeAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
+log4j.appender.stateChangeAppender.MaxBackupIndex=2
+log4j.appender.stateChangeAppender.MaxFileSize=10MB
+
+log4j.appender.requestAppender=org.apache.log4j.RollingFileAppender
+log4j.appender.requestAppender.File=<%= node['kafka']['syslog_dir'] %>/kafka-request.log
+log4j.appender.requestAppender.layout=org.apache.log4j.PatternLayout
+log4j.appender.requestAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
+log4j.appender.requestAppender.MaxBackupIndex=2
+log4j.appender.requestAppender.MaxFileSize=10MB
+
+log4j.appender.cleanerAppender=org.apache.log4j.RollingFileAppender
+log4j.appender.cleanerAppender.File=<%= node['kafka']['syslog_dir'] %>/log-cleaner.log
+log4j.appender.cleanerAppender.layout=org.apache.log4j.PatternLayout
+log4j.appender.cleanerAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
+log4j.appender.cleanerAppender.MaxBackupIndex=2
+log4j.appender.cleanerAppender.MaxFileSize=10MB
+
+log4j.appender.controllerAppender=org.apache.log4j.RollingFileAppender
+log4j.appender.controllerAppender.File=<%= node['kafka']['syslog_dir'] %>/controller.log
+log4j.appender.controllerAppender.layout=org.apache.log4j.PatternLayout
+log4j.appender.controllerAppender.layout.ConversionPattern=[%d] %p %m (%c)%n
+log4j.appender.controllerAppender.MaxBackupIndex=10
+log4j.appender.controllerAppender.MaxFileSize=10MB
+
+log4j.logger.kafka.network.RequestChannel$=INFO, requestAppender
+log4j.additivity.kafka.network.RequestChannel$=false
+
+#log4j.logger.kafka.network.Processor=TRACE, requestAppender
+#log4j.logger.kafka.server.KafkaApis=TRACE, requestAppender
+#log4j.additivity.kafka.server.KafkaApis=false
+log4j.logger.kafka.request.logger=INFO, requestAppender
+log4j.additivity.kafka.request.logger=false
+
+log4j.logger.kafka.controller=TRACE, controllerAppender
+log4j.additivity.kafka.controller=false
+
+log4j.logger.kafka.log.LogCleaner=INFO, cleanerAppender
+log4j.additivity.kafka.log.LogCleaner=false
+
+log4j.logger.state.change.logger=INFO, stateChangeAppender
+log4j.additivity.state.change.logger=false

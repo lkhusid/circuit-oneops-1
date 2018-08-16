@@ -83,14 +83,13 @@ module AzureBase
     end
 
     def list_resources
-      require 'azure_mgmt_resources'
-
-      token_provider = MsRestAzure::ApplicationTokenProvider.new(@creds[:tenant_id], @creds[:client_id], @creds[:client_secret])
-      credentials = MsRest::TokenCredentials.new(token_provider)
-      client = Azure::ARM::Resources::ResourceManagementClient.new(credentials)
-      client.subscription_id = @creds[:subscription_id]
-
-      client.resource_groups.list_resources(@rg_name)
+      begin
+        @resource_client.azure_resources.list_resources_in_resource_group(@rg_name)
+      rescue MsRestAzure::AzureOperationError => e
+        OOLog.fatal("Error getting resources from resource group #{@rg_name}, error is: #{e.body}")
+      rescue => ex
+        OOLog.fatal("Error getting resources from resource group #{@rg_name}, error is: #{ex.message}")
+      end
     end
 
     # This method will get the resource group

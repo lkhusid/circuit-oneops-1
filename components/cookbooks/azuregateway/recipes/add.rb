@@ -16,9 +16,6 @@ require 'base64'
 # get platform resource group and availability set
 include_recipe 'azure::get_platform_rg_and_as'
 
-include_recipe 'azuredns::get_azure_token'
-token = node['azure_rest_token']
-
 def get_compute_nodes
   compute_nodes = []
   compute_list = node.workorder.payLoad.DependsOn.select { |d| d[:ciClassName] =~ /Compute/ }

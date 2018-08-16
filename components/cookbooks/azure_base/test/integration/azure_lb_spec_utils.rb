@@ -9,16 +9,7 @@ class AzureLBSpecUtils < AzureSpecUtils
 
     lb_name
   end
-  def get_probes
-    probes = []
-    ecvs = AzureNetwork::LoadBalancer.get_probes_from_wo(@node)
 
-    ecvs.each do |ecv|
-      probe = AzureNetwork::LoadBalancer.create_probe(ecv[:probe_name], ecv[:protocol], ecv[:port], ecv[:interval_secs], ecv[:num_probes], ecv[:request_path])
-      probes.push(probe)
-    end
-    probes
-  end
   def get_loadbalancer_rules(subscription_id, resource_group_name, lb_name, env_name, platform_name, probes, frontend_ipconfig_id, backend_address_pool_id)
     lb_rules = []
 

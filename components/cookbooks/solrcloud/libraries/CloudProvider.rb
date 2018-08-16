@@ -6,15 +6,17 @@ require 'json'
 
 # This class is used to implement cloud provider specific code. 
 class CloudProvider
-  
+
   def initialize(node)
     #get the current node's cloud name
     @cloud_name = node[:workorder][:cloud][:ciName]
     Chef::Log.info("@cloud_name : #{@cloud_name}")
-    
+
     @cloud_provider = self.class.get_cloud_provider_name(node)
     Chef::Log.info("Initializing Cloud Provider : #{@cloud_provider}")
-    
+
+    @cloud_id_to_name_map = get_cloud_id_to_name_map(node)
+
     # Replica distribution varies based on cloud provider. For ex. with 'Openstack' cloud provider, we distribute replicas across clouds and witn 'Azure', 
     # replicas are distributes across domains. If no cloud provider in payload, then error out. 
     if @cloud_provider == nil || @cloud_provider.empty?
@@ -137,7 +139,7 @@ class CloudProvider
 
     computes.each do |compute|
       next if compute[:ciAttributes][:private_ip].nil?
-      if zone_info_missing?(compute)
+      if self.class.zone_info_missing?(compute)
         raise "Zone attrribute with fault_domain/update_domain information is required."
       end
       zone  = JSON.parse(compute['ciAttributes']['zone'])
@@ -157,7 +159,7 @@ class CloudProvider
   end
 
   # check if 'zone' attribute and/or its details are missing at compute
-  def zone_info_missing?(compute)
+  def self.zone_info_missing?(compute)
     # check if 'zone' attribute is missing at compute
     if compute['ciAttributes']['zone'].nil?
       return true
@@ -233,6 +235,81 @@ class CloudProvider
       raise error
     end
   end
-    
+
+  # Shows fault domain and update domain for each solrcloud component.
+  def self.show_faultdomain_and_updatedomain(node)
+    computes = self.get_computes_payload(node)
+    computes.each do |compute|
+      if self.zone_info_missing?(compute)
+        raise "Zone attrribute with fault_domain/update_domain information is required."
+      end
+      if compute[:ciAttributes][:private_ip] == node['ipaddress']
+        zone  = JSON.parse(compute['ciAttributes']['zone'])
+        fault_domain = zone['fault_domain']
+        update_domain = zone['update_domain']
+        Chef::Log.info(" Fault Domain = #{fault_domain}" + ", Update Domain = #{update_domain}")
+        puts "***RESULT:fault_domain=#{fault_domain}"
+        puts "***RESULT:update_domain=#{update_domain}"
+      end
+    end
+  end
+
+  def get_cloud_id_to_name_map(node)
+    clouds = get_clouds_payload(node)
+    # Ex: cloud_id_to_name_map => {'35709237':'prod-cdc5','35709238':'prod-cdc6'}
+    cloud_id_to_name_map = Hash.new
+    clouds.each { |cloud|
+      cloud_id_to_name_map[cloud[:ciId].to_s] = cloud[:ciName]
+    }
+    return cloud_id_to_name_map
+  end
+
+  # Shows a summary of the allocations done for all collections
+  def show_summary(compute_ip_to_cloud_domain_map, clusterstatus_resp_obj)
+    if (@cloud_provider != "azure")
+      cloud_ip_cores = Hash.new
+      @zone_to_compute_ip_map.each { |cloud_name, computes|
+        cloud_ip_cores[cloud_name] = Hash.new
+        computes.each { |ip|
+          cloud_ip_cores[cloud_name][ip] = Array.new
+        }
+      }
+      collections = clusterstatus_resp_obj["cluster"]["collections"]
+      collections.each { |coll_name, coll_info|
+        shards = coll_info["shards"]
+        shards.each { |shard_name, shard_info|
+          replicas = shard_info["replicas"]
+          replicas.each { |replica_name, replica_info|
+            node_name = replica_info["node_name"]
+            ip = node_name.slice(0, node_name.index(':'))
+            cloud_domain = compute_ip_to_cloud_domain_map[ip]
+            cloud_id = cloud_domain.split('___')[0]
+            cloud_name = @cloud_id_to_name_map[cloud_id]
+            cloud_ip_cores[cloud_name][ip].push(coll_name + ", " + shard_name + ", " + replica_name)
+          }
+        }
+      }
+      cloud_numcores_map = Hash.new
+      cluster_cores = 0
+      cloud_ip_cores.each { |cloud_name, cloud_info|
+        core_per_cloud = 0
+        cloud_info.each { |ip, cores|
+          core_per_cloud = core_per_cloud + cores.length
+        }
+        cluster_cores = cluster_cores + core_per_cloud
+        cloud_numcores_map[cloud_name] = core_per_cloud
+      }
+      # Show both the summary and the detailed information as both are helpful for verification.
+      # Ex: Verify cloud_numcores_map => {"prod-cdc6":3,"prod-cdc5":3}
+      Chef::Log.info("Verify cloud_numcores_map => #{cloud_numcores_map.to_json}")
+      # Ex: Verify cloud_ip_cores => {"prod-cdc5":{"ip_11":["qw, shard1, core_node3"],"ip_22":["qw, shard2, core_node6"],"ip_33":[qw, shard2, core_node5]},
+      # "prod-cdc6":{"ip21":["qw, shard1, core_node1"],"ip22":["qw, shard1, core_node2"],"ip23":["qw, shard2, core_node4"]}
+      Chef::Log.info("Verify cloud_ip_cores => #{cloud_ip_cores.to_json}")
+
+    else
+      Chef::Log.info("Show summary API is not implemented for Azure Cloud Provider yet.")
+    end
+  end
+
 end
 

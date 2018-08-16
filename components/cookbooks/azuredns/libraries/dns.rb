@@ -19,9 +19,8 @@ module AzureDns
     attr_accessor :recordset
     attr_accessor :zone
 
-    def initialize(platform_resource_group, azure_rest_token, dns_attributes)
+    def initialize(platform_resource_group, dns_attributes)
       @platform_resource_group = platform_resource_group
-      @azure_rest_token = azure_rest_token # Not being used in this class.
       @dns_attributes = dns_attributes
       @recordset = AzureDns::RecordSet.new(@platform_resource_group, @dns_attributes)
       @zone = nil

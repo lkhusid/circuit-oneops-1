@@ -50,13 +50,7 @@ node.loadbalancers.each do |lb|
     puts "servicename: #{s_name}"
     resp_obj = JSON.parse(node.ns_conn.request(:method=>:get, :path=>"/nitro/v1/config/gslbservice/#{s_name}").body)
     full_detail += PP.pp resp_obj["gslbservice"],""
-  
+    puts full_detail
   end
 
-end
-
-if Chef::Log.level == :debug
-  Chef::Log.info("level: #{Chef::Log.level}")
-  puts "###### Full Detail ######"
-  puts full_detail
 end

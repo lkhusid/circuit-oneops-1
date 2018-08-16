@@ -1,0 +1,7 @@
+<% if @zookeeper[:enable_zk_sasl_plain].eql?('true') %>
+Client {
+  org.apache.zookeeper.server.auth.DigestLoginModule required
+  username="admin"
+  password=<%=@zookeeper[:sasl_zk_admin_pwd]%>
+;};
+<% end %>

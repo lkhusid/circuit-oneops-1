@@ -162,6 +162,8 @@ node_solr_version = ci['solr_version']
 
 cloud_provider_name = CloudProvider.get_cloud_provider_name(node)
 Chef::Log.info("cloud_provider_name = #{cloud_provider_name}")
+node.set['cloud_provider_name'] = cloud_provider_name
+
 allow_ephemeral_on_azure = ci['allow_ephemeral_on_azure'] || "false"
 node.set['azure_on_storage'] = 'false'
 if cloud_provider_name == 'azure' && allow_ephemeral_on_azure == 'false'

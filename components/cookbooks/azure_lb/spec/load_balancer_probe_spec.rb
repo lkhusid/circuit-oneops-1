@@ -61,9 +61,10 @@ describe 'probes and listeners' do
       probes = []
       probes.push(
           {
-              probe_name: "pname1",
-              interval_secs: 15,
-              num_probes: 3,
+              listener_port: 8080,
+              name: "pname1",
+              interval_in_seconds: 15,
+              number_of_probes: 3,
               port: 8080,
               protocol: 'http',
               request_path: '/'
@@ -71,9 +72,10 @@ describe 'probes and listeners' do
       )
       probes.push(
           {
-              probe_name: "pname2",
-              interval_secs: 15,
-              num_probes: 3,
+              listener_port: 8081,
+              name: "pname2",
+              interval_in_seconds: 15,
+              number_of_probes: 3,
               port: 8081,
               protocol: 'http',
               request_path: 'another_health_check'
@@ -82,15 +84,15 @@ describe 'probes and listeners' do
 
       found = AzureNetwork::LoadBalancer.get_probe_for_listener(listener, probes)
       expect(found).not_to be_nil
-      expect(found[:probe_name]).to eq('pname1')
+      expect(found[:name]).to eq('pname1')
       expect(found[:port].to_i).to eq(8080)
 
     end
 
-    context 'for listener with http backend' do
-      it 'uses any http probe when no matching probe found' do
+    context 'for listener with multiple probes' do
+      it 'uses default probe' do
         listener = {
-            name: "lname",
+            name: 'lname',
             iport: 8080,
             iprotocol: 'http',
             vport: 'http',
@@ -100,35 +102,37 @@ describe 'probes and listeners' do
         probes = []
         probes.push(
             {
-                probe_name: "pname1",
-                interval_secs: 15,
-                num_probes: 3,
-                port: 8082,
+                listener_port: 8080,
+                name: 'pname1',
+                interval_in_seconds: 15,
+                number_of_probes: 3,
+                port: 8080,
                 protocol: 'http',
                 request_path: '/'
             }
         )
         probes.push(
             {
-                probe_name: "pname2",
-                interval_secs: 15,
-                num_probes: 3,
-                port: 8081,
+                listener_port: 8080,
+                name: 'pname2',
+                interval_in_seconds: 15,
+                number_of_probes: 3,
+                port: 443,
                 protocol: 'Tcp',
-                request_path: 'nil'
+                request_path: 'nil',
+                default: true
             }
         )
 
         found = AzureNetwork::LoadBalancer.get_probe_for_listener(listener, probes)
         expect(found).not_to be_nil
-        expect(found[:probe_name]).to eq('pname1')
-        expect(found[:port].to_i).to eq(8082)
-
+        expect(found[:name]).to eq('pname2')
+        expect(found[:port].to_i).to eq(443)
       end
 
-      it 'returns nil when no matching probe and no http probe found' do
+      it 'raises exception when there is no default' do
         listener = {
-            name: "lname",
+            name: 'lname',
             iport: 8080,
             iprotocol: 'http',
             vport: 'http',
@@ -138,10 +142,47 @@ describe 'probes and listeners' do
         probes = []
         probes.push(
             {
-                probe_name: "pname",
-                interval_secs: 15,
-                num_probes: 3,
-                port: 1234,
+                listener_port: 8080,
+                name: 'pname1',
+                interval_in_seconds: 15,
+                number_of_probes: 3,
+                port: 8080,
+                protocol: 'http',
+                request_path: '/'
+            }
+        )
+        probes.push(
+            {
+                listener_port: 8080,
+                name: 'pname2',
+                interval_in_seconds: 15,
+                number_of_probes: 3,
+                port: 443,
+                protocol: 'Tcp',
+                request_path: 'nil'
+            }
+        )
+
+        expect{AzureNetwork::LoadBalancer.get_probe_for_listener(listener, probes)}.to raise_exception
+      end
+
+      it 'returns nil when no matching probe and no http probe found' do
+        listener = {
+            name: 'lname',
+            iport: 8080,
+            iprotocol: 'http',
+            vport: 'http',
+            vprotocol: 8080
+        }
+
+        probes = []
+        probes.push(
+            {
+                listener_port: 1234,
+                name: 'pname',
+                interval_in_seconds: 15,
+                number_of_probes: 3,
+                port: 8080,
                 protocol: 'Tcp',
                 request_path: nil
             }
@@ -164,9 +205,9 @@ describe 'probes and listeners' do
         listener_port = (listener.split(' ')[3]).to_i
 
         probes = work_order_utils.ecvs
-        found = probes.detect {|p| p[:port].to_i == listener_port}
+        found = probes.detect {|p| p[:listener_port].to_i == listener_port}
 
-        expect(probes.length).to eq(2)
+        expect(probes.length).to eq(1)
 
         expect(found).not_to be_nil
         expect(found[:protocol]).to eq('Tcp')
@@ -182,7 +223,7 @@ describe 'probes and listeners' do
         listener_port = (listener.split(' ')[3]).to_i
 
         probes = work_order_utils.ecvs
-        found = probes.detect {|p| p[:port].to_i == listener_port}
+        found = probes.detect {|p| p[:listener_port].to_i == listener_port}
 
         #when a match is found it is not creating a new one
         expect(probes.length).to eq(1)
@@ -225,7 +266,7 @@ describe 'probes and listeners' do
         found = probes.detect {|p| p[:port].to_i == listener_port}
 
         #when a match is not found a new probe is created.
-        expect(probes.length).to eq(2)
+        expect(probes.length).to eq(1)
 
         expect(found).not_to be_nil
         expect(found[:port].to_i).to eq(listener_port)

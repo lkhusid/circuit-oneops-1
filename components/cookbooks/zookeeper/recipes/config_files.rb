@@ -154,6 +154,7 @@ template_variables = {
   :zookeeper_hosts   => zookeeper_hosts,
   :myid              => my_zk_id,
   :leader_is_also_server => leader_is_also_server,
+  :zkVersion => node[:zookeeper][:version],
 }
 
 
@@ -207,3 +208,43 @@ template "/etc/zookeeper/zookeeper_jaas.conf" do
 end
 
 
+template "/etc/zookeeper/lock_zk.sh" do
+    source "lock_zk.sh.erb"
+    owner "root"
+    group "root"
+    mode "777"
+    variables   template_variables
+    only_if {node.zookeeper.enable_zk_sasl_plain == 'true'}
+end
+
+template "/etc/zookeeper/zookeeper_client_jaas.conf" do
+    source "zookeeper_client_jaas.conf.erb"
+    owner "root"
+    group "root"
+    mode "777"
+    variables   template_variables
+    only_if {node.zookeeper.enable_zk_sasl_plain == 'true'}
+end
+
+execute "#{node[:zookeeper][:enable_zk_sasl_plain] == 'true'}" do
+   command "/etc/zookeeper/lock_zk.sh"
+   action :run
+   only_if { File.exists?("/etc/zookeeper/lock_zk.sh") }
+end
+
+template "/etc/zookeeper/unlock_zk.sh" do
+    source "unlock_zk.sh.erb"
+    owner "root"
+    group "root"
+    mode "777"
+    variables   template_variables
+    only_if { File.exists?("/etc/zookeeper/lock_zk.sh") }
+    only_if {node.zookeeper.enable_zk_sasl_plain == 'false'}
+end
+
+execute "#{node[:zookeeper][:enable_zk_sasl_plain] == 'false'}" do
+   command "/etc/zookeeper/unlock_zk.sh"
+   action :run
+   only_if { File.exists?("/etc/zookeeper/lock_zk.sh") }
+   only_if {node.zookeeper.enable_zk_sasl_plain == 'false'}
+end

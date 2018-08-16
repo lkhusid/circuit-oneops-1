@@ -1,7 +1,4 @@
 require 'chef'
-
-
-require ::File.expand_path('../../../azure/constants', __FILE__)
 require ::File.expand_path('../../../azure_base/libraries/logger', __FILE__)
 
 # **Rubocop Suppression**

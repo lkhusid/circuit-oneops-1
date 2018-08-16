@@ -30,8 +30,11 @@ module SolrCollection
         raise obj['error']['msg']
       rescue JSON::ParserError => e
         Chef::Log.error("response.body.error.msg not found")
-        # If error.msg could not be raised, then assume response.msg as the error message
-        raise response.msg
+        # If error.msg could not be raised, then check response.msg
+        if response.msg != nil then
+          raise "Error \"#{response.msg}\" occurred while executing #{path}. Check oneops logs or Solr-server logs."
+        end
+        raise "Unable to execute #{path}. Check oneops logs or Solr-server logs."
       end
     end
 
@@ -1156,49 +1159,6 @@ module SolrCollection
                   "attr_name" => "name",
                   "attr_value" => "logDeleteQuery",
                   "elem_value" => "true"
-              }
-          ]
-      }
-
-      props_map["26_search_comp_ignore_commit_processor"] = {
-          "parent_elem_path" => "config/updateRequestProcessorChain",
-          "parent_elem_attrs" => {
-              "name" => "custom"
-          },
-          "parent_mandatory_children" => [
-              {
-                  "elem_name" => "processor",
-                  "attr_name" => "class",
-                  "attr_value" => "solr.LogUpdateProcessorFactory"
-              },
-              {
-                  "elem_name" => "processor",
-                  "attr_name" => "class",
-                  "attr_value" => "solr.DistributedUpdateProcessorFactory"
-              },
-              {
-                  "elem_name" => "processor",
-                  "attr_name" => "class",
-                  "attr_value" => "solr.RunUpdateProcessorFactory"
-              }
-          ],
-          "elem_name" => "processor",
-          "attr_name" => "class",
-          "attr_value" => "solr.IgnoreCommitOptimizeUpdateProcessorFactory",
-          "add_after_attr_name" => "",
-          "add_after_attr_value" => "",
-          "elem_children" => [
-              {
-                  "elem_name" => "int",
-                  "attr_name" => "name",
-                  "attr_value" => "statusCode",
-                  "elem_value" => 200
-              },
-              {
-                  "elem_name" => "str",
-                  "attr_name" => "name",
-                  "attr_value" => "responseMessage",
-                  "elem_value" => "Solr is ignoring explicit commit or optimize commands and relying only on the soft/hard commits provided in solrconfig.xml"
               }
           ]
       }

@@ -31,6 +31,7 @@ export KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:${CONFIG_DIR}/log4j.properti
 export JMX_PORT="<%= node['kafka']['kafka_jmx_port'] %>"
 export KAFKA_HEAP_OPTS="-Xmx<%= @heap_size %>M -Xms<%= @heap_size %>M"
 export KAFKA_JVM_PERFORMANCE_OPTS="<%= @kafka_jvm_performance_opts %>"
+export KAFKA_JMX_OPTS="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.rmi.port=11062"
 
 function setup() {
     cp $PUBSUB_CONFIG $TEMP_PUBSUB_CONFIG

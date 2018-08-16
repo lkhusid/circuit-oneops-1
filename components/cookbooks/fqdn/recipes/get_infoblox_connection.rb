@@ -36,6 +36,13 @@ def checkCxn(conn)
 end
 
 encoded = Base64.encode64("#{username}:#{password}").gsub("\n","")
+
+http_proxy = ENV['http_proxy']
+https_proxy = ENV['https_proxy']
+
+ENV['http_proxy'] = ''
+ENV['https_proxy'] = ''
+
 conn = Excon.new('https://'+host,
   :headers => {'Authorization' => "Basic #{encoded}"}, :ssl_verify_peer => false)
 
@@ -44,3 +51,6 @@ checkCxn(conn)
 
 # Set the connection object
 node.set["infoblox_conn"] = conn
+ENV['http_proxy'] = http_proxy
+ENV['https_proxy'] = https_proxy
+

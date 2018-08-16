@@ -131,18 +131,18 @@ resource "kafka",
                      'JmxProcessDown' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1),'unhealthy')
                  }
              },
-#               'kafkazkconn' => {:description => 'KafkaZKConn',
-#                  :source => '',
-#                  :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
-#                  :cmd => 'check_kafka_zk_conn',
-#                  :cmd_line => '/opt/nagios/libexec/check_kafka_zk_conn.sh',
-#                  :metrics => {
-#                      'up' => metric(:unit => '%', :description => 'Percent Up'),
-#                  },
-#                  :thresholds => {
-#                      'KafkaZookeeperConnection' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
-#                  }
-#              },
+              'kafkazkconn' => {:description => 'KafkaZKConn',
+                 :source => '',
+                 :chart => {'min' => '0', 'max' => '100', 'unit' => 'Percent'},
+                 :cmd => 'check_kafka_zk_conn',
+                 :cmd_line => '/opt/nagios/libexec/check_kafka_zk_conn.sh',
+                 :metrics => {
+                     'up' => metric(:unit => '%', :description => 'Percent Up'),
+                 },
+                 :thresholds => {
+                     'KafkaZookeeperConnection' => threshold('1m', 'avg', 'up', trigger('<=', 98, 1, 1), reset('>', 95, 1, 1))
+                 }
+              },
               'KafkaLog' => {:description => 'Kafka Log',
                  :source => '',
                  :chart => {'min' => 0, 'unit' => ''},

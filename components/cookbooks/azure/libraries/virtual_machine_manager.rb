@@ -65,6 +65,16 @@ module AzureCompute
       @storage_profile = AzureCompute::StorageProfile.new(@creds)
       @network_profile = AzureNetwork::NetworkInterfaceCard.new(@creds)
       @availability_set_response = @compute_client.availability_sets.get(@resource_group_name, @availability_set_name)
+
+      @accelerated_networking = if (defined?(node[:workorder][:rfcCi][:ciAttributes][:accelerated_flag]))
+        node[:workorder][:rfcCi][:ciAttributes][:accelerated_flag]
+      else
+        false
+      end
+
+      if @accelerated_networking.eql? 'true'
+        OOLog.fatal "Accelerated Network is only available for CentOS 7.4" unless @ostype.eql? 'centos-7.4'
+      end
     end
 
     def create_or_update_vm
@@ -79,7 +89,6 @@ module AzureCompute
       @storage_profile.size_id = @size_id
       @storage_profile.ci_id = @platform_ci_id
       @storage_profile.server_name = @server_name
-
 
       if (defined?(node[:workorder][:rfcCi][:ciAttributes][:private_ip]) && node[:workorder][:rfcCi][:rfcAction] == 'update')
         @network_profile.flag = true
@@ -194,7 +203,8 @@ module AzureCompute
                                                       (@compute_service[:subnet_address]).split(','),
                                                       (@compute_service[:dns_ip]).split(','),
                                                       @ip_type,
-                                                      @secgroup_id)
+                                                      @secgroup_id,
+                                                      @accelerated_networking)
 
       vm_hash[:network_interface_card_ids] = [nic_id]
 

@@ -128,19 +128,6 @@ module AzureNetwork
       frontend_ipconfig
     end
 
-    def self.create_probe(probe_name, protocol, port, interval_secs, num_probes, request_path)
-      # Probes, probes enable you to keep track of the health of VM instances.
-      # If a health probe fails, the VM instance will be taken out of rotation automatically.
-      {
-          name: probe_name,
-          protocol: protocol,
-          request_path: request_path,
-          port: port,
-          interval_in_seconds: interval_secs,
-          number_of_probes: num_probes
-      }
-    end
-
     def self.create_lb_rule(lb_rule_name, load_distribution, protocol, frontend_port, backend_port, probe_id, frontend_ipconfig_id, backend_address_pool_id)
       # Load Balancing Rule: a rule property maps a given frontend IP and port combination to a set
       # of backend IP addresses and port combination.
@@ -188,21 +175,17 @@ module AzureNetwork
     end
 
     def self.get_probe_for_listener(listener, probes)
+      # Find probes matching by listener_port, if more than 1 found use default
+      found = probes.select{ |p| p[:listener_port].to_i == listener[:iport].to_i }
+      default_found = found.detect{ |p| p[:default] }
 
-      listener_backend_protocol = listener[:iprotocol]
-      listener_backend_port = listener[:iport].to_i
-
-      #ports should match
-      found = probes.select {|p| p[:port].to_i == listener_backend_port}
-
-      if(found.empty?)
-        if listener_backend_protocol.upcase == 'HTTP'
-          probes.detect {|p| p[:protocol].upcase == 'HTTP'}
-        end
-      else
-        return found[0]
+      if found.size > 1 && default_found
+        default_found
+      elsif found.size > 1 && !default_found
+        raise 'Multiple health probes are requested, but no default probe is specified.'
+      elsif found.size == 1
+        found[0]
       end
-
     end
 
     def get_backend_ip_configurations(resource_group_name, lb_name, azure_creds, backend_address_pool_id = nil)

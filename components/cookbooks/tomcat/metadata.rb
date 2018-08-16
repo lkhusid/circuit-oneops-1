@@ -33,7 +33,7 @@ attribute 'version',
               :help => 'Version of Tomcat',
               :category => '1.Global',
               :order => 4,
-              :form => {'field' => 'select', 'options_for_select' => [['7.0.82', '7.0.82'], ['8.5.23', '8.5.23']]},
+              :form => {'field' => 'select', 'options_for_select' => [['7.0.82', '7.0.82'], ['7.0.88', '7.0.88'], ['8.5.23', '8.5.23'], ['8.5.31', '8.5.31']]},
               :pattern => "[0-9\.]+"
           }
 

@@ -19,6 +19,7 @@ else
 end
 
 host = cloud_service[:host]
+node.set["netscaler_host_ip"] = host
 Chef::Log.info("netscaler: #{host}")
 
 encoded = Base64.encode64("#{cloud_service[:username]}:#{cloud_service[:password]}").gsub("\n","")

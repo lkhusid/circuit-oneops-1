@@ -362,6 +362,16 @@ attribute 'private_ipv6',
     :order => 11
   }
 
+attribute 'accelerated_flag',
+  :description => "Enable Accelerated Networking",
+  :default => 'false',
+  :format => {
+    :help => 'Enables accelerated networking for a NIC.',
+    :category => '4.Networking',
+    :form => { 'field' => 'checkbox' },
+    :order => 12
+  }
+
 attribute 'is_baremetal',
   :description => "Baremetal Compute",
   :grouping => 'bom',

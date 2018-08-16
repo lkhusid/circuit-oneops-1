@@ -90,6 +90,15 @@ context 'get_nameservers' do
       it 'should be valid ip-address' do
         expect(ip).to match(ip4_regex)
       end
+
+      it 'should be reachable' do
+        port_number = 53
+        nc_command = "nc -v #{ip} #{port_number} -i 2 2>&1"
+        result = Mixlib::ShellOut.new(nc_command)
+        result.run_command
+        expected_response = "Ncat: Connected to #{ip}:#{port_number}."
+        expect(result.stdout.to_s).to include(expected_response)
+      end
     end
   end
 end

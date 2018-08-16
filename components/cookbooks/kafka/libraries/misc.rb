@@ -1,3 +1,6 @@
+require 'json'
+
+
 def get_graphite_host
   graphite_endpoint = nil
   graphite_url = node.workorder.rfcCi.ciAttributes.graphite_url
@@ -221,6 +224,7 @@ end
 def setup_ssl_get_props
   ssl_props = {}
   attrs = node.workorder.rfcCi.ciAttributes
+
   if attrs.version.eql?('0.8.2.1')
     ssl_props['advertised.host.name'] = get_full_hostname(node[:hostname])
   else
@@ -296,7 +300,18 @@ def setup_ssl_get_props
     elsif saslPlainEnabled
       ssl_props['advertised.listeners'] = ssl_props['listeners'] = "SASL_PLAINTEXT://"+ hostname +":9092"
     elsif plainTextEnabled
+
       ssl_props['advertised.listeners'] = ssl_props['listeners'] =  "PLAINTEXT://:9092"
+      
+      if JSON.parse(attrs["kafka_properties"])["listeners"].to_s == "host"
+        ssl_props['listeners'] =  "PLAINTEXT://"+ hostname +":9092"
+      end
+
+      if JSON.parse(attrs["kafka_properties"])["advertised.listeners"].to_s == "host"
+        ssl_props['advertised.listeners'] =  "PLAINTEXT://"+ hostname +":9092"
+      end
+
+      
     else
       Chef::Log.error("For plaintext messaging include Port 9092 in secgroup. For SSL include port 9093 in secgroup.")
       exit 1

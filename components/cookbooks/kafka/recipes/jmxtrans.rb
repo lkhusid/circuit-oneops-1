@@ -25,5 +25,5 @@ end
 # jmxtrans service
 service "jmxtrans" do
   action [:restart, :enable]
-  supports :status => true, :restart => true, :reload => true
+  supports :status => true, :restart => true, :start => true, :stop => true
 end

@@ -40,71 +40,112 @@ module AzureLb
     end
 
     def validate_config
-      validate_ecvs_and_listeners_config
       validate_load_distribution_config
     end
 
     def get_ecvs_from_wo
-      ci = {}
       ci = @node['workorder'].key?('rfcCi') ? @node['workorder']['rfcCi'] : @node['workorder']['ci']
-
       ecvs = []
+      interval_secs = 15
+      num_probes = 3
       ecvs_raw = JSON.parse(ci['ciAttributes']['ecv_map'])
-      if ecvs_raw && listeners
-        interval_secs = 15
-        num_probes = 3
 
-        ecvs_raw.each do |item|
-          # each item is an array
-          port = item[0].to_i
-          pathParts = item[1].split(' ')
-          request_path = pathParts[1]
+      # Iterate through listeners, we need to create a default TCP health probe if
+      # one does not exist
+      listeners.each do |l|
+        the_probe = nil
+        ecvs_raw.each_pair do |k,v|
 
-          probe_name = "Probe#{port}"
-
-          the_listener = nil
-          listeners.each do |listener|
-            listen_port = listener[:iport].to_i
-            if listen_port == port
-              the_listener = listener
-              break
-            end
+          if k == l[:iport]
+            the_probe = v
+            break
           end
-
-          if the_listener && (the_listener[:iprotocol].upcase == 'TCP' || the_listener[:iprotocol].upcase == 'HTTPS')
-            protocol = 'Tcp'
-            request_path = nil # If Protocol is set to TCP, this value MUST BE NULL.
-          else
-            protocol = 'Http'
-          end
-
-          ecvs.push(
-              probe_name: probe_name,
-              interval_secs: interval_secs,
-              num_probes: num_probes,
-              port: port,
-              protocol: protocol,
-              request_path: request_path
-          )
         end
 
-        #if a listener, with Tcp or https as backend protocol, doesn't have a matching ecv then create a new Tcp ecv for it
-        listeners.each do |l|
-          has_ecv = ecvs.any? {|ecv| ecv[:port].to_i == l[:iport].to_i}
-          if !has_ecv && (l[:iprotocol].upcase == 'TCP' || l[:iprotocol].upcase == 'HTTPS')
+        if the_probe
+          # Check if value in ecv_map actually contains hash, then treat it accordingly
+          begin
+            json_arr = JSON.parse(the_probe)
+            # if what we have is a hash - convert to 1-item array
+            json_arr = [json_arr] if json_arr.is_a?(Hash)
+          rescue JSON::ParserError => e
+            json_arr = nil
+          end
+
+          if json_arr
+            mandatory_keys = %w[proto port]
+            json_arr.each do |i|
+              # Check for mandatory keys
+              missing_keys = mandatory_keys - i.keys
+              unless missing_keys.empty?
+                raise "The JSON value in ecv_map is missing mandatory keys: #{missing_keys.inspect}"
+              end
+
+              probe = {
+                :listener_port => l[:iport],
+                :name                => ['Probe', i['proto'], i['port'].to_s].join('-'),
+                :protocol            => i['proto'],
+                :port                => i['port'],
+                :interval_in_seconds => i['interval_sec'] || interval_secs,
+                :number_of_probes    => i['num_probes'] || num_probes,
+                :default             => i['default'] || (json_arr.size == 1 ? true : false),
+                :request_path        => i['req_path']
+              }
+              ecvs.push(probe)
+            end
+          else
+            protocol = 'Tcp'
+            req_path = nil
+            if l[:iprotocol].upcase == 'HTTP'
+              protocol = 'Http'
+              req_path = the_probe.split(' ')[1]
+            end
+
             ecvs.push(
-                probe_name: "Probe#{l[:iport]}",
-                interval_secs: interval_secs,
-                num_probes: num_probes,
-                port: l[:iport].to_i,
-                protocol: 'Tcp',
-                request_path: nil
+              :listener_port       => l[:iport],
+              :name                => ['Probe', protocol, l[:iport].to_s].join('-'),
+              :interval_in_seconds => interval_secs,
+              :number_of_probes    => num_probes,
+              :port                => l[:iport],
+              :protocol            => protocol,
+              :request_path        => req_path
             )
           end
+        else
+          # Create a default "HTTP-GET /" probe for http listener,
+          # tcp probe for everything else
+          protocol = l[:iprotocol].upcase == 'HTTP' ? 'Http' : 'Tcp'
+          req_path = l[:iprotocol].upcase == 'HTTP' ? '/' : nil
+          ecvs.push(
+            :listener_port       => l[:iport],
+            :name                => ['Probe', protocol, l[:iport].to_s].join('-'),
+            :interval_in_seconds => interval_secs,
+            :number_of_probes    => num_probes,
+            :port                => l[:iport].to_i,
+            :protocol            => protocol,
+            :request_path        => req_path
+          )
+        end #if the_probe
+      end #listeners.each do |l|
+
+
+      # Do not add probes not associated with any listeners, they're useless
+=begin
+      ecvs_raw.each_pair do |k,v|
+        found = listeners.detect{ |l| l[:iport] == k }
+        if !found
+          ecvs.push(
+            :listener_port       => k,
+            :name                => ['NoListenerProbe', 'Tcp', k.to_s,].join('-'),
+            :interval_in_seconds => interval_secs,
+            :number_of_probes    => num_probes,
+            :port                => k,
+            :protocol            => 'Tcp',
+            :request_path        => nil
+          )
         end
-
       end
-
+=end
       ecvs
     end
 
@@ -185,22 +226,12 @@ module AzureLb
       port
     end
 
-    def validate_ecvs_and_listeners_config
-      http_listener_exists = listeners.any? {|l| l[:iprotocol].upcase == 'HTTP'}
-
-      if http_listener_exists
-        http_ecv_exists = ecvs.any? {|e| e[:protocol].upcase == 'HTTP'}
-        OOLog.fatal('Bad LB configuration! at least one http ecv should be present when there is a http listener') unless http_ecv_exists
-      end
-    end
-
     def validate_load_distribution_config
       ci_attribs = @node['workorder']['rfcCi']['ciAttributes']
       lb_method = ci_attribs['lbmethod']
       stickiness = ci_attribs['stickiness']
       persistence_type = ci_attribs['persistence_type']
       help_doc_link = 'http://oneops.com/user/design/lb-component.html'
-
 
       if (lb_method != 'roundrobin') && (lb_method != 'sourceiphash')
         OOLog.fatal("Bad LB configuration! #{lb_method} is not supported on azure. please look at #{help_doc_link} for supported load distribution methods on azure")
@@ -292,6 +323,6 @@ module AzureLb
       rfcCi
     end
 
-    private :get_ecvs_from_wo, :get_listeners_from_wo, :get_compute_nodes_from_wo, :get_allow_rule_port, :validate_ecvs_and_listeners_config, :validate_load_distribution_config
+    private :get_ecvs_from_wo, :get_listeners_from_wo, :get_compute_nodes_from_wo, :get_allow_rule_port, :validate_load_distribution_config
   end
 end

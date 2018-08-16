@@ -11,9 +11,6 @@ Utils.set_proxy(node.workorder.payLoad.OO_CLOUD_VARS)
 # get platform resource group and availability set
 include_recipe 'azure::get_platform_rg_and_as'
 
-# get the azure token for making rest api calls to azure
-include_recipe 'azuredns::get_azure_token'
-
 cloud_name = node['workorder']['cloud']['ciName']
 zone_name =
     node['workorder']['services']['dns'][cloud_name]['ciAttributes']['zone']
@@ -21,7 +18,7 @@ zone_name =
 cloud_service = node['workorder']['services']['dns'][cloud_name]
 service_attrs = cloud_service['ciAttributes']
 
-dns = AzureDns::DNS.new(node['platform-resource-group'], node['azure_rest_token'], service_attrs)
+dns = AzureDns::DNS.new(node['platform-resource-group'], service_attrs)
 
 # ex) customer_domain: env.asm.org.oneops.com
 customer_domain = dns.normalize_customer_domain(node.customer_domain)

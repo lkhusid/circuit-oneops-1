@@ -5,7 +5,7 @@ import commands
 import json
 
 try:
-    conn = httplib.HTTPConnection("169.254.169.254". timeout=10)
+    conn = httplib.HTTPConnection("169.254.169.254", timeout=10)
     conn.request("GET", "/metadata/instance/compute?api-version=2017-04-02", headers={'Metadata': 'true'})
     r = conn.getresponse()
     if r.status != 200: raise Exception("Failed http request")

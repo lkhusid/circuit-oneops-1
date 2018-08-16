@@ -130,21 +130,25 @@ class ReplicaDistributor
     compute_ip_to_cloud_id_map = Hash.new
     puts "computes in get_compute_ip_to_cloud_id_map = #{computes}"
     computes.each do |compute|
-      if cloud_provider == 'azure'
-        # TODO: fail if zone info missing
-        zone_info = JSON.parse(compute['ciAttributes']['zone'])
-        puts "zone_info = #{zone_info}"
-        fault_domain = zone_info['fault_domain']
-        update_domain = zone_info['update_domain']
+      if (compute['ciAttributes'].key?("private_ip"))
+        if cloud_provider == 'azure'
+          # TODO: fail if zone info missing
+          zone_info = JSON.parse(compute['ciAttributes']['zone'])
+          puts "zone_info = #{zone_info}"
+          fault_domain = zone_info['fault_domain']
+          update_domain = zone_info['update_domain']
+        else
+          ciName = compute['ciName']
+          # 'compute-34951930-1' => "34951930"
+          fault_domain = ciName.split('-')[1]
+          # 'compute-34951930-1' => "1"
+          update_domain = ciName.split('-')[2]
+        end
+        cloudId = "#{fault_domain}___#{update_domain}"
+        compute_ip_to_cloud_id_map[compute['ciAttributes']['private_ip']] = cloudId
       else
-        ciName = compute['ciName']
-        # 'compute-34951930-1' => "34951930"
-        fault_domain = ciName.split('-')[1]
-        # 'compute-34951930-1' => "1"
-        update_domain = ciName.split('-')[2]
+        puts "compute - #{compute} - doesn't exist as the private IP value doesn't exist."
       end
-      cloudId = "#{fault_domain}___#{update_domain}"
-      compute_ip_to_cloud_id_map[compute['ciAttributes']['private_ip']] = cloudId
     end
     return compute_ip_to_cloud_id_map
   end
